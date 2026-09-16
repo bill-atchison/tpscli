@@ -1,8 +1,10 @@
   PROGRAM
   INCLUDE('StringTheory.inc'),ONCE
   INCLUDE('tpsOut.inc'),ONCE
+  INCLUDE('tpsSchema.inc'),ONCE
   MAP
     ParseArgs()
+    DumpDef()
   END
 
 Out        tpsOut
@@ -11,6 +13,8 @@ Owner        STRING(64)
 Table        BYTE
 ParseOnly    BYTE
 LimitDefault LONG(1000)
+WantDumpDef  BYTE
+DumpDefPath  STRING(260)
 Sql          &STRING
            END
 TPSCLI_VERSION  EQUATE('0.1.0')
@@ -18,6 +22,7 @@ TPSCLI_VERSION  EQUATE('0.1.0')
   CODE
   Out.Init()
   ParseArgs()
+  IF Opt.WantDumpDef THEN DumpDef().
   IF Opt.Sql &= NULL OR LEN(CLIP(Opt.Sql)) = 0
     Out.Fail('SYNTAX', 'No SQL statement given. Pass it as the first argument or on stdin.', 1)
   END
@@ -28,6 +33,8 @@ ParseArgs  PROCEDURE()
 n     LONG
 a     &STRING
 seen  BYTE
+x     LONG
+y     LONG
   CODE
   LOOP n = 1 TO 4096                  ! COMMAND(n) returns '' past the last argument, which ends the loop; 4096 is a guard, not a cutoff
     a &= NEW STRING(LEN(CLIP(COMMAND(n))))
@@ -50,6 +57,16 @@ seen  BYTE
     OF '--version'
       Out.Line('{{ "ok": true, "op": null, "version": "' & TPSCLI_VERSION & '", "complete": true }')
       HALT(0)
+    OF '--selftest'
+      x = 2147483647; x += 1;  Out.Line('wrap=' & x)
+      y = -2147483648; y -= 1; Out.Line('wrap2=' & y)
+      Out.Line('bshift=' & BSHIFT(1, 31))
+      HALT(0)
+    OF '--dump-def'
+      n += 1
+      Opt.DumpDefPath = COMMAND(n)
+      IF Opt.DumpDefPath = '' THEN Out.Fail('SYNTAX', '--dump-def needs a path', 1).
+      Opt.WantDumpDef = 1
     ELSE
       IF SUB(a, 1, 2) = '--' THEN Out.Fail('SYNTAX', 'Unknown option ' & CLIP(a), 1).
       IF seen THEN Out.Fail('SYNTAX', 'Only one statement per invocation', 1).
@@ -62,3 +79,27 @@ seen  BYTE
     Opt.Sql &= NEW STRING(LEN(CLIP(Out.ReadStdin())))
     Opt.Sql = Out.ReadStdin()   ! second call returns the buffered copy, see tpsOut.ReadStdin
   END
+
+DumpDef  PROCEDURE()
+Sch    tpsSchema
+rc     LONG
+n      LONG
+pos    LONG
+c      BYTE
+hexln  StringTheory
+  CODE
+  rc = Sch.Load(Opt.DumpDefPath, Opt.Owner)
+  IF rc <> 0 THEN Out.Fail(CLIP(Sch.Err), CLIP(Sch.ErrMsg), 2).
+  n = LEN(Sch.Def)
+  Out.Line('len=' & n & ' table=' & Sch.TableNo & ' encrypted=' & Sch.Encrypted)
+  pos = 1
+  LOOP WHILE pos <= n
+    hexln.Free()
+    LOOP WHILE pos <= n AND hexln.Length() < 64
+      c = VAL(Sch.Def[pos])
+      hexln.Append(SUB('0123456789abcdef', BSHIFT(c,-4)+1, 1) & SUB('0123456789abcdef', BAND(c,0Fh)+1, 1))
+      pos += 1
+    END
+    Out.Line(hexln.GetValue())
+  END
+  HALT(0)

@@ -20,6 +20,7 @@
     <Library Include="ClaDFl.lib" />
     <Compile Include="tpscli.clw" />
     <Compile Include="tpsOut.clw" />
+    <Compile Include="tpsSchema.clw" />
   </ItemGroup>
   <Import Project="$(ClarionBinPath)\SoftVelocity.Build.Clarion.targets" />
 </Project>
