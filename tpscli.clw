@@ -67,6 +67,7 @@ y     LONG
       Opt.DumpDefPath = COMMAND(n)
       IF Opt.DumpDefPath = '' THEN Out.Fail('SYNTAX', '--dump-def needs a path', 1).
       Opt.WantDumpDef = 1
+      seen = 1
     ELSE
       IF SUB(a, 1, 2) = '--' THEN Out.Fail('SYNTAX', 'Unknown option ' & CLIP(a), 1).
       IF seen THEN Out.Fail('SYNTAX', 'Only one statement per invocation', 1).
