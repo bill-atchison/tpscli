@@ -2,6 +2,7 @@
 _TpsSchemaPresent_ EQUATE(1)
   INCLUDE('StringTheory.inc'),ONCE
   INCLUDE('DynFile.inc'),ONCE
+  INCLUDE('tpsOut.inc'),ONCE
 
 SchFieldQ  QUEUE,TYPE
 Nbr          LONG        ! 1-based, definition order
@@ -83,5 +84,9 @@ Decrypt64    PROCEDURE(LONG o)
 Walk         PROCEDURE(),LONG                ! finds and merges 0xFA records
 Bad          PROCEDURE(STRING why),LONG      ! sets DEFINITION_UNREADABLE, returns 2
 DeRle        PROCEDURE(LONG o, LONG clen, StringTheory outp),LONG
+Parse        PROCEDURE(),LONG                ! fills Fields/Keys/Comps/Memos from Def
+SchemaDumpJson PROCEDURE(tpsOut o),STRING    ! oracle vocabulary, hidden --dump-schema
+DescribeJson PROCEDURE(tpsOut o, LONG records),STRING   ! public DESCRIBE shape, spec §4
+FindField    PROCEDURE(STRING label),LONG    ! case-insensitive, 0 = not found
            END
   _EndTpsSchema_

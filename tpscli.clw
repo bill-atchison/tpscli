@@ -5,6 +5,7 @@
   MAP
     ParseArgs()
     DumpDef()
+    DoDescribe()
   END
 
 Out        tpsOut
@@ -15,6 +16,7 @@ ParseOnly    BYTE
 LimitDefault LONG(1000)
 WantDumpDef  BYTE
 DumpDefPath  STRING(260)
+WantDumpSchema BYTE
 Sql          &STRING
            END
 TPSCLI_VERSION  EQUATE('0.1.0')
@@ -26,6 +28,7 @@ TPSCLI_VERSION  EQUATE('0.1.0')
   IF Opt.Sql &= NULL OR LEN(CLIP(Opt.Sql)) = 0
     Out.Fail('SYNTAX', 'No SQL statement given. Pass it as the first argument or on stdin.', 1)
   END
+  IF UPPER(SUB(LEFT(Opt.Sql), 1, 8)) = 'DESCRIBE' THEN DoDescribe().
   ! Tasks 6-9 replace this line with parse + execute.
   Out.Fail('SYNTAX', 'Parser not implemented yet', 1)
 
@@ -68,6 +71,7 @@ y     LONG
       IF Opt.DumpDefPath = '' THEN Out.Fail('SYNTAX', '--dump-def needs a path', 1).
       Opt.WantDumpDef = 1
       seen = 1
+    OF '--dump-schema'    ; Opt.WantDumpSchema = 1
     ELSE
       IF SUB(a, 1, 2) = '--' THEN Out.Fail('SYNTAX', 'Unknown option ' & CLIP(a), 1).
       IF seen THEN Out.Fail('SYNTAX', 'Only one statement per invocation', 1).
@@ -102,5 +106,34 @@ hexln  StringTheory
       pos += 1
     END
     Out.Line(hexln.GetValue())
+  END
+  HALT(0)
+
+! Temporary DESCRIBE dispatch (Task 4); Task 6 replaces this with the real parser.
+DoDescribe  PROCEDURE()
+sql   StringTheory
+lb    LONG
+rb    LONG
+path  STRING(260)
+sch   tpsSchema
+rc    LONG
+  CODE
+  sql.SetValue(Opt.Sql)
+  lb = INSTRING('[', sql.GetValue(), 1, 1)
+  IF lb > 0 THEN rb = INSTRING(']', sql.GetValue(), 1, lb+1).
+  IF lb = 0 OR rb = 0
+    Out.Fail('SYNTAX', 'DESCRIBE requires a bracketed file path', 1)
+  END
+  path = sql.Sub(lb+1, rb-lb-1)
+  rc = sch.Load(CLIP(path), Opt.Owner)
+  IF rc = 0 THEN rc = sch.Parse().
+  IF rc <> 0
+    Out.Line('{{ "ok": false, "op": "describe", "error": {{ "code": ' & Out.JStr(CLIP(sch.Err)) & ', "message": ' & Out.JStr(CLIP(sch.ErrMsg)) & ' }, "complete": true }')
+    HALT(2)
+  END
+  IF Opt.WantDumpSchema
+    Out.Line(sch.SchemaDumpJson(Out))
+  ELSE
+    Out.Line(sch.DescribeJson(Out, -1))
   END
   HALT(0)

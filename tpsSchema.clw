@@ -1,6 +1,10 @@
   MEMBER()
   INCLUDE('tpsSchema.inc'),ONCE
   MAP
+    SchFieldOffsetEnd(tpsSchema s, LONG i),LONG
+    SchFieldOffsetOf(tpsSchema s, LONG i),LONG
+    SchEmitFields(tpsSchema s, StringTheory js, LONG parentNbr, STRING dotted)
+    SchEmitOneField(tpsSchema s, StringTheory js, LONG idx, STRING dotted)
   END
 Kw    LONG,DIM(16)          ! decryption key schedule, module static (OVER is not allowed on class members)
 Kb    STRING(64),OVER(Kw)
@@ -293,3 +297,300 @@ merged   StringTheory
   SELF.Def = merged.GetValue()
   LOOP i = 1 TO RECORDS(parts); GET(parts, i); DISPOSE(parts.Data); END
   RETURN 0
+
+! ---- Task 4: definition parser and DESCRIBE parity ----
+
+SchFieldOffsetEnd PROCEDURE(tpsSchema s, LONG i)
+  CODE
+  GET(s.Fields, i)
+  RETURN s.Fields.Offset + s.Fields.Bytes
+
+SchFieldOffsetOf PROCEDURE(tpsSchema s, LONG i)
+  CODE
+  GET(s.Fields, i)
+  RETURN s.Fields.Offset
+
+tpsSchema.Parse PROCEDURE()
+o       LONG
+nF      LONG
+nM      LONG
+nK      LONG
+i       LONG
+j       LONG
+full    STRING(128)
+cpos    LONG
+mask    STRING(64)
+kflags  LONG
+nComp   LONG
+fno     LONG
+cflag   LONG
+saveBuf &STRING
+saveSz  LONG
+target  LONG
+myOfs   LONG
+groupEnd LONG
+  CODE
+  saveBuf &= SELF.buf; saveSz = SELF.size; SELF.Overrun = 0
+  SELF.buf &= SELF.Def; SELF.size = LEN(SELF.Def)
+  SELF.DriverVer = SELF.U16(0); SELF.RecLen = SELF.U16(2)
+  nF = SELF.U16(4); nM = SELF.U16(6); nK = SELF.U16(8); o = 10
+  LOOP i = 1 TO nF
+    CLEAR(SELF.Fields)
+    SELF.Fields.Nbr = i
+    SELF.Fields.TpsType = SELF.U8(o); o += 1
+    SELF.Fields.Offset  = SELF.U16(o); o += 2
+    full = SELF.ZStr(o)
+    cpos = INSTRING(':', full, 1, 1)
+    IF cpos
+      IF SELF.Prefix = '' THEN SELF.Prefix = SUB(full, 1, cpos-1).
+      SELF.Fields.Label = SUB(full, cpos+1, LEN(CLIP(full))-cpos)
+    ELSE
+      SELF.Fields.Label = full
+    END
+    SELF.Fields.Elements = SELF.U16(o); o += 2
+    SELF.Fields.Bytes    = SELF.U16(o); o += 2
+    SELF.Fields.Over     = CHOOSE(SELF.U16(o) = 1, -1, 0); o += 2     ! resolved below
+    o += 2                                                              ! ordinal, redundant
+    IF SELF.Fields.Elements < 1 THEN SELF.Fields.Elements = 1.
+    CASE SELF.Fields.TpsType
+    OF 01h ; SELF.Fields.Type = 'BYTE'
+    OF 02h ; SELF.Fields.Type = 'SHORT'
+    OF 03h ; SELF.Fields.Type = 'USHORT'
+    OF 04h ; SELF.Fields.Type = 'DATE'
+    OF 05h ; SELF.Fields.Type = 'TIME'
+    OF 06h ; SELF.Fields.Type = 'LONG'
+    OF 07h ; SELF.Fields.Type = 'ULONG'
+    OF 08h ; SELF.Fields.Type = 'SREAL'
+    OF 09h ; SELF.Fields.Type = 'REAL'
+    OF 0Ah ; SELF.Fields.Type = 'DECIMAL'
+             SELF.Fields.Places = SELF.U8(o); SELF.Fields.Digits = SELF.U8(o+1); o += 2
+             SELF.Fields.Size = 2 * SELF.Fields.Digits - 1  ! the file stores packed-decimal storage bytes, not digit count: bytes=(digits+2)/2
+             ! No PDECIMAL in this corpus (the driver rejects it at CREATE); IsPacked stays 0.
+    OF 12h OROF 13h OROF 14h
+             SELF.Fields.Type = CHOOSE(SELF.Fields.TpsType = 12h, 'STRING', CHOOSE(SELF.Fields.TpsType = 13h, 'CSTRING', 'PSTRING'))
+             SELF.Fields.Size = SELF.U16(o); o += 2
+             mask = SELF.ZStr(o)
+             IF mask = '' THEN o += 1 ELSE SELF.Fields.Picture = mask.   ! empty mask: file carries one stray NUL past ZStr's own terminator
+    OF 16h ; SELF.Fields.Type = 'GROUP'
+    ELSE
+      SELF.Err = 'UNSUPPORTED_FIELD_TYPE'
+      SELF.ErrMsg = 'Field ' & CLIP(SELF.Fields.Label) & ' has TPS type code ' & SELF.Fields.TpsType & ' which tpscli does not support'
+      SELF.buf &= saveBuf; SELF.size = saveSz
+      RETURN 2
+    END
+    IF SELF.Fields.Size = 0 AND SELF.Fields.Elements > 0    ! DynFile.Size for a scalar/GROUP field: bytes per element
+      SELF.Fields.Size = SELF.Fields.Bytes / SELF.Fields.Elements
+    END
+    ADD(SELF.Fields)
+  END
+  ! group membership, member counts, OVER targets
+  LOOP i = 1 TO RECORDS(SELF.Fields)
+    GET(SELF.Fields, i)
+    IF SELF.Fields.Type = 'GROUP'
+      SELF.Fields.Fields = 0
+      groupEnd = SELF.Fields.Offset + SELF.Fields.Bytes   ! captured before the inner GET moves the cursor
+      LOOP j = i+1 TO RECORDS(SELF.Fields)
+        GET(SELF.Fields, j)
+        IF SELF.Fields.Offset >= groupEnd THEN BREAK.
+        ! nearest enclosing wins: a later (inner) group has the larger number
+        IF SELF.Fields.Parent = 0 OR SELF.Fields.Parent < i THEN SELF.Fields.Parent = i; PUT(SELF.Fields).
+        GET(SELF.Fields, i); SELF.Fields.Fields += 1; PUT(SELF.Fields)
+      END
+    END
+    GET(SELF.Fields, i)
+    IF SELF.Fields.Over = -1
+      target = 0; myOfs = SELF.Fields.Offset
+      LOOP j = i-1 TO 1 BY -1
+        GET(SELF.Fields, j)
+        IF SELF.Fields.Offset = myOfs THEN target = j; BREAK.
+      END
+      GET(SELF.Fields, i); SELF.Fields.Over = target; PUT(SELF.Fields)
+      IF target = 0 THEN RETURN SELF.Bad('OVER field ' & CLIP(SELF.Fields.Label) & ' has no field at its offset').
+    END
+  END
+  LOOP i = 1 TO nM
+    CLEAR(SELF.Memos); SELF.Memos.Nbr = i
+    full = SELF.ZStr(o)
+    IF full = ''
+      IF SELF.U8(o) <> 1
+        RETURN SELF.Bad('memo entry marker byte is not 0x01')
+      END
+      o += 1
+    END
+    full = SELF.ZStr(o)
+    cpos = INSTRING(':', full, 1, 1)
+    SELF.Memos.Label = CHOOSE(cpos > 0, SUB(full, cpos+1, LEN(CLIP(full))-cpos), full)
+    SELF.Memos.Bytes = SELF.U16(o); o += 2
+    SELF.Memos.Flags = SELF.U16(o); o += 2
+    SELF.Memos.IsBlob = CHOOSE(BAND(SELF.Memos.Flags, 4) <> 0, 1, 0)
+    SELF.Memos.Binary = CHOOSE(BAND(SELF.Memos.Flags, 2) <> 0, 1, 0)   ! bit 0x02 distinguishes BINARY (Notes=0x1, Bin=0x3, Pic/BLOB=0x5)
+    ADD(SELF.Memos)
+  END
+  LOOP i = 1 TO nK
+    CLEAR(SELF.Keys); SELF.Keys.Nbr = i
+    full = SELF.ZStr(o)
+    IF full = ''
+      IF SELF.U8(o) <> 1
+        RETURN SELF.Bad('key entry marker byte is not 0x01')
+      END
+      o += 1
+    END
+    full = SELF.ZStr(o)
+    cpos = INSTRING(':', full, 1, 1)
+    SELF.Keys.Label = CHOOSE(cpos > 0, SUB(full, cpos+1, LEN(CLIP(full))-cpos), full)
+    kflags = SELF.U8(o); o += 1
+    SELF.Keys.Flags   = kflags
+    SELF.Keys.Dup     = BAND(kflags, 01h) / 01h
+    SELF.Keys.Opt     = BAND(kflags, 02h) / 02h
+    SELF.Keys.NoCase  = BAND(kflags, 04h) / 04h
+    SELF.Keys.Primary = BAND(kflags, 10h) / 10h
+    SELF.Keys.IsKey   = CHOOSE(BAND(kflags, 60h) = 0, 1, 0)
+    IF NOT SELF.Keys.IsKey THEN SELF.Keys.Dup = 1.        ! INDEX always allows duplicates
+    nComp = SELF.U16(o); o += 2
+    LOOP j = 1 TO nComp
+      fno = SELF.U16(o); cflag = SELF.U16(o+2); o += 4
+      CLEAR(SELF.Comps)
+      SELF.Comps.KeyNbr = i; SELF.Comps.FieldNbr = fno + 1; SELF.Comps.Descending = CHOOSE(cflag <> 0, 1, 0); SELF.Comps.Rank = j
+      ADD(SELF.Comps)
+    END
+    ADD(SELF.Keys)
+  END
+  SELF.buf &= saveBuf; SELF.size = saveSz
+  IF SELF.Overrun THEN RETURN SELF.Bad('definition record shorter than its field, memo and key counts imply').
+  RETURN 0
+
+tpsSchema.FindField PROCEDURE(STRING label)
+i    LONG
+want STRING(64)
+  CODE
+  want = UPPER(CLIP(label))
+  LOOP i = 1 TO RECORDS(SELF.Fields)
+    GET(SELF.Fields, i)
+    IF UPPER(CLIP(SELF.Fields.Label)) = want THEN RETURN i.
+  END
+  RETURN 0
+
+tpsSchema.SchemaDumpJson PROCEDURE(tpsOut o)
+js    StringTheory
+i     LONG
+j     LONG
+full  STRING(80)
+cfirst BYTE
+  CODE
+  js.SetValue('{{ "file": ' & o.JStr(CLIP(SELF.Path)) & ', "fields": [')
+  LOOP i = 1 TO RECORDS(SELF.Fields)
+    GET(SELF.Fields, i)
+    full = CLIP(SELF.Prefix) & ':' & CLIP(SELF.Fields.Label)
+    js.Append(CHOOSE(i = 1, '', ',') & '{{"nbr":' & SELF.Fields.Nbr & ',"label":' & o.JStr(CLIP(full)) |
+      & ',"type":' & o.JStr(CLIP(SELF.Fields.Type)) |
+      & ',"size":' & SELF.Fields.Size & ',"places":' & SELF.Fields.Places |
+      & ',"dim":' & CHOOSE(SELF.Fields.Elements > 1, SELF.Fields.Elements, 0) & ',"over":' & SELF.Fields.Over |
+      & ',"fields":' & SELF.Fields.Fields & ',"picture":' & o.JStr(CLIP(SELF.Fields.Picture)) & '}')
+  END
+  js.Append('], "memos": [')
+  LOOP i = 1 TO RECORDS(SELF.Memos)
+    GET(SELF.Memos, i)
+    full = CLIP(SELF.Prefix) & ':' & CLIP(SELF.Memos.Label)
+    js.Append(CHOOSE(i = 1, '', ',') & '{{"nbr":' & SELF.Memos.Nbr & ',"label":' & o.JStr(CLIP(full)) |
+      & ',"type":' & o.JStr(CHOOSE(SELF.Memos.IsBlob = 1, 'B', 'M')) |
+      & ',"binary":' & SELF.Memos.Binary & ',"size":' & SELF.Memos.Bytes & ',"flags":' & SELF.Memos.Flags & '}')
+  END
+  js.Append('], "keys": [')
+  LOOP i = 1 TO RECORDS(SELF.Keys)
+    GET(SELF.Keys, i)
+    full = CLIP(SELF.Prefix) & ':' & CLIP(SELF.Keys.Label)
+    js.Append(CHOOSE(i = 1, '', ',') & '{{"nbr":' & SELF.Keys.Nbr & ',"label":' & o.JStr(CLIP(full)) |
+      & ',"type":' & o.JStr(CHOOSE(SELF.Keys.IsKey = 1, 'K', 'I')) |
+      & ',"dup":' & SELF.Keys.Dup & ',"primary":' & SELF.Keys.Primary |
+      & ',"nocase":' & SELF.Keys.NoCase & ',"opt":' & SELF.Keys.Opt & ',"flags":' & SELF.Keys.Flags & ',"components":[')
+    cfirst = 1
+    LOOP j = 1 TO RECORDS(SELF.Comps)
+      GET(SELF.Comps, j)
+      IF SELF.Comps.KeyNbr <> SELF.Keys.Nbr THEN CYCLE.
+      GET(SELF.Fields, SELF.Comps.FieldNbr)
+      full = CLIP(SELF.Prefix) & ':' & CLIP(SELF.Fields.Label)
+      js.Append(CHOOSE(cfirst, '', ',') & '{{"label":' & o.JStr(CLIP(full)) & ',"nbr":' & SELF.Comps.FieldNbr |
+        & ',"asc":' & CHOOSE(SELF.Comps.Descending = 1, 0, 1) & ',"rank":' & SELF.Comps.Rank & '}')
+      cfirst = 0
+    END
+    js.Append(']}')
+  END
+  js.Append('] }')
+  RETURN js.GetValue()
+
+tpsSchema.DescribeJson PROCEDURE(tpsOut o, LONG records)
+js    StringTheory
+i     LONG
+j     LONG
+first BYTE
+  CODE
+  js.SetValue('{{ "ok": true, "op": "describe", "file": ' & o.JStr(CLIP(SELF.Path)) |
+    & ', "encrypted": ' & CHOOSE(SELF.Encrypted = 1, 'true', 'false'))
+  IF records >= 0 THEN js.Append(', "records": ' & records).
+  js.Append(', "columns": [')
+  SchEmitFields(SELF, js, 0, '')
+  IF RECORDS(SELF.Fields) > 0 AND RECORDS(SELF.Memos) > 0 THEN js.Append(',').
+  LOOP i = 1 TO RECORDS(SELF.Memos)
+    GET(SELF.Memos, i)
+    IF i > 1 THEN js.Append(',').
+    js.Append('{{"name":' & o.JStr(CLIP(SELF.Memos.Label)) & ',"type":' & o.JStr(CHOOSE(SELF.Memos.IsBlob = 1, 'BLOB', 'MEMO')) |
+      & ',"size":' & SELF.Memos.Bytes)
+    IF SELF.Memos.IsBlob = 1 THEN js.Append(',"encoding":"base64"').
+    js.Append('}')
+  END
+  js.Append('], "keys": [')
+  LOOP i = 1 TO RECORDS(SELF.Keys)
+    GET(SELF.Keys, i)
+    IF i > 1 THEN js.Append(',').
+    js.Append('{{"name":' & o.JStr(CLIP(SELF.Keys.Label)) & ',"primary":' & CHOOSE(SELF.Keys.Primary = 1, 'true', 'false') |
+      & ',"unique":' & CHOOSE(SELF.Keys.Dup = 1, 'false', 'true'))
+    IF SELF.Keys.NoCase = 1 THEN js.Append(',"nocase":true').
+    IF SELF.Keys.Opt = 1 THEN js.Append(',"optional":true').
+    js.Append(',"components":[')
+    first = 1
+    LOOP j = 1 TO RECORDS(SELF.Comps)
+      GET(SELF.Comps, j)
+      IF SELF.Comps.KeyNbr <> SELF.Keys.Nbr THEN CYCLE.
+      GET(SELF.Fields, SELF.Comps.FieldNbr)
+      IF NOT first THEN js.Append(',').
+      first = 0
+      js.Append('{{"col":' & o.JStr(CLIP(SELF.Fields.Label)) & ',"asc":' & CHOOSE(SELF.Comps.Descending = 1, 'false', 'true') & '}')
+    END
+    js.Append(']}')
+  END
+  js.Append('], "complete": true }')
+  RETURN js.GetValue()
+
+SchEmitFields PROCEDURE(tpsSchema s, StringTheory js, LONG parentNbr, STRING dotted)
+i     LONG
+first BYTE
+  CODE
+  first = 1
+  LOOP i = 1 TO RECORDS(s.Fields)
+    GET(s.Fields, i)
+    IF s.Fields.Parent <> parentNbr THEN CYCLE.
+    IF NOT first THEN js.Append(',').
+    first = 0
+    SchEmitOneField(s, js, i, dotted)
+  END
+
+SchEmitOneField PROCEDURE(tpsSchema s, StringTheory js, LONG idx, STRING dotted)
+name STRING(80)
+nbr  LONG
+  CODE
+  GET(s.Fields, idx)
+  nbr = s.Fields.Nbr
+  name = CHOOSE(dotted = '', CLIP(s.Fields.Label), CLIP(dotted) & '.' & CLIP(s.Fields.Label))
+  js.Append('{{"name":"' & CLIP(name) & '","type":"' & CLIP(s.Fields.Type) & '"')
+  IF s.Fields.Elements > 1 THEN js.Append(',"dim":' & s.Fields.Elements).
+  CASE s.Fields.Type
+  OF 'DECIMAL'
+    js.Append(',"size":' & s.Fields.Size & ',"places":' & s.Fields.Places)
+  OF 'STRING' OROF 'CSTRING' OROF 'PSTRING'
+    js.Append(',"size":' & s.Fields.Size)
+  OF 'GROUP'
+    js.Append(',"members":[')
+    SchEmitFields(s, js, nbr, name)
+    js.Append(']')
+  END
+  js.Append('}')
