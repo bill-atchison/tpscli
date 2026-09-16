@@ -1,0 +1,25 @@
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ProjectGuid>{7B1C9C2E-5D3A-4B6F-9E2A-1F0C3D4E5A61}</ProjectGuid>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">Win32</Platform>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>tpscli</AssemblyName>
+    <OutputName>tpscli</OutputName>
+    <Model>Lib</Model>
+    <stack_size>65536</stack_size>
+    <CopyCore>False</CopyCore>
+    <DefineConstants>StringTheoryLinkMode=&gt;1%3bStringTheoryDllMode=&gt;0</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugSymbols>False</DebugSymbols><DebugType>None</DebugType><vid>off</vid>
+    <check_stack>False</check_stack><check_index>False</check_index>
+  </PropertyGroup>
+  <ItemGroup>
+    <FileDriver Include="TOPSPEED" />
+    <Library Include="ClaDFl.lib" />
+    <Compile Include="tpscli.clw" />
+    <Compile Include="tpsOut.clw" />
+  </ItemGroup>
+  <Import Project="$(ClarionBinPath)\SoftVelocity.Build.Clarion.targets" />
+</Project>
