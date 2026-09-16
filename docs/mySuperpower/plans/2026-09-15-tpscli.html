@@ -1,0 +1,1963 @@
+<!DOCTYPE html>
+<!-- writing-plans PLAN DOC — DTPOS-325 Auto-EOD cashout amount override. Self-contained; renders from file:// offline. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tpscli Implementation Plan</title>
+<style>
+  :root{
+    --paper:#f4efe1; --ink:#221f18; --maroon:#8a2b27; --meta-bg:#e9e1cd;
+    --label:#6d5f4e; --value:#2b2820; --amber:#a8762b;
+    --serif:Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;
+    --rule:#cdbfa3; --soft:#ece4d2; --code-bg:#2b2820; --code-ink:#f4efe1;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);padding:3.5rem 2rem;line-height:1.6;}
+  .wrap{max-width:1280px;margin:0 auto;}
+  .eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.35em;font-size:.8rem;font-weight:700;color:var(--maroon);margin:0 0 1.1rem;}
+  h1{font-family:var(--serif);font-weight:700;font-size:clamp(2.6rem,6vw,4rem);line-height:1.04;letter-spacing:-.01em;margin:0 0 .9rem;}
+  .subtitle{font-family:var(--serif);font-style:italic;font-weight:700;font-size:clamp(1.25rem,2.4vw,1.7rem);line-height:1.3;margin:0 0 1.9rem;max-width:54ch;}
+  .meta-card{display:grid;grid-template-columns:max-content 1fr;column-gap:1.75rem;row-gap:.55rem;align-items:baseline;background:var(--meta-bg);border-radius:14px;border-left:6px solid var(--maroon);padding:1.4rem 1.85rem;}
+  .meta-card dt{font-family:var(--mono);color:var(--label);font-size:.95rem;font-weight:400;}
+  .meta-card dd{font-family:var(--mono);color:var(--value);font-size:.95rem;margin:0;word-break:break-word;}
+  .agentic-note{background:var(--meta-bg);border-radius:14px;padding:1.25rem 1.85rem;margin-top:1rem;font-family:var(--mono);color:var(--value);font-size:.92rem;line-height:1.6;}
+  main{margin-top:3rem;}
+  main h2{font-family:var(--serif);font-weight:700;font-size:1.7rem;letter-spacing:-.01em;color:var(--maroon);margin:2.6rem 0 .5rem;padding-bottom:.35rem;border-bottom:2px solid var(--rule);}
+  main h3{font-family:var(--serif);font-style:italic;font-weight:700;font-size:1.18rem;margin:1.4rem 0 .3rem;color:var(--value);}
+  main p{margin:.55rem 0;max-width:78ch;}
+  main strong{color:var(--maroon);}
+  main ul,main ol.plain{max-width:78ch;}
+  .lead{font-size:1.1rem;}
+  .constraints{background:var(--soft);border-left:4px solid var(--maroon);border-radius:0 10px 10px 0;padding:.8rem 1.2rem;margin:1rem 0;}
+  .constraints li{margin:.25rem 0;}
+  section.task{margin:0 0 1.2rem;padding:.2rem 0;}
+  .tasknum{font-family:var(--mono);font-size:.8rem;color:var(--amber);font-weight:700;}
+  .files{background:var(--soft);border-left:4px solid var(--amber);border-radius:0 10px 10px 0;padding:.7rem 1.1rem;margin:.7rem 0 1rem;font-family:var(--mono);font-size:.86rem;line-height:1.7;}
+  .files .k{color:var(--maroon);font-weight:700;text-transform:uppercase;font-size:.72rem;letter-spacing:.05em;}
+  ol.steps{list-style:none;counter-reset:step;padding-left:0;margin:.6rem 0;}
+  ol.steps>li.step{position:relative;padding:.15rem 0 .6rem 2.2rem;margin:0;}
+  ol.steps>li.step::before{content:"";position:absolute;left:0;top:.18rem;width:1.15rem;height:1.15rem;border:2px solid var(--maroon);border-radius:4px;background:transparent;}
+  ol.steps>li.step::after{counter-increment:step;content:counter(step);position:absolute;left:1.55rem;top:.05rem;font-family:var(--mono);font-size:.72rem;color:var(--amber);font-weight:700;}
+  li.step .t{font-weight:700;}
+  pre{font-family:var(--mono);font-size:.76rem;line-height:1.5;background:var(--code-bg);color:var(--code-ink);border-radius:10px;padding:1rem 1.2rem;overflow-x:auto;margin:.6rem 0;}
+  pre code{background:none;padding:0;font-size:1em;color:inherit;}
+  code{font-family:var(--mono);font-size:.88em;background:var(--soft);padding:.06rem .35rem;border-radius:5px;}
+  .expect{font-family:var(--mono);font-size:.8rem;color:var(--label);margin:.3rem 0;}
+  blockquote{margin:1rem 0;padding:.6rem 1.2rem;border-left:4px solid var(--amber);background:var(--soft);font-style:italic;border-radius:0 8px 8px 0;}
+  hr{border:none;border-top:1px solid var(--rule);margin:2rem 0;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <p class="eyebrow">Plan &middot; Implementation</p>
+      <h1>tpscli Implementation Plan</h1>
+      <p class="subtitle">TDD: a self-contained Clarion 12 exe that runs a SQL subset against any TopSpeed file, built task by task against a generated test corpus.</p>
+      <dl class="meta-card">
+        <dt>Date</dt><dd>2026-09-15</dd>
+        <dt>Repo</dt><dd>New: <code>C:\Projects\tpscli</code> (git init in Task 1, branch <code>main</code>). Nothing here touches dtpos.</dd>
+        <dt>Spec</dt><dd>C:\Projects\GitLab\POS\dtpos_273\docs\mySuperpower\specs\2026-09-15-tpscli-design.html</dd>
+        <dt>Notes</dt><dd>Keep <code>C:\Projects\tpscli\docs\implementation-notes.html</code> running from Task 1: every decision not in the spec, every deviation, every empirical finding (oracle dumps, flag bits).</dd>
+      </dl>
+      <p class="agentic-note">REQUIRED SUB-SKILL: execute task-by-task with TDD (red &rarr; green &rarr; commit) using subagent-driven-development (recommended) or executing-plans. Codex review of this plan + spec before implementation; per-task two-stage review. Steps are checkbox-styled; track progress with your task tools, not by editing this file.</p>
+    </header>
+
+    <main>
+
+      <h2>Overview</h2>
+      <p class="lead"><strong>Goal:</strong> ship <code>tpscli.exe</code>, one static exe that takes a SQL statement, reads the table layout out of the named <code>.TPS</code> file, and runs DESCRIBE, SELECT, INSERT, UPDATE or DELETE through the real TopSpeed driver.</p>
+      <p><strong>Architecture:</strong> four Clarion units behind one main. <code>tpsSchema</code> parses the TPS binary definition record and builds a runtime FILE with SoftVelocity's DynFile class. <code>tpsSql</code> tokenizes and parses the SQL subset into a statement record whose WHERE is a Clarion expression over the file's own bound field labels. <code>tpsExec</code> walks the file with SET/NEXT on a chosen key, filters with EVALUATE, and writes with ADD/PUT/DELETE inside LOGOUT/COMMIT. <code>tpsOut</code> writes JSON or a text grid to the inherited stdout handle. A generated corpus with a DynFile "oracle" dump is the test bed for every unit.</p>
+      <p><strong>Tech stack:</strong> Clarion 12.0.14000 (<code>C:\Clarion12</code>), MSBuild 4.0, a CUI module-definition file, DynFile (<code>libsrc\win\DynFile.inc</code>, source-linked), CapeSoft StringTheory 3.82 (source-linked from <code>accessory\libsrc\win</code>), TopSpeed driver static (<code>ClaTPSl.lib</code>), Dynamic File Driver static (<code>ClaDFl.lib</code>), Win32 <code>GetStdHandle</code>/<code>WriteFile</code>/<code>ReadFile</code>, PowerShell for <code>verify.ps1</code>.</p>
+
+      <h3>Global constraints (from the spec)</h3>
+      <div class="constraints"><ul>
+        <li>One statement per invocation. SQL from the first positional argument, else stdin.</li>
+        <li>Table names are bracketed paths: <code>[C:\dir\FILE.TPS]</code>. Bare names are relative to the current directory.</li>
+        <li>Output is JSON on stdout, always ending with <code>"complete": true</code>. <code>--table</code> renders a grid. Diagnostics only on stderr.</li>
+        <li>Exit codes: 0 ok, 1 syntax/validation, 2 file/definition, 3 runtime. Error codes exactly as spec &sect;8, plus <code>outcome</code> on write failures.</li>
+        <li>File opened with <code>SHARE()</code>. <code>HOLD(file,1)</code>. No retries. UPDATE and DELETE refuse a missing WHERE and any LIMIT/OFFSET.</li>
+        <li>Unknown field type or unreadable definition fails the open. Driver error 47 is <code>DEFINITION_MISMATCH</code>.</li>
+        <li>DATE out as <code>YYYY-MM-DD</code>, TIME as <code>HH:MM:SS.hh</code>, DECIMAL as an exact string, BLOB as base64. String overflow truncates with a <code>STRING_TRUNCATED</code> warning; every other conversion failure is <code>VALUE_OUT_OF_RANGE</code>.</li>
+        <li>No JOIN, aggregates, DDL, NULL, subqueries, arithmetic, or a second interface. Reject with <code>UNSUPPORTED</code>.</li>
+        <li>The owner string is never echoed anywhere.</li>
+      </ul></div>
+
+      <h3>Research facts every task relies on</h3>
+      <ul>
+        <li><strong>Console exe via the EXP file.</strong> Clarion has no project-level console switch; the subsystem comes from the linker's module-definition file. Every project links a default <code>C:\Clarion12\libsrc\win\clawstd.exp</code> containing <code>NAME CLAWSTD GUI</code>. A file named <code>&lt;OutputName&gt;.exp</code> beside the cwproj replaces it with no project entry needed, and <code>NAME 'tpscli' CUI</code> makes the linker emit a CONSOLE-subsystem exe. Verified by rebuilding the probe: PE subsystem 2 became 3, cmd waited and captured output in order before the exit code, PowerShell captured every line. Stdout is still written with <code>GetStdHandle(-11)</code> + <code>WriteFile</code> (Clarion has no console I/O statements). Reference: Clarion help topic "Module Definition Files (.EXP Files)", NAME statement apptype WINDOWAPI, GUI or CUI.</li>
+        <li><strong>Static link is <code>&lt;Model&gt;Lib&lt;/Model&gt;</code></strong>, which pulls <code>ClaRUNl.lib</code>, <code>ClaTPSl.lib</code> automatically. <code>Local</code> is silently ignored. Include paths come from <code>C:\Clarion12\bin\CLARION120.RED</code>, so StringTheory and DynFile need no project entries.</li>
+        <li><strong>Build command</strong> (both properties mandatory, exit code is trustworthy):
+<pre><code>C:\Windows\Microsoft.NET\Framework\v4.0.30319\MSBuild.exe tpscli.cwproj /t:Rebuild /p:Configuration=Release ^
+  /p:ClarionBinPath="C:\Clarion12\bin" /p:clarion_version="Clarion 12.0.14000" /v:minimal</code></pre></li>
+        <li><strong>DFD in a Lib-linked exe</strong>: <code>PROP:Driver</code> does not work (error 80). Use <code>DynFile.SetDriver(*FILE)</code> with a static placeholder FILE declared <code>DRIVER('TOPSPEED')</code>. FIXFORMAT only accepts a FILE created with NEW, so a compile-time VIEW cannot sit on it: the executor uses SET/NEXT and EVALUATE, not VIEW. This is a deviation from spec &sect;5 ("VIEW with PROP:Filter") and is recorded in the notes.</li>
+        <li><strong>DynFile contract</strong> (read from <code>DynFile.clw</code>): <code>AddField(TFieldGrp)</code> with <code>Label</code>, <code>Type</code> as text (<code>'STRING'</code>, <code>'DECIMAL'</code>, <code>'GROUP'</code>...), <code>Size</code>, <code>Places</code>, <code>Dim</code>, <code>Over</code>, <code>Fields</code>, <code>Picture</code>; <code>AddKey(TKeyGrp)</code> with <code>Type</code> 'K'/'I', <code>Dup</code>, <code>Opt</code>, <code>NoCase</code>, <code>Primary</code>; <code>AddFieldToKey(key, fieldLabel, asc, rank)</code>; <code>AddMemo(TMemoGrp)</code> with <code>MemoNbr</code> negative, <code>Type</code> 'M'/'B', <code>Binary</code>, <code>size</code>. <code>FixFormat</code> shows a modal MESSAGE on error (line 842); <code>CreateStruct</code> and <code>rDynF</code> are PROTECTED so a derived class can shadow it. <code>GetField(label)</code> is <code>WHAT(record, n)</code> after matching <code>WHO(record, n)</code> for n in 1..<code>PROP:Fields</code>; array elements are <code>WHAT(record, n, elem)</code>.</li>
+        <li><strong>TPS layout</strong> (ported from ctrl-alt-dev/tps-parse, Apache 2.0, plus the clarionlife.net format note for flag bits): header 0x200 bytes, magic <code>tOpS</code> at 0x0E, 60 block start/end refs at 0x20 and 0x110 with <code>offset = (ref &lt;&lt; 8) + 0x200</code>; pages found by scanning 0x100 boundaries for a self-addressing LE long; 13-byte page header; RLE when <code>pageSize &lt;&gt; pageSizeUncompressed</code> and flags = 0; record headers with 0xC0 flags on the first record and delta reuse after; type byte at header offset 4 (0xFA = table definition, block index LE u16 at offset 5); definition = u16 driverVersion, recordLength, nrOfFields, nrOfMemos, nrOfIndexes then field, memo, index entries. Key flags: 0x01 DUP, 0x02 OPT, 0x04 NOCASE, bits 5-6 type (0 = KEY, else INDEX); 0x10 claimed PRIMARY by two readers, unverified. Per-component flag nonzero = descending. Field entry u16 <code>flags</code> = 1 means OVER, u16 <code>index</code> = field ordinal.</li>
+        <li><strong>Command line</strong>: <code>COMMAND(n)</code> returns the n-th argument with quotes stripped; the flag-lookup form is unreliable. Parse with a loop.</li>
+      </ul>
+
+      <h3>File structure</h3>
+      <div class="files">
+        <div><span class="k">Create</span> <code>tpscli.cwproj</code> &middot; <code>tpscli.clw</code> (main: args, stdin, dispatch, exit)</div>
+        <div><span class="k">Create</span> <code>tpsOut.inc</code> / <code>tpsOut.clw</code> (stdout, JSON escaping, error+halt, table grid)</div>
+        <div><span class="k">Create</span> <code>tpsSchema.inc</code> / <code>tpsSchema.clw</code> (TPS reader, definition parser, DynFile builder, open)</div>
+        <div><span class="k">Create</span> <code>tpsSql.inc</code> / <code>tpsSql.clw</code> (tokenizer, parser, column resolution, expression builder)</div>
+        <div><span class="k">Create</span> <code>tpsExec.inc</code> / <code>tpsExec.clw</code> (describe, select, insert, update, delete)</div>
+        <div><span class="k">Create</span> <code>tpscli.exp</code> &middot; <code>tools\build.ps1</code> &middot; <code>verify.ps1</code></div>
+        <div><span class="k">Create</span> <code>testdata\gen\mkcorpus.cwproj</code> / <code>mkcorpus.clw</code> (corpus + oracle) &middot; <code>testdata\expected\*.json</code> &middot; <code>tests\parser.sql</code> / <code>tests\parser.expected.txt</code></div>
+        <div><span class="k">Create</span> <code>README.md</code> &middot; <code>docs\implementation-notes.html</code></div>
+      </div>
+
+      <!-- ======================================================================= -->
+      <section class="task">
+        <h2>Task 1 <span class="tasknum">&middot; skeleton: repo, static console build, stdout, args, JSON errors</span></h2>
+        <p>tpscli is a console program (a CUI application in Clarion's terms). It never opens a window. The subsystem is set by <code>tpscli.exp</code> with <code>NAME 'tpscli' CUI</code>, which the linker picks up by name; this task proves it.</p>
+        <p>Deliverable: <code>tpscli.exe</code> that builds statically, reads its statement from argv or stdin, prints a JSON error for anything it does not yet understand, exits with the right code, and can be run from a shell that waits for it.</p>
+        <div class="files">
+          <div><span class="k">Create</span> <code>C:\Projects\tpscli\tpscli.cwproj</code>, <code>tpscli.exp</code>, <code>tpscli.clw</code>, <code>tpsOut.inc</code>, <code>tpsOut.clw</code>, <code>tools\build.ps1</code>, <code>.gitignore</code>, <code>docs\implementation-notes.html</code></div>
+          <div><span class="k">Produces</span> <code>tpsOut</code> class: <code>Init()</code>, <code>Write(STRING)</code>, <code>Line(STRING)</code>, <code>JStr(STRING),STRING</code>, <code>Fail(STRING code, STRING msg, LONG exitCode, &lt;STRING extraJson&gt;)</code>; <code>ReadStdin(),STRING</code>; global <code>Opt</code> group: <code>Owner</code>, <code>Table</code>, <code>ParseOnly</code>, <code>LimitDefault</code>, <code>Sql</code></div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Init the repo.</span>
+<pre><code>mkdir C:\Projects\tpscli; cd C:\Projects\tpscli; git init -b main
+mkdir tools, docs, tests, testdata\gen, testdata\expected</code></pre>
+          <code>.gitignore</code>: <code>obj/</code>, <code>map/</code>, <code>*.exe</code>, <code>testdata/*.TPS</code>, <code>testdata/work/</code>. Start <code>docs\implementation-notes.html</code> with a heading and an empty dated list; append to it in every later task.</li>
+
+          <li class="step"><span class="t">Write the project file.</span> <code>tpscli.cwproj</code> (StringTheory defines are the value proven by the probe build):
+<pre><code>&lt;Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003"&gt;
+  &lt;PropertyGroup&gt;
+    &lt;ProjectGuid&gt;{7B1C9C2E-5D3A-4B6F-9E2A-1F0C3D4E5A61}&lt;/ProjectGuid&gt;
+    &lt;Configuration Condition=" '$(Configuration)' == '' "&gt;Release&lt;/Configuration&gt;
+    &lt;Platform Condition=" '$(Platform)' == '' "&gt;Win32&lt;/Platform&gt;
+    &lt;OutputType&gt;Exe&lt;/OutputType&gt;
+    &lt;AssemblyName&gt;tpscli&lt;/AssemblyName&gt;
+    &lt;OutputName&gt;tpscli&lt;/OutputName&gt;
+    &lt;Model&gt;Lib&lt;/Model&gt;
+    &lt;stack_size&gt;65536&lt;/stack_size&gt;
+    &lt;CopyCore&gt;False&lt;/CopyCore&gt;
+    &lt;DefineConstants&gt;StringTheoryLinkMode=&amp;gt;1%3bStringTheoryDllMode=&amp;gt;0&lt;/DefineConstants&gt;
+  &lt;/PropertyGroup&gt;
+  &lt;PropertyGroup Condition=" '$(Configuration)' == 'Release' "&gt;
+    &lt;DebugSymbols&gt;False&lt;/DebugSymbols&gt;&lt;DebugType&gt;None&lt;/DebugType&gt;&lt;vid&gt;off&lt;/vid&gt;
+    &lt;check_stack&gt;False&lt;/check_stack&gt;&lt;check_index&gt;False&lt;/check_index&gt;
+  &lt;/PropertyGroup&gt;
+  &lt;ItemGroup&gt;
+    &lt;FileDriver Include="TOPSPEED" /&gt;
+    &lt;Library Include="ClaDFl.lib" /&gt;
+    &lt;Compile Include="tpscli.clw" /&gt;
+    &lt;Compile Include="tpsOut.clw" /&gt;
+  &lt;/ItemGroup&gt;
+  &lt;Import Project="$(ClarionBinPath)\SoftVelocity.Build.Clarion.targets" /&gt;
+&lt;/Project&gt;</code></pre>
+          Later tasks add <code>tpsSchema.clw</code>, <code>tpsSql.clw</code>, <code>tpsExec.clw</code> to the Compile group.</li>
+
+          <li class="step"><span class="t">Write <code>tpsOut.inc</code>.</span>
+<pre><code>  OMIT('_EndTpsOut_',_TpsOutPresent_)
+_TpsOutPresent_  EQUATE(1)
+  INCLUDE('StringTheory.inc'),ONCE
+
+tpsOut  CLASS,TYPE,MODULE('tpsOut.clw'),LINK('tpsOut.clw')
+hOut      ULONG
+hIn       ULONG
+StdinBuf  StringTheory
+StdinRead BYTE
+Init      PROCEDURE()
+Write     PROCEDURE(STRING s)                 ! raw bytes to stdout
+Line      PROCEDURE(STRING s)                 ! s + CRLF
+JStr      PROCEDURE(STRING s),STRING          ! JSON string literal with quotes
+Fail      PROCEDURE(STRING code, STRING msg, LONG exitCode, &lt;STRING extraJson&gt;)
+ReadStdin PROCEDURE(),STRING
+        END
+  _EndTpsOut_</code></pre></li>
+
+          <li class="step"><span class="t">Write <code>tpsOut.clw</code>.</span>
+<pre><code>  MEMBER()
+  INCLUDE('tpsOut.inc'),ONCE
+  MAP
+    MODULE('WINAPI')
+      GetStdHandle(LONG),ULONG,PASCAL,RAW,PROC,NAME('GetStdHandle')
+      WriteFile(ULONG,LONG,ULONG,*ULONG,LONG),SIGNED,PASCAL,RAW,PROC,NAME('WriteFile')
+      ReadFile(ULONG,LONG,ULONG,*ULONG,LONG),SIGNED,PASCAL,RAW,PROC,NAME('ReadFile')
+      GetLastError(),ULONG,PASCAL,RAW,NAME('GetLastError')
+    END
+  END
+STD_INPUT_HANDLE   EQUATE(-10)
+STD_OUTPUT_HANDLE  EQUATE(-11)
+
+tpsOut.Init  PROCEDURE()
+  CODE
+  SELF.hOut = GetStdHandle(STD_OUTPUT_HANDLE)
+  SELF.hIn  = GetStdHandle(STD_INPUT_HANDLE)
+
+tpsOut.Write PROCEDURE(STRING s)
+written  ULONG
+done     LONG
+  CODE
+  LOOP WHILE done &lt; LEN(s)
+    written = 0
+    IF WriteFile(SELF.hOut, ADDRESS(s) + done, LEN(s) - done, written, 0) = 0 OR written = 0 THEN HALT(3).   ! stdout gone: nothing else we can say
+    done += written
+  END
+
+tpsOut.Line  PROCEDURE(STRING s)
+  CODE
+  SELF.Write(s &amp; '&lt;13,10&gt;')
+
+tpsOut.JStr  PROCEDURE(STRING s)
+st   StringTheory
+i    LONG
+c    BYTE
+  CODE
+  st.SetValue(s)
+  st.Replace('\', '\\')
+  st.Replace('"', '\"')
+  st.Replace('&lt;13&gt;', '\r')
+  st.Replace('&lt;10&gt;', '\n')
+  st.Replace('&lt;9&gt;', '\t')
+  LOOP i = 1 TO st.Length()
+    c = VAL(st.valueptr[i])
+    IF c &lt; 32
+      st.SetSlice(i, i, '\u00' &amp; SUB('0123456789abcdef', BSHIFT(c,-4)+1, 1) &amp; SUB('0123456789abcdef', BAND(c,0Fh)+1, 1))
+      i += 5
+    END
+  END
+  RETURN '"' &amp; st.GetValue() &amp; '"'
+
+tpsOut.Fail  PROCEDURE(STRING code, STRING msg, LONG exitCode, &lt;STRING extraJson&gt;)
+  CODE
+  SELF.Line('{{ "ok": false, "op": null, "error": {{ "code": ' &amp; SELF.JStr(code) &amp; ', "message": ' &amp; SELF.JStr(msg) &amp; ' }' |
+            &amp; CHOOSE(OMITTED(extraJson) OR extraJson = '', '', ', ' &amp; extraJson) &amp; ', "complete": true }')
+  HALT(exitCode)
+
+tpsOut.ReadStdin PROCEDURE()
+chunk STRING(4096)
+got   ULONG
+rc    LONG
+  CODE
+  IF SELF.StdinRead THEN RETURN SELF.StdinBuf.GetValue().
+  SELF.StdinRead = 1
+  LOOP
+    got = 0
+    rc = ReadFile(SELF.hIn, ADDRESS(chunk), SIZE(chunk), got, 0)
+    IF rc = 0
+      IF GetLastError() = 109 THEN BREAK.                 ! ERROR_BROKEN_PIPE = clean EOF on a pipe
+      SELF.Fail('SYNTAX', 'Reading stdin failed (' &amp; GetLastError() &amp; ')', 1)
+    END
+    IF got = 0 THEN BREAK.
+    SELF.StdinBuf.Append(chunk[1 : got])
+  END
+  RETURN SELF.StdinBuf.GetValue()</code></pre>
+          <code>op</code> is <code>null</code> here because <code>Fail</code> is only called before a statement is recognised; the executor in later tasks prints its own error objects with the real <code>op</code>.</li>
+
+          <li class="step"><span class="t">Write <code>tpscli.clw</code>.</span> Argument loop, stdin fallback, and for now a fixed SYNTAX failure for any SQL, so the exit path is exercised end to end.
+<pre><code>  PROGRAM
+  INCLUDE('StringTheory.inc'),ONCE
+  INCLUDE('tpsOut.inc'),ONCE
+  MAP
+    ParseArgs()
+  END
+
+Out        tpsOut
+Opt        GROUP
+Owner        STRING(64)
+Table        BYTE
+ParseOnly    BYTE
+LimitDefault LONG(1000)
+Sql          &amp;STRING
+           END
+TPSCLI_VERSION  EQUATE('0.1.0')
+
+  CODE
+  Out.Init()
+  ParseArgs()
+  IF Opt.Sql &amp;= NULL OR LEN(CLIP(Opt.Sql)) = 0
+    Out.Fail('SYNTAX', 'No SQL statement given. Pass it as the first argument or on stdin.', 1)
+  END
+  ! Tasks 6-9 replace this line with parse + execute.
+  Out.Fail('SYNTAX', 'Parser not implemented yet', 1)
+
+ParseArgs  PROCEDURE()
+n     LONG
+a     &amp;STRING
+seen  BYTE
+  CODE
+  LOOP n = 1 TO 4096                  ! COMMAND(n) returns '' past the last argument, which ends the loop; 4096 is a guard, not a cutoff
+    a &amp;= NEW STRING(LEN(CLIP(COMMAND(n))))
+    a = COMMAND(n)
+    IF a = '' THEN DISPOSE(a); BREAK.
+    IF n = 4096 THEN Out.Fail('SYNTAX', 'Too many arguments', 1).
+    CASE LOWER(CLIP(a))
+    OF '--owner'
+      n += 1
+      Opt.Owner = COMMAND(n)
+      IF Opt.Owner = '' THEN Out.Fail('SYNTAX', '--owner needs a value', 1).
+    OF '--table'          ; Opt.Table = 1
+    OF '--parse-only'     ; Opt.ParseOnly = 1
+    OF '--limit-default'
+      n += 1
+      IF NOT MATCH(CLIP(COMMAND(n)), '^[0-9]{{1,10}$', Match:Regular) OR COMMAND(n) &gt; 2147483647
+        Out.Fail('SYNTAX', '--limit-default needs a non-negative integer up to 2147483647', 1)
+      END
+      Opt.LimitDefault = COMMAND(n)
+    OF '--version'
+      Out.Line('{{ "ok": true, "op": null, "version": "' &amp; TPSCLI_VERSION &amp; '", "complete": true }')
+      HALT(0)
+    ELSE
+      IF SUB(a, 1, 2) = '--' THEN Out.Fail('SYNTAX', 'Unknown option ' &amp; CLIP(a), 1).
+      IF seen THEN Out.Fail('SYNTAX', 'Only one statement per invocation', 1).
+      seen = 1
+      Opt.Sql &amp;= a; a &amp;= NULL; CYCLE
+    END
+    DISPOSE(a)
+  END
+  IF NOT seen
+    Opt.Sql &amp;= NEW STRING(LEN(CLIP(Out.ReadStdin())))
+    Opt.Sql = Out.ReadStdin()   ! second call returns the buffered copy, see tpsOut.ReadStdin
+  END</code></pre></li>
+
+          <li class="step"><span class="t">Write the export file and the build script.</span> <code>tpscli.exp</code> (uppercase keywords, CRLF line endings):
+<pre><code>NAME 'tpscli' CUI</code></pre>
+          The linker finds it because it sits beside the project and matches <code>OutputName</code>; the generated <code>obj\release\tpscli.cwproj.FileList.xml</code> must list <code>TPSCLI.EXP</code> and not <code>CLAWSTD.EXP</code>. <code>tools\build.ps1</code>:
+<pre><code>param([string]$Proj = "tpscli.cwproj")
+$msb = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\MSBuild.exe"
+&amp; $msb $Proj /t:Rebuild /p:Configuration=Release /p:ClarionBinPath="C:\Clarion12\bin" `
+      /p:clarion_version="Clarion 12.0.14000" /v:minimal
+if ($LASTEXITCODE -ne 0) { throw "build failed ($LASTEXITCODE)" }
+$exe = [IO.Path]::ChangeExtension($Proj, ".exe")
+$b = [IO.File]::ReadAllBytes($exe); $pe = [BitConverter]::ToInt32($b, 0x3C)
+$sub = [BitConverter]::ToUInt16($b, $pe + 4 + 20 + 68)
+if ($sub -ne 3) { throw "$exe is not a console-subsystem image (subsystem=$sub); check tpscli.exp" }
+"subsystem=3 (console)"</code></pre>
+          Run it from PowerShell, not Git Bash: Git Bash rewrites <code>/t:Rebuild</code> as a path and MSBuild fails with MSB1008.</li>
+
+          <li class="step"><span class="t">Build.</span> Run <code>powershell -File tools\build.ps1</code>.
+            <div class="expect">Expected: MSBuild banner only, exit 0, then <code>subsystem=3 (console)</code>. <code>tpscli.exe</code> exists, and <code>dumpbin</code>-free check: <code>Select-String -Path tpscli.exe -Pattern "ClaRUN.dll|claDF.dll|ClaTPS.dll" -Quiet</code> is False (statically linked, no Clarion DLL imports).</div></li>
+
+          <li class="step"><span class="t">Verify the exit path from a shell that waits.</span>
+<pre><code>cmd /v:on /c "tpscli.exe &lt; nul &gt; out1.txt &amp; echo EXIT=!ERRORLEVEL! &gt;&gt; out1.txt"
+cmd /v:on /c "tpscli.exe --version &gt; out2.txt &amp; echo EXIT=!ERRORLEVEL! &gt;&gt; out2.txt"
+cmd /v:on /c "echo SELECT 1 | tpscli.exe &gt; out3.txt &amp; echo EXIT=!ERRORLEVEL! &gt;&gt; out3.txt"
+cmd /v:on /c "tpscli.exe --bogus &lt; nul &gt; out4.txt &amp; echo EXIT=!ERRORLEVEL! &gt;&gt; out4.txt"
+cmd /v:on /c "tpscli.exe ""SELECT 1"" ""x"" &gt; out5.txt &amp; echo EXIT=!ERRORLEVEL! &gt;&gt; out5.txt"</code></pre>
+            <div class="expect">out1: SYNTAX "No SQL statement given", EXIT=1. out2: version JSON, EXIT=0. out3: "Parser not implemented yet", EXIT=1 (proves stdin). out4: "Unknown option --bogus", EXIT=1. out5: "Only one statement per invocation", EXIT=1. If the EXIT line appears before the JSON, the exe is not console-subsystem: check that FileList.xml names <code>TPSCLI.EXP</code>. Also confirm from PowerShell that <code>$r = .\tpscli.exe --version; $LASTEXITCODE</code> gives 0 and <code>$r</code> holds the JSON. Finally confirm it is windowless: <code>Start-Process .\tpscli.exe -ArgumentList '--version' -PassThru | Select MainWindowHandle</code> prints 0 and nothing appears on the taskbar.</div></li>
+
+          <li class="step"><span class="t">Commit.</span> <code>git add -A; git commit -m "tpscli: static build skeleton, stdout, args, JSON errors"</code></li>
+        </ol>
+      </section>
+
+      <!-- ======================================================================= -->
+      <section class="task">
+        <h2>Task 2 <span class="tasknum">&middot; test corpus generator with DynFile oracle</span></h2>
+        <p>Deliverable: a second small Clarion exe that creates every TPS shape the spec supports, fills it with known rows, and dumps what DynFile's <code>CreateFromFile</code> sees for each structure as JSON. Those dumps are the expected output for DESCRIBE parity and the source of truth for every "how does Clarion encode this" question in Tasks 4 and 5.</p>
+        <div class="files">
+          <div><span class="k">Create</span> <code>testdata\gen\mkcorpus.cwproj</code> (copy of tpscli.cwproj with AssemblyName/OutputName <code>mkcorpus</code>, Compile <code>mkcorpus.clw</code>, no ClaDF needed but harmless), <code>testdata\gen\mkcorpus.clw</code></div>
+          <div><span class="k">Produces</span> <code>testdata\ALLTYPES.TPS</code>, <code>KEYS.TPS</code>, <code>GROUPS.TPS</code>, <code>MEMOS.TPS</code>, <code>NOKEY.TPS</code>, <code>SECRET.TPS</code> (owner <code>s3cret</code>) and <code>testdata\expected\&lt;NAME&gt;.json</code> for each; row counts: ALLTYPES 3, KEYS 5, GROUPS 2, MEMOS 2, NOKEY 3, SECRET 2</div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Declare the five files.</span> Top of <code>mkcorpus.clw</code>:
+<pre><code>  PROGRAM
+  INCLUDE('DynFile.inc'),ONCE
+  INCLUDE('StringTheory.inc'),ONCE
+  MAP
+    Dump(FILE f, STRING name)
+    MakeAll()
+  END
+
+AllTypes FILE,DRIVER('TOPSPEED'),NAME('testdata\ALLTYPES.TPS'),PRE(AT),CREATE
+IdKey      KEY(AT:Id),PRIMARY
+Record       RECORD
+Id           LONG
+B            BYTE
+S            SHORT
+US           USHORT
+UL           ULONG
+SR           SREAL
+R            REAL
+D            DECIMAL(7,2)
+PD           PDECIMAL(9,3)
+Dt           DATE
+Tm           TIME
+Str          STRING(20)
+CStr         CSTRING(21)
+PStr         PSTRING(21)
+Pic          STRING(@N9.2)
+Arr          SHORT,DIM(4)
+             END
+         END
+
+Keys     FILE,DRIVER('TOPSPEED'),NAME('testdata\KEYS.TPS'),PRE(KY),CREATE
+PKey       KEY(KY:Id),PRIMARY
+DupKey     KEY(KY:Name),DUP,NOCASE
+OptKey     KEY(KY:Code),OPT
+DescKey    KEY(-KY:Amount,+KY:Id),DUP
+Idx        INDEX(KY:Name)
+Record       RECORD
+Id           LONG
+Name         STRING(30)
+Code         STRING(4)
+Amount       DECIMAL(9,2)
+             END
+         END
+
+Groups   FILE,DRIVER('TOPSPEED'),NAME('testdata\GROUPS.TPS'),PRE(GR),CREATE
+IdKey      KEY(GR:Id),PRIMARY
+Record       RECORD
+Id           LONG
+Addr           GROUP
+Line1            STRING(30)
+City             STRING(20)
+Geo                GROUP
+Lat                  REAL
+Lon                  REAL
+                   END
+               END
+Phones         GROUP,DIM(2)
+Kind             STRING(1)
+Number           STRING(12)
+               END
+Raw            STRING(8)
+RawL           LONG,OVER(Raw)
+Grid           SHORT,DIM(2,3)
+             END
+         END
+
+Memos    FILE,DRIVER('TOPSPEED'),NAME('testdata\MEMOS.TPS'),PRE(MM),CREATE
+IdKey      KEY(MM:Id),PRIMARY
+Notes      MEMO(1000)
+Bin        MEMO(500),BINARY
+Pic        BLOB
+Record       RECORD
+Id           LONG
+Title        STRING(20)
+             END
+         END
+
+NoKey    FILE,DRIVER('TOPSPEED'),NAME('testdata\NOKEY.TPS'),PRE(NK),CREATE
+Record       RECORD
+Code         STRING(4)
+Qty          LONG
+             END
+         END
+
+Secret   FILE,DRIVER('TOPSPEED'),NAME('testdata\SECRET.TPS'),PRE(SC),OWNER('s3cret'),ENCRYPT,CREATE
+IdKey      KEY(SC:Id),PRIMARY
+Record       RECORD
+Id           LONG
+Note         STRING(40)
+             END
+         END</code></pre></li>
+
+          <li class="step"><span class="t">Write the oracle dump.</span> It uses DynFile's own reader so the expected JSON is exactly the vocabulary <code>tpsSchema</code> must reproduce. Escape with a local helper, not tpsOut, to keep the generator standalone.
+<pre><code>Dump  PROCEDURE(FILE f, STRING name)
+dyn   DynFile
+st    StringTheory
+i     LONG
+j     LONG
+  CODE
+  dyn.CreateFromFile(f)
+  st.SetValue('{{ "file": "' &amp; name &amp; '", "fields": [')
+  LOOP i = 1 TO RECORDS(dyn.FieldQ)
+    GET(dyn.FieldQ, i)
+    st.Append(CHOOSE(i = 1, '', ',') &amp; '{{"nbr":' &amp; dyn.FieldQ.FieldNbr &amp; ',"label":"' &amp; CLIP(dyn.FieldQ.Label) |
+              &amp; '","type":"' &amp; CLIP(dyn.FieldQ.Type) |
+              &amp; '","size":' &amp; dyn.FieldQ.Size &amp; ',"places":' &amp; dyn.FieldQ.Places |
+              &amp; ',"dim":' &amp; dyn.FieldQ.Dim &amp; ',"over":' &amp; dyn.FieldQ.Over |
+              &amp; ',"fields":' &amp; dyn.FieldQ.Fields &amp; ',"picture":"' &amp; CLIP(dyn.FieldQ.Picture) &amp; '"}')
+  END
+  st.Append('], "memos": [')
+  LOOP i = 1 TO RECORDS(dyn.MemoQ)
+    GET(dyn.MemoQ, i)
+    st.Append(CHOOSE(i = 1, '', ',') &amp; '{{"nbr":' &amp; dyn.MemoQ.MemoNbr &amp; ',"label":"' &amp; CLIP(dyn.MemoQ.Label) |
+              &amp; '","type":"' &amp; dyn.MemoQ.Type |
+              &amp; '","binary":' &amp; dyn.MemoQ.Binary &amp; ',"size":' &amp; dyn.MemoQ.size &amp; '}')
+  END
+  st.Append('], "keys": [')
+  LOOP i = 1 TO RECORDS(dyn.KeyQ)
+    GET(dyn.KeyQ, i)
+    st.Append(CHOOSE(i = 1, '', ',') &amp; '{{"nbr":' &amp; dyn.KeyQ.KeyNbr &amp; ',"label":"' &amp; CLIP(dyn.KeyQ.Label) &amp; '","type":"' &amp; dyn.KeyQ.Type |
+              &amp; '","dup":' &amp; dyn.KeyQ.Dup &amp; ',"primary":' &amp; dyn.KeyQ.Primary |
+              &amp; ',"nocase":' &amp; dyn.KeyQ.NoCase &amp; ',"opt":' &amp; dyn.KeyQ.Opt &amp; ',"components":[')
+    LOOP j = 1 TO RECORDS(dyn.KeyQ.FieldQ)
+      GET(dyn.KeyQ.FieldQ, j)
+      st.Append(CHOOSE(j = 1, '', ',') &amp; '{{"label":"' &amp; CLIP(dyn.KeyQ.FieldQ.FieldLabel) &amp; '","nbr":' &amp; dyn.KeyQ.FieldQ.FieldNbr |
+                &amp; ',"asc":' &amp; dyn.KeyQ.FieldQ.Ascending &amp; ',"rank":' &amp; dyn.KeyQ.FieldQ.Rank &amp; '}')
+    END
+    st.Append(']}')
+  END
+  st.Append('] }')
+  st.SaveFile('testdata\expected\' &amp; name &amp; '.json')</code></pre></li>
+
+          <li class="step"><span class="t">Create and fill.</span> <code>MakeAll</code> removes old files, CREATEs, OPENs, adds rows with distinctive values, then calls <code>Dump</code> while the file is open. Rows (abbreviated; write every column):
+<pre><code>MakeAll  PROCEDURE()
+  CODE
+  REMOVE(AllTypes); CREATE(AllTypes); OPEN(AllTypes)
+  CLEAR(AT:Record); AT:Id = 1; AT:B = 200; AT:S = -12345; AT:US = 65000; AT:UL = 4000000000
+  AT:SR = 1.5; AT:R = -2.25; AT:D = 12345.67; AT:PD = -1.005; AT:Dt = DATE(9,15,2026)
+  AT:Tm = DEFORMAT('13:45:30',@T4); AT:Str = 'alpha'; AT:CStr = 'beta'; AT:PStr = 'gamma'
+  AT:Pic = 42.5; AT:Arr[1] = 10; AT:Arr[2] = 20; AT:Arr[3] = 30; AT:Arr[4] = 40; ADD(AllTypes)
+  CLEAR(AT:Record); AT:Id = 2; AT:Str = 'MINI MARSHMALLOWS'; AT:D = 1.25; ADD(AllTypes)
+  CLEAR(AT:Record); AT:Id = 3; AT:Str = 'zed'; AT:Dt = 0; ADD(AllTypes)
+  Dump(AllTypes, 'ALLTYPES'); CLOSE(AllTypes)
+
+  REMOVE(Keys); CREATE(Keys); OPEN(Keys)
+  ! ids 1..5, names Able,baker,Charlie,delta,Echo, codes A,'',C,'',E, amounts 5,4,3,2,1
+  ...
+  Dump(Keys, 'KEYS'); CLOSE(Keys)
+  ! GROUPS: 2 rows, Phones[1].Kind='H', Phones[2].Kind='M', RawL = 305419896
+  ! MEMOS: 2 rows, Notes = 'line one&lt;13,10&gt;line two', Bin = 'x&lt;0&gt;y&lt;255&gt;', Pic = 'PNG?' via MM:Pic{PROP:Size}=4; MM:Pic[0:3]='PNG?'
+  ! NOKEY: 3 rows, codes 'AA','BB','AA', qty 1,2,3
+  ! SECRET: 2 rows
+  CLEAR(SC:Record)  ! ...</code></pre>
+          Write all five in full in the source; the ellipses above are for the plan only, the file must contain every row.</li>
+
+          <li class="step"><span class="t">Build and run.</span> <code>powershell -File tools\build.ps1 testdata\gen\mkcorpus.cwproj</code>, then <code>cd C:\Projects\tpscli; testdata\gen\mkcorpus.exe</code>.
+            <div class="expect">Expected: six <code>.TPS</code> files in <code>testdata\</code>, six JSON files in <code>testdata\expected\</code>. Open <code>ALLTYPES.json</code> and record in the implementation notes: the <code>type</code> and <code>size</code> DynFile reports for <code>D</code> (DECIMAL 7,2), <code>PD</code>, <code>CStr</code>, <code>PStr</code>, <code>Pic</code> (picture string), <code>Arr</code> (dim), and in <code>GROUPS.json</code> the <code>fields</code> count on <code>Addr</code> (does it count Geo's members?) and the <code>over</code> value on <code>RawL</code>. These numbers are what Task 4 must emit.</div></li>
+
+          <li class="step"><span class="t">Commit.</span> <code>git add testdata\gen testdata\expected; git commit -m "corpus generator with DynFile oracle dumps"</code></li>
+        </ol>
+      </section>
+
+      <!-- ======================================================================= -->
+      <section class="task">
+        <h2>Task 3 <span class="tasknum">&middot; tpsSchema part A: file, header, decryption, pages, records, merged definition</span></h2>
+        <p>Deliverable: <code>tpsSchema.Load(path, owner)</code> that returns the merged table-definition bytes of a TPS file, plus a hidden <code>--dump-def</code> option that prints them as hex so every layout step is observable.</p>
+        <div class="files">
+          <div><span class="k">Create</span> <code>tpsSchema.inc</code>, <code>tpsSchema.clw</code>; <span class="k">Modify</span> <code>tpscli.cwproj</code> (add Compile), <code>tpscli.clw</code> (option + dispatch)</div>
+          <div><span class="k">Produces</span> <code>tpsSchema</code>: <code>Load(STRING path, STRING owner),LONG</code> (0 ok, else error code equate), <code>Err</code> STRING(20) error code, <code>ErrMsg</code>, <code>Def</code> &amp;STRING merged definition, <code>Encrypted</code> BYTE, <code>TableNo</code> LONG</div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Prove LONG wraps.</span> Add to <code>tpscli.clw</code> a hidden <code>--selftest</code> that runs and prints:
+<pre><code>x = 2147483647; x += 1;  Out.Line('wrap=' &amp; x)          ! expect -2147483648
+y = -2147483648; y -= 1; Out.Line('wrap2=' &amp; y)         ! expect 2147483647
+Out.Line('bshift=' &amp; BSHIFT(1, 31))                     ! expect -2147483648</code></pre>
+            <div class="expect">Build, run <code>tpscli.exe --selftest</code>. If any value differs, the decrypt routine below must use ULONG with explicit <code>BAND(..., 0FFFFFFFFh)</code> masking; record which in the notes before writing step 3.</div></li>
+
+          <li class="step"><span class="t">Write <code>tpsSchema.inc</code></span> with the queues later tasks fill and the byte helpers:
+<pre><code>  OMIT('_EndTpsSchema_',_TpsSchemaPresent_)
+_TpsSchemaPresent_ EQUATE(1)
+  INCLUDE('StringTheory.inc'),ONCE
+  INCLUDE('DynFile.inc'),ONCE
+
+SchFieldQ  QUEUE,TYPE
+Nbr          LONG        ! 1-based, definition order
+Label        STRING(64)  ! after the colon
+TpsType      BYTE
+Type         STRING(12)  ! DynFile type text
+Offset       LONG
+Bytes        LONG        ! total bytes incl. all elements
+Elements     LONG        ! DIM, 1 = scalar
+Size         LONG        ! DynFile Size
+Places       LONG
+Digits       LONG
+Fields       LONG        ! GROUP member count (all nesting)
+Dim2         LONG        ! second extent for DIM(a,b), 0 otherwise
+IsPacked     BYTE        ! PDECIMAL, per Task 4 reconciliation
+Over         LONG        ! field nbr overlaid, 0 = none
+Parent       LONG        ! enclosing GROUP nbr, 0 = record
+Picture      STRING(50)
+           END
+SchKeyQ    QUEUE,TYPE
+Nbr          LONG
+Label        STRING(64)
+IsKey        BYTE
+Dup          BYTE
+Opt          BYTE
+NoCase       BYTE
+Primary      BYTE
+Flags        BYTE
+           END
+SchKeyCompQ QUEUE,TYPE
+KeyNbr       LONG
+FieldNbr     LONG        ! 1-based SchFieldQ.Nbr
+Descending   BYTE
+Rank         LONG
+           END
+WhoQ       QUEUE,TYPE
+FieldNbr     LONG
+Idx          LONG
+           END
+SchMemoQ   QUEUE,TYPE
+Nbr          LONG
+Label        STRING(64)
+Bytes        LONG
+IsBlob       BYTE
+Binary       BYTE
+Flags        LONG
+           END
+
+tpsSchema  CLASS,TYPE,MODULE('tpsSchema.clw'),LINK('tpsSchema.clw')
+st           StringTheory
+buf          &amp;STRING
+size         LONG
+Err          STRING(24)
+ErrMsg       STRING(255)
+Def          &amp;STRING
+Encrypted    BYTE
+Overrun      BYTE
+HaveTable    BYTE
+TableNo      LONG
+Prefix       STRING(16)
+DriverVer    LONG
+RecLen       LONG
+Fields       &amp;SchFieldQ
+Keys         &amp;SchKeyQ
+Comps        &amp;SchKeyCompQ
+Memos        &amp;SchMemoQ
+Construct    PROCEDURE()
+Destruct     PROCEDURE()
+Load         PROCEDURE(STRING path, STRING owner),LONG
+U8           PROCEDURE(LONG o),LONG
+U16          PROCEDURE(LONG o),LONG
+U32          PROCEDURE(LONG o),LONG          ! LE, may be negative
+BE32         PROCEDURE(LONG o),LONG
+ZStr         PROCEDURE(*LONG o),STRING       ! reads zero-terminated, advances o
+Decrypt      PROCEDURE(STRING owner)
+Decrypt64    PROCEDURE(LONG o)
+Walk         PROCEDURE(),LONG                ! finds and merges 0xFA records
+Bad          PROCEDURE(STRING why),LONG      ! sets DEFINITION_UNREADABLE, returns 2
+DeRle        PROCEDURE(LONG o, LONG clen, StringTheory outp),LONG
+           END
+  _EndTpsSchema_</code></pre></li>
+
+          <li class="step"><span class="t">Write the raw layer in <code>tpsSchema.clw</code>.</span> Offsets below are 0-based file offsets; <code>buf[]</code> is 1-based, so every helper adds 1.
+<pre><code>  MEMBER()
+  INCLUDE('tpsSchema.inc'),ONCE
+  MAP
+  END
+Kw    LONG,DIM(16)          ! decryption key schedule, module static (OVER is not allowed on class members)
+Kb    STRING(64),OVER(Kw)
+
+tpsSchema.Construct  PROCEDURE()
+  CODE
+  SELF.Fields &amp;= NEW SchFieldQ; SELF.Keys &amp;= NEW SchKeyQ
+  SELF.Comps  &amp;= NEW SchKeyCompQ; SELF.Memos &amp;= NEW SchMemoQ
+
+tpsSchema.Destruct   PROCEDURE()
+  CODE
+  DISPOSE(SELF.Fields); DISPOSE(SELF.Keys); DISPOSE(SELF.Comps); DISPOSE(SELF.Memos)
+  IF NOT SELF.Def &amp;= NULL THEN DISPOSE(SELF.Def).
+
+tpsSchema.Bad  PROCEDURE(STRING why)
+  CODE
+  SELF.Err = 'DEFINITION_UNREADABLE'; SELF.ErrMsg = CLIP(why) &amp; '; run TPSFix'
+  RETURN 2
+
+! Every byte helper range-checks; an out-of-range read sets SELF.Overrun and returns 0. Parse and Walk
+! test SELF.Overrun after each structure and return Bad('read past end of ...') when it is set.
+tpsSchema.U8   PROCEDURE(LONG o)
+  CODE
+  IF o &lt; 0 OR o &gt;= SELF.size THEN SELF.Overrun = 1; RETURN 0.
+  RETURN VAL(SELF.buf[o+1])
+
+tpsSchema.U16  PROCEDURE(LONG o)
+v  USHORT
+s  STRING(2),OVER(v)
+  CODE
+  IF o &lt; 0 OR o+2 &gt; SELF.size THEN SELF.Overrun = 1; RETURN 0.
+  s = SELF.buf[o+1 : o+2]
+  RETURN v
+
+tpsSchema.U32  PROCEDURE(LONG o)
+v  LONG
+s  STRING(4),OVER(v)
+  CODE
+  IF o &lt; 0 OR o+4 &gt; SELF.size THEN SELF.Overrun = 1; RETURN 0.
+  s = SELF.buf[o+1 : o+4]
+  RETURN v
+
+tpsSchema.BE32 PROCEDURE(LONG o)
+v  LONG
+s  STRING(4),OVER(v)
+  CODE
+  s = SELF.buf[o+4] &amp; SELF.buf[o+3] &amp; SELF.buf[o+2] &amp; SELF.buf[o+1]
+  RETURN v
+
+tpsSchema.ZStr PROCEDURE(*LONG o)
+start LONG
+  CODE
+  start = o
+  LOOP WHILE o &lt; SELF.size AND VAL(SELF.buf[o+1]) &lt;&gt; 0
+    o += 1
+  END
+  IF o &gt;= SELF.size THEN SELF.Overrun = 1; RETURN ''.       ! no terminator before end of data
+  o += 1                         ! step over the terminator
+  IF o - 1 &gt; start THEN RETURN SELF.buf[start+1 : o-1].
+  RETURN ''
+
+tpsSchema.Load PROCEDURE(STRING path, STRING owner)
+  CODE
+  IF NOT EXISTS(path)
+    SELF.Err = 'FILE_NOT_FOUND'; SELF.ErrMsg = 'File not found: ' &amp; CLIP(path); RETURN 2
+  END
+  IF SELF.st.LoadFile(path) = 0
+    SELF.Err = 'FILE_NOT_FOUND'; SELF.ErrMsg = 'Cannot read ' &amp; CLIP(path) &amp; ': ' &amp; SELF.st.lastError; RETURN 2
+  END
+  SELF.buf &amp;= SELF.st.valueptr
+  SELF.size = SELF.st.Length()
+  IF SELF.size &lt; 200h
+    SELF.Err = 'DEFINITION_UNREADABLE'; SELF.ErrMsg = 'File shorter than the 512-byte TPS header'; RETURN 2
+  END
+  IF SELF.buf[0Fh : 12h] &lt;&gt; 'tOpS'
+    IF owner = ''
+      SELF.Err = 'OWNER_REQUIRED'; SELF.ErrMsg = 'Not a plain TopSpeed file; if it is encrypted pass --owner'; RETURN 2
+    END
+    SELF.Decrypt(owner)
+    IF SELF.buf[0Fh : 12h] &lt;&gt; 'tOpS'
+      SELF.Err = 'OWNER_WRONG'; SELF.ErrMsg = 'Owner string does not decrypt this file'; RETURN 2
+    END
+    SELF.Encrypted = 1
+  END
+  IF SELF.U32(0) &lt;&gt; 0
+    SELF.Err = 'DEFINITION_UNREADABLE'; SELF.ErrMsg = 'Header address is not zero'; RETURN 2
+  END
+  RETURN SELF.Walk()</code></pre>
+          Decryption, ported exactly (owner bytes as given, ASCII; the Java reads them as cp1258 which is identical for ASCII):
+<pre><code>tpsSchema.Decrypt PROCEDURE(STRING owner)
+ownerBytes STRING(65)
+klen  LONG
+t     LONG
+tx    LONG
+i     LONG
+wa    LONG
+pb    LONG
+wb    LONG
+ofs   LONG
+endo  LONG
+  CODE
+  klen = LEN(CLIP(owner)) + 1               ! trailing zero byte is part of the key
+  ownerBytes = CLIP(owner) &amp; '&lt;0&gt;'
+  LOOP t = 0 TO 63
+    tx = BAND(t * 11h, 3Fh)
+    Kb[tx+1] = CHR(BAND(t + VAL(ownerBytes[((t+1) % klen) + 1]), 0FFh))
+  END
+  LOOP i = 1 TO 2                            ! shuffle twice
+    LOOP t = 1 TO 16
+      wa = Kw[t]; pb = BAND(wa, 0Fh) + 1; wb = Kw[pb]
+      Kw[pb] = wa + BAND(wa, wb)        ! unsigned add, wraps
+      Kw[t]  = BOR(wa, wb) + wa
+    END
+  END
+  SELF.Decrypt64(0); SELF.Decrypt64(64); SELF.Decrypt64(128); SELF.Decrypt64(192)
+  SELF.Decrypt64(256); SELF.Decrypt64(320); SELF.Decrypt64(384); SELF.Decrypt64(448)
+  IF SELF.buf[0Fh : 12h] &lt;&gt; 'tOpS' THEN RETURN.               ! wrong owner: caller reports OWNER_WRONG, never follow block pointers
+  LOOP t = 0 TO 59
+    ofs  = BSHIFT(SELF.U32(20h + t*4), 8) + 200h
+    endo = BSHIFT(SELF.U32(110h + t*4), 8) + 200h
+    IF (ofs = 200h AND endo = 200h) OR ofs &lt; 200h OR ofs &gt;= SELF.size OR endo &lt; ofs THEN CYCLE.
+    IF endo &gt; SELF.size THEN endo = SELF.size.
+    LOOP WHILE ofs + 64 &lt;= endo
+      SELF.Decrypt64(ofs); ofs += 64
+    END
+  END
+
+tpsSchema.Decrypt64 PROCEDURE(LONG o)
+dw    LONG,DIM(16)
+db    STRING(64),OVER(dw)
+t     LONG
+ka    LONG
+pb    LONG
+d1    LONG
+d2    LONG
+nk    LONG
+  CODE
+  db = SELF.buf[o+1 : o+64]
+  LOOP t = 16 TO 1 BY -1
+    ka = Kw[t]; pb = BAND(ka, 0Fh) + 1
+    d1 = dw[t]  - ka
+    d2 = dw[pb] - ka
+    nk = BXOR(ka, -1)
+    dw[t]  = BOR(BAND(d1, ka), BAND(d2, nk))
+    dw[pb] = BOR(BAND(d2, ka), BAND(d1, nk))
+  END
+  SELF.buf[o+1 : o+64] = db</code></pre>
+          Note the header decrypt is the first 0x200 bytes in eight 64-byte chunks, before any header field is read, exactly as the reference does. Block walk, page scan, RLE, records and 0xFA collection:
+<pre><code>tpsSchema.DeRle PROCEDURE(LONG o, LONG clen, StringTheory outp)
+p     LONG
+endo  LONG
+skip  LONG
+msb   LONG
+rep   LONG
+cnt   LONG
+  CODE
+  p = o; endo = o + clen
+  LOOP WHILE p &lt; endo
+    skip = SELF.U8(p); p += 1
+    IF skip = 0 THEN RETURN 0.
+    IF skip &gt; 7Fh
+      IF p &gt;= endo THEN RETURN 0.
+      msb = SELF.U8(p); p += 1
+      skip = BAND(BSHIFT(msb, 7), 0FF00h) + BAND(skip, 7Fh) + 80h * BAND(msb, 1)
+    END
+    IF p + skip &gt; endo THEN RETURN 0.
+    outp.Append(SELF.buf[p+1 : p+skip]); p += skip
+    IF p &gt;= endo THEN BREAK.
+    rep = SELF.U8(p-1)                       ! last literal byte
+    cnt = SELF.U8(p); p += 1
+    IF cnt &gt; 7Fh
+      IF p &gt;= endo THEN RETURN 0.
+      msb = SELF.U8(p); p += 1
+      cnt = BAND(BSHIFT(msb, 7), 0FF00h) + BAND(cnt, 7Fh) + 80h * BAND(msb, 1)
+    END
+    outp.Append(ALL(CHR(rep), cnt))
+  END
+  RETURN 1
+
+tpsSchema.Walk PROCEDURE()
+t        LONG
+ofs      LONG
+endo     LONG
+pos      LONG
+psize    LONG
+pusize   LONG
+recs     LONG
+flags    LONG
+page     StringTheory
+pg       &amp;STRING
+plen     LONG
+rp       LONG                                   ! cursor inside page data
+rflags   LONG
+rlen     LONG
+hlen     LONG
+copy     LONG
+prev     StringTheory                           ! previous record data
+cur      StringTheory
+hdr      STRING(16)
+blk      LONG
+parts    QUEUE
+Blk        LONG
+Data       &amp;StringTheory
+         END
+seenTbl  LONG
+i        LONG
+maxblk   LONG
+merged   StringTheory
+  CODE
+  LOOP t = 0 TO 59
+    ofs  = BSHIFT(SELF.U32(20h + t*4), 8) + 200h
+    endo = BSHIFT(SELF.U32(110h + t*4), 8) + 200h
+    IF (ofs = 200h AND endo = 200h) OR ofs &gt;= SELF.size THEN CYCLE.
+    IF endo &gt; SELF.size THEN endo = SELF.size.
+    pos = ofs
+    LOOP WHILE pos + 13 &lt;= endo
+      IF SELF.U32(pos) &lt;&gt; pos                   ! not a page start: scan forward on 0x100 boundaries
+        pos = BAND(pos, 0FFFFFF00h) + 100h
+        CYCLE
+      END
+      psize  = SELF.U16(pos+4); pusize = SELF.U16(pos+6); recs = SELF.U16(pos+10); flags = SELF.U8(pos+12)
+      IF psize &lt; 13 OR pos + psize &gt; endo THEN RETURN SELF.Bad('page size out of range at ' &amp; pos).
+      IF flags = 0
+        page.Free()
+        IF psize &lt;&gt; pusize
+          IF NOT SELF.DeRle(pos+13, psize-13, page) THEN RETURN SELF.Bad('bad RLE data in page at ' &amp; pos).
+          IF page.Length() &lt;&gt; pusize - 13 THEN RETURN SELF.Bad('decompressed size mismatch in page at ' &amp; pos).
+        ELSE
+          page.SetValue(SELF.buf[pos+14 : pos+psize])
+        END
+        pg &amp;= page.valueptr; plen = page.Length()
+        rp = 1; prev.Free()
+        LOOP i = 1 TO recs
+          IF rp &gt; plen THEN RETURN SELF.Bad('page declares ' &amp; recs &amp; ' records but data ends after ' &amp; (i-1)).
+          rflags = VAL(pg[rp]); rp += 1
+          IF BAND(rflags, 80h) THEN IF rp + 1 &gt; plen THEN RETURN SELF.Bad('record header truncated').; rlen = VAL(pg[rp]) + VAL(pg[rp+1])*256; rp += 2.
+          IF BAND(rflags, 40h) THEN IF rp + 1 &gt; plen THEN RETURN SELF.Bad('record header truncated').; hlen = VAL(pg[rp]) + VAL(pg[rp+1])*256; rp += 2.
+          copy = BAND(rflags, 3Fh)
+          IF i = 1 AND BAND(rflags, 0C0h) &lt;&gt; 0C0h THEN RETURN SELF.Bad('first record on page lacks 0xC0 header flags').
+          IF copy &gt; prev.Length() OR rlen &lt; copy OR rp + rlen - copy - 1 &gt; plen THEN RETURN SELF.Bad('record length exceeds page').
+          cur.SetValue(CHOOSE(copy &gt; 0, prev.Sub(1, copy), '') &amp; pg[rp : rp + rlen - copy - 1])
+          rp += rlen - copy
+          prev.SetValue(cur.GetValue())
+          IF hlen &gt;= 7 AND VAL(cur.valueptr[1]) &lt;&gt; 0FEh AND VAL(cur.valueptr[5]) = 0FAh
+            hdr = cur.Sub(1, hlen)
+            blk = VAL(hdr[6]) + VAL(hdr[7])*256
+            seenTbl = VAL(hdr[4]) + VAL(hdr[3])*256 + VAL(hdr[2])*65536 + VAL(hdr[1])*16777216
+            IF NOT SELF.HaveTable THEN SELF.TableNo = seenTbl; SELF.HaveTable = 1.
+            IF seenTbl &lt;&gt; SELF.TableNo
+              SELF.Err = 'DEFINITION_UNREADABLE'
+              SELF.ErrMsg = 'File holds more than one table (' &amp; SELF.TableNo &amp; ' and ' &amp; seenTbl &amp; '); multi-table TPS files are not supported'
+              LOOP i = 1 TO RECORDS(parts); GET(parts, i); DISPOSE(parts.Data); END
+              RETURN 2
+            END
+            parts.Blk = blk; GET(parts, parts.Blk)
+            IF ERRORCODE()
+              parts.Blk = blk; parts.Data &amp;= NEW StringTheory
+              parts.Data.SetValue(cur.Sub(hlen+1, rlen-hlen)); ADD(parts, parts.Blk)
+              IF blk &gt; maxblk THEN maxblk = blk.
+            END
+          END
+        END
+      END
+      pos += psize
+      IF SELF.Overrun THEN RETURN SELF.Bad('read past end of file while walking pages').
+    END
+  END
+  IF RECORDS(parts) = 0
+    SELF.Err = 'DEFINITION_UNREADABLE'; SELF.ErrMsg = 'No table definition record found; run TPSFix'; RETURN 2
+  END
+  LOOP i = 0 TO maxblk
+    parts.Blk = i; GET(parts, parts.Blk)
+    IF ERRORCODE()
+      SELF.Err = 'DEFINITION_UNREADABLE'; SELF.ErrMsg = 'Definition block ' &amp; i &amp; ' missing'; RETURN 2
+    END
+    merged.Append(parts.Data.GetValue())
+  END
+  SELF.Def &amp;= NEW STRING(merged.Length())
+  SELF.Def = merged.GetValue()
+  LOOP i = 1 TO RECORDS(parts); GET(parts, i); DISPOSE(parts.Data); END
+  RETURN 0</code></pre>
+          The first record on a page carries both lengths (flags 0xC0), so <code>rlen</code>/<code>hlen</code> are always set before use. A Clarion FILE is one table; a second table number in the same file is rejected as shown, before any merge.</li>
+
+          <li class="step"><span class="t">Wire <code>--dump-def</code>.</span> In <code>tpscli.clw</code> add option <code>--dump-def &lt;path&gt;</code> that calls <code>Sch.Load(path, Opt.Owner)</code>, prints <code>Sch.Err</code>/<code>ErrMsg</code> on failure (exit 2), else prints <code>len=N table=T encrypted=E</code> then the bytes as hex, 32 per line. Add <code>tpsSchema.clw</code> to the cwproj.</li>
+
+          <li class="step"><span class="t">Run against the corpus.</span>
+<pre><code>tpscli.exe --dump-def testdata\ALLTYPES.TPS
+tpscli.exe --dump-def testdata\SECRET.TPS                  # expect OWNER_REQUIRED, exit 2
+tpscli.exe --owner s3cret --dump-def testdata\SECRET.TPS
+tpscli.exe --owner nope --dump-def testdata\SECRET.TPS     # expect OWNER_WRONG
+tpscli.exe --dump-def testdata\gen\mkcorpus.clw             # expect DEFINITION_UNREADABLE (no tOpS, owner absent -&gt; OWNER_REQUIRED is acceptable)</code></pre>
+            <div class="expect">ALLTYPES: first ten bytes decode as driverVersion, recLen, nrOfFields = 16, nrOfMemos = 0, nrOfIndexes = 1 (LE u16 each). SECRET with the right owner: nrOfFields = 2. Record the RLE and page counts you observed in the notes; if the definition record spans more than one block, say so.</div></li>
+
+          <li class="step"><span class="t">Commit.</span> <code>git commit -am "tpsSchema: header, decrypt, page walk, RLE, merged definition"</code></li>
+        </ol>
+      </section>
+
+      <!-- ======================================================================= -->
+      <section class="task">
+        <h2>Task 4 <span class="tasknum">&middot; tpsSchema part B: definition parser and DESCRIBE parity</span></h2>
+        <p>Deliverable: the schema queues filled from the merged definition, and a DESCRIBE JSON (without <code>records</code> yet) that matches the oracle dumps field for field.</p>
+        <div class="files">
+          <div><span class="k">Modify</span> <code>tpsSchema.inc/.clw</code> (add <code>Parse()</code>, <code>DescribeJson(tpsOut)</code>), <code>tpscli.clw</code> (DESCRIBE dispatch via a temporary direct string match; Task 6 replaces it with the parser)</div>
+          <div><span class="k">Produces</span> <code>tpsSchema.Parse(),LONG</code>; <code>SchemaDumpJson(tpsOut o),STRING</code>; <code>DescribeJson(tpsOut o, LONG records),STRING</code>; <code>FindField(STRING label),LONG</code></div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Write the failing check.</span> Create <code>tests\describe.ps1</code> that, for each corpus file, runs <code>tpscli.exe --dump-schema "DESCRIBE [testdata\NAME.TPS]"</code> (with <code>--owner s3cret</code> for SECRET; <code>--dump-schema</code> is a hidden option that prints the internal queues in the oracle's JSON vocabulary instead of the public DESCRIBE shape), loads the JSON, loads <code>testdata\expected\NAME.json</code>, and compares per field: label, type, size, places, dim, over, fields, picture; per memo: label, type, binary, size; per key: label, type, dup, primary, nocase, opt, and the component labels, directions and order. Print one line per mismatch and exit 1 if any.
+            <div class="expect">Run it now: fails with "Parser not implemented yet" on every file.</div></li>
+
+          <li class="step"><span class="t">Implement <code>Parse</code>.</span> Definition cursor <code>o</code> is 0-based into <code>SELF.Def</code>; reuse the byte helpers by temporarily pointing <code>SELF.buf</code>/<code>size</code> at <code>Def</code> (save and restore).
+<pre><code>tpsSchema.Parse PROCEDURE()
+o       LONG
+nF      LONG
+nM      LONG
+nK      LONG
+i       LONG
+j       LONG
+full    STRING(128)
+cpos    LONG
+mask    STRING(64)
+kflags  LONG
+nComp   LONG
+fno     LONG
+cflag   LONG
+saveBuf &amp;STRING
+saveSz  LONG
+target  LONG
+myOfs   LONG
+  CODE
+  saveBuf &amp;= SELF.buf; saveSz = SELF.size; SELF.Overrun = 0
+  SELF.buf &amp;= SELF.Def; SELF.size = LEN(SELF.Def)
+  SELF.DriverVer = SELF.U16(0); SELF.RecLen = SELF.U16(2)
+  nF = SELF.U16(4); nM = SELF.U16(6); nK = SELF.U16(8); o = 10
+  LOOP i = 1 TO nF
+    CLEAR(SELF.Fields)
+    SELF.Fields.Nbr = i
+    SELF.Fields.TpsType = SELF.U8(o); o += 1
+    SELF.Fields.Offset  = SELF.U16(o); o += 2
+    full = SELF.ZStr(o)
+    cpos = INSTRING(':', full, 1, 1)
+    IF cpos
+      IF SELF.Prefix = '' THEN SELF.Prefix = SUB(full, 1, cpos-1).
+      SELF.Fields.Label = SUB(full, cpos+1, LEN(CLIP(full))-cpos)
+    ELSE
+      SELF.Fields.Label = full
+    END
+    SELF.Fields.Elements = SELF.U16(o); o += 2
+    SELF.Fields.Bytes    = SELF.U16(o); o += 2
+    SELF.Fields.Over     = CHOOSE(SELF.U16(o) = 1, -1, 0); o += 2     ! resolved below
+    o += 2                                                              ! ordinal, redundant
+    IF SELF.Fields.Elements &lt; 1 THEN SELF.Fields.Elements = 1.
+    CASE SELF.Fields.TpsType
+    OF 01h ; SELF.Fields.Type = 'BYTE'
+    OF 02h ; SELF.Fields.Type = 'SHORT'
+    OF 03h ; SELF.Fields.Type = 'USHORT'
+    OF 04h ; SELF.Fields.Type = 'DATE'
+    OF 05h ; SELF.Fields.Type = 'TIME'
+    OF 06h ; SELF.Fields.Type = 'LONG'
+    OF 07h ; SELF.Fields.Type = 'ULONG'
+    OF 08h ; SELF.Fields.Type = 'SREAL'
+    OF 09h ; SELF.Fields.Type = 'REAL'
+    OF 0Ah ; SELF.Fields.Type = 'DECIMAL'
+             SELF.Fields.Places = SELF.U8(o); SELF.Fields.Digits = SELF.U8(o+1); o += 2
+             SELF.Fields.Size = SELF.Fields.Digits
+             ! PDECIMAL: Task 4 step 5 compares the raw entry bytes of D and PD in --dump-def; the
+             ! differing byte (expected: the u16 flags word or a distinct type code) sets IsPacked
+             ! and Type = 'PDECIMAL'. Until observed, both are DECIMAL and the oracle diff shows it.
+    OF 12h OROF 13h OROF 14h
+             SELF.Fields.Type = CHOOSE(SELF.Fields.TpsType = 12h, 'STRING', CHOOSE(SELF.Fields.TpsType = 13h, 'CSTRING', 'PSTRING'))
+             SELF.Fields.Size = SELF.U16(o); o += 2
+             mask = SELF.ZStr(o)
+             IF mask = '' THEN o += 1 ELSE SELF.Fields.Picture = mask.
+    OF 16h ; SELF.Fields.Type = 'GROUP'
+    ELSE
+      SELF.Err = 'UNSUPPORTED_FIELD_TYPE'
+      SELF.ErrMsg = 'Field ' &amp; CLIP(SELF.Fields.Label) &amp; ' has TPS type code ' &amp; SELF.Fields.TpsType &amp; ' which tpscli does not support'
+      SELF.buf &amp;= saveBuf; SELF.size = saveSz
+      RETURN 2
+    END
+    ADD(SELF.Fields)
+  END
+  ! group membership, member counts, OVER targets
+  LOOP i = 1 TO RECORDS(SELF.Fields)
+    GET(SELF.Fields, i)
+    IF SELF.Fields.Type = 'GROUP'
+      SELF.Fields.Fields = 0
+      LOOP j = i+1 TO RECORDS(SELF.Fields)
+        GET(SELF.Fields, j)
+        IF SELF.Fields.Offset &gt;= SchFieldOffsetEnd(SELF, i) THEN BREAK.
+        ! nearest enclosing wins: a later (inner) group has the larger number
+        IF SELF.Fields.Parent = 0 OR SELF.Fields.Parent &lt; i THEN SELF.Fields.Parent = i; PUT(SELF.Fields).
+        GET(SELF.Fields, i); SELF.Fields.Fields += 1; PUT(SELF.Fields)
+      END
+    END
+    GET(SELF.Fields, i)
+    IF SELF.Fields.Over = -1
+      target = 0; myOfs = SELF.Fields.Offset
+      LOOP j = i-1 TO 1 BY -1
+        GET(SELF.Fields, j)
+        IF SELF.Fields.Offset = myOfs THEN target = j; BREAK.
+      END
+      GET(SELF.Fields, i); SELF.Fields.Over = target; PUT(SELF.Fields)
+      IF target = 0 THEN RETURN SELF.Bad('OVER field ' &amp; CLIP(SELF.Fields.Label) &amp; ' has no field at its offset').
+    END
+  END
+  LOOP i = 1 TO nM
+    CLEAR(SELF.Memos); SELF.Memos.Nbr = i
+    full = SELF.ZStr(o)
+    IF full = '' THEN IF SELF.U8(o) &lt;&gt; 1 THEN RETURN SELF.Bad('memo entry marker byte is not 0x01').; o += 1.   ! external name; empty is followed by 0x01
+    full = SELF.ZStr(o)
+    cpos = INSTRING(':', full, 1, 1)
+    SELF.Memos.Label = CHOOSE(cpos &gt; 0, SUB(full, cpos+1, LEN(CLIP(full))-cpos), full)
+    SELF.Memos.Bytes = SELF.U16(o); o += 2
+    SELF.Memos.Flags = SELF.U16(o); o += 2
+    SELF.Memos.IsBlob = CHOOSE(BAND(SELF.Memos.Flags, 4) &lt;&gt; 0, 1, 0)
+    ADD(SELF.Memos)
+  END
+  LOOP i = 1 TO nK
+    CLEAR(SELF.Keys); SELF.Keys.Nbr = i
+    full = SELF.ZStr(o)
+    IF full = '' THEN IF SELF.U8(o) &lt;&gt; 1 THEN RETURN SELF.Bad('key entry marker byte is not 0x01').; o += 1.
+    full = SELF.ZStr(o)
+    cpos = INSTRING(':', full, 1, 1)
+    SELF.Keys.Label = CHOOSE(cpos &gt; 0, SUB(full, cpos+1, LEN(CLIP(full))-cpos), full)
+    kflags = SELF.U8(o); o += 1
+    SELF.Keys.Flags   = kflags
+    SELF.Keys.Dup     = BAND(kflags, 01h) / 01h
+    SELF.Keys.Opt     = BAND(kflags, 02h) / 02h
+    SELF.Keys.NoCase  = BAND(kflags, 04h) / 04h
+    SELF.Keys.Primary = BAND(kflags, 10h) / 10h
+    SELF.Keys.IsKey   = CHOOSE(BAND(kflags, 60h) = 0, 1, 0)
+    nComp = SELF.U16(o); o += 2
+    LOOP j = 1 TO nComp
+      fno = SELF.U16(o); cflag = SELF.U16(o+2); o += 4
+      CLEAR(SELF.Comps)
+      SELF.Comps.KeyNbr = i; SELF.Comps.FieldNbr = fno + 1; SELF.Comps.Descending = CHOOSE(cflag &lt;&gt; 0, 1, 0); SELF.Comps.Rank = j
+      ADD(SELF.Comps)
+    END
+    ADD(SELF.Keys)
+  END
+  SELF.buf &amp;= saveBuf; SELF.size = saveSz
+  IF SELF.Overrun THEN RETURN SELF.Bad('definition record shorter than its field, memo and key counts imply').
+  RETURN 0</code></pre>
+          <code>SchFieldOffsetEnd(SELF, i)</code> and <code>SchFieldOffsetOf(SELF, i)</code> are two five-line module procedures (declared in the MAP) that GET field i, return <code>Offset + Bytes</code> or <code>Offset</code>, and leave the queue positioned where the caller expects (re-GET after). The <code>fno + 1</code> assumes key component field numbers are 0-based definition ordinals; step 4 confirms.</li>
+
+          <li class="step"><span class="t">Implement <code>SchemaDumpJson</code> and <code>DescribeJson</code>.</span> <code>SchemaDumpJson</code> walks the four queues and prints the same member names the Task 2 oracle prints (<code>fields</code>, <code>memos</code>, <code>keys</code> with <code>components</code>) so parity is a literal comparison. <code>DescribeJson</code> emits the spec &sect;4 shape: <code>file</code>, <code>encrypted</code>, <code>records</code> (pass -1 for now and omit the member when negative), <code>columns</code> nested (a GROUP column has <code>members</code>; a dimmed field has <code>dim</code>; DECIMAL has <code>size</code> and <code>places</code>; strings <code>size</code>), then MEMO/BLOB columns with <code>type</code> MEMO or BLOB and <code>encoding: "base64"</code> on BLOB, then <code>keys</code> with <code>components</code> as <code>{ "col", "asc" }</code>, <code>nocase</code>/<code>optional</code> only when true. Use <code>Parent</code> to nest: a field is emitted inside the nearest group whose <code>Nbr</code> equals its <code>Parent</code>. Member names are dotted from the root (<code>ADDR.GEO.LAT</code>).</li>
+
+          <li class="step"><span class="t">Temporary dispatch.</span> In <code>tpscli.clw</code>, if the SQL starts with <code>DESCRIBE</code> (case-insensitive) take the bracketed path, <code>Load</code> + <code>Parse</code>, print <code>DescribeJson</code>, exit 0. Any schema error: print <code>{ "ok": false, "op": "describe", "error": {...}, "complete": true }</code> and exit 2. Build.</li>
+
+          <li class="step"><span class="t">Run <code>tests\describe.ps1</code> and reconcile with the oracle.</span> Work the mismatches in this order, recording each finding in the notes:
+            <ul>
+              <li>DECIMAL <code>size</code>: if the oracle reports digits, keep <code>Size = Digits</code>; if it reports bytes, set <code>Size = (Digits + 2) / 2</code>.</li>
+              <li>PDECIMAL: the oracle reports <code>PD</code> as <code>PDECIMAL</code>. Diff the raw definition bytes of <code>D</code> and <code>PD</code> from <code>--dump-def</code>; pin the distinguishing byte or bit as <code>IsPacked</code> and emit <code>Type = 'PDECIMAL'</code>. If no byte differs, PDECIMAL is not recoverable: record it, and the driver's error 47 in Task 5 decides whether DECIMAL is an acceptable substitute.</li>
+              <li>DIM(a,b): the oracle reports <code>Grid</code> with <code>dim</code>; check whether the TPS entry carries both extents (<code>elements</code> = 6 only, or more). Set <code>Dim2</code> from what is there; if only the product exists, 2-D fields are one-dimensional to tpscli and the notes say so.</li>
+              <li>CSTRING/PSTRING <code>size</code>: match the oracle (it may be declared length or length + 1).</li>
+              <li>GROUP <code>fields</code>: if the oracle counts only direct children, subtract nested groups' member counts.</li>
+              <li>OVER: the oracle's <code>over</code> for <code>RawL</code> is the field number of <code>Raw</code>; confirm the offset match finds it.</li>
+              <li>Key component field numbers: if <code>KEYS.json</code> components resolve to the wrong labels, the ordinal is 1-based already: change <code>fno + 1</code> to <code>fno</code>.</li>
+              <li>PRIMARY: <code>KEYS.json</code> has <code>primary: 1</code> on PKey and 0 on the others. Print each key's raw <code>flags</code> byte in the mismatch line. If bit 0x10 is not what separates them, find the bit that is and change the mask; if no bit separates them, set <code>Primary = 0</code> always and log that PRIMARY is not recoverable from the file (the driver will still open, PRIMARY is advisory for TopSpeed).</li>
+              <li>Memo <code>binary</code>: the oracle shows <code>Bin</code> with <code>binary: 1</code>. Print the raw memo flags; pin the bit that differs between <code>Notes</code> and <code>Bin</code> as <code>MEMO_BINARY_BIT</code> and set <code>Binary</code> from it.</li>
+            </ul>
+            <div class="expect">Expected after reconciliation: <code>tests\describe.ps1</code> prints nothing and exits 0 for all six files.</div></li>
+
+          <li class="step"><span class="t">Commit.</span> <code>git add -A; git commit -m "tpsSchema: definition parser, DESCRIBE parity with DynFile oracle"</code></li>
+        </ol>
+      </section>
+
+      <!-- ======================================================================= -->
+      <section class="task">
+        <h2>Task 5 <span class="tasknum">&middot; DynFile build and shared open</span></h2>
+        <p>Deliverable: from the schema queues, a live FILE opened shared through the real TopSpeed driver, with error 47 mapped, and DESCRIBE now reporting <code>records</code> from that open file. Passing this on every corpus file is the proof that the reconstructed layout is what the driver stored.</p>
+        <div class="files">
+          <div><span class="k">Modify</span> <code>tpsSchema.inc/.clw</code>: add <code>tpsDynFile</code> (derived), <code>Build(),LONG</code>, <code>Open(),LONG</code>, <code>Close()</code>, <code>F &amp;FILE</code>, <code>Dyn tpsDynFile</code>; <code>tpscli.clw</code>: static driver placeholder</div>
+          <div><span class="k">Produces</span> <code>tpsSchema.Build(FILE driver),LONG</code>, <code>tpsSchema.Open(),LONG</code>, <code>tpsSchema.F</code> (open &amp;FILE), <code>tpsSchema.KeyRef(LONG keyNbr),*KEY</code>, <code>tpsSchema.FieldRef(LONG fieldNbr, LONG elem),*?</code> (ANY to a scalar or array element), <code>tpsSchema.MemoRef(LONG memoNbr),*?</code>, <code>tpsSchema.Who</code>, a queue (<code>FieldNbr LONG, Idx LONG</code>) filled in <code>Open</code> mapping field Nbr to WHAT index</div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Static driver placeholder.</span> In <code>tpscli.clw</code> global data (Lib-linked exes cannot use PROP:Driver):
+<pre><code>TpsDrv   FILE,DRIVER('TOPSPEED'),NAME('tpsdrv.tps'),PRE(TD)
+Record     RECORD
+Dummy        BYTE
+           END
+         END</code></pre>
+          It is never opened; it exists so <code>SetDriver(TpsDrv)</code> can hand the driver to DynFile.</li>
+
+          <li class="step"><span class="t">Derived class with a silent FixFormat.</span> In <code>tpsSchema.inc</code>:
+<pre><code>tpsDynFile CLASS(DynFile),TYPE,MODULE('tpsSchema.clw'),LINK('tpsSchema.clw')
+FixFormat    PROCEDURE(),LONG,PROC       ! shadows the modal one
+           END</code></pre>
+          In <code>tpsSchema.clw</code>:
+<pre><code>tpsDynFile.FixFormat PROCEDURE()
+  CODE
+  IF ~SELF.StructCreated THEN SELF.CreateStruct().
+  FIXFORMAT(SELF.rDynF)
+  RETURN ERRORCODE()</code></pre></li>
+
+          <li class="step"><span class="t">Build and open.</span>
+<pre><code>tpsSchema.Build PROCEDURE(FILE driver)
+fg   LIKE(TFieldGrp)
+kg   LIKE(TKeyGrp)
+mg   LIKE(TMemoGrp)
+i    LONG
+j    LONG
+lbl  STRING(64)
+  CODE
+  SELF.Dyn.ResetAll()
+  SELF.Dyn.SetDriver(driver)          ! the caller passes its static TOPSPEED placeholder
+  SELF.Dyn.SetName(SELF.Path)
+  SELF.Dyn.SetPrefix(SELF.Prefix)
+  IF SELF.Encrypted THEN SELF.Dyn.SetOwner(SELF.Owner); SELF.Dyn.SetEncrypt(1).
+  SELF.Dyn.SetCreate(0)
+  LOOP i = 1 TO RECORDS(SELF.Fields)
+    GET(SELF.Fields, i)
+    CLEAR(fg)
+    fg.FieldNbr = i; fg.Label = SELF.Fields.Label; fg.Type = SELF.Fields.Type
+    fg.Size = SELF.Fields.Size; fg.Places = SELF.Fields.Places
+    fg.Dim = CHOOSE(SELF.Fields.Elements &gt; 1, SELF.Fields.Elements, 0)
+    fg.Over = SELF.Fields.Over; fg.Fields = SELF.Fields.Fields; fg.Picture = SELF.Fields.Picture
+    SELF.Dyn.AddField(fg)
+  END
+  LOOP i = 1 TO RECORDS(SELF.Memos)
+    GET(SELF.Memos, i)
+    CLEAR(mg)
+    mg.MemoNbr = -i; mg.Label = SELF.Memos.Label
+    mg.Type = CHOOSE(SELF.Memos.IsBlob, 'B', 'M'); mg.Binary = SELF.Memos.Binary; mg.size = SELF.Memos.Bytes
+    SELF.Dyn.AddMemo(mg)
+  END
+  LOOP i = 1 TO RECORDS(SELF.Keys)
+    GET(SELF.Keys, i)
+    CLEAR(kg)
+    kg.KeyNbr = i; kg.Label = SELF.Keys.Label; kg.Type = CHOOSE(SELF.Keys.IsKey, 'K', 'I')
+    kg.Dup = SELF.Keys.Dup; kg.Primary = SELF.Keys.Primary; kg.NoCase = SELF.Keys.NoCase; kg.Opt = SELF.Keys.Opt
+    SELF.Dyn.AddKey(kg)
+    LOOP j = 1 TO RECORDS(SELF.Comps)
+      GET(SELF.Comps, j)
+      IF SELF.Comps.KeyNbr &lt;&gt; i THEN CYCLE.
+      GET(SELF.Fields, SELF.Comps.FieldNbr); lbl = SELF.Fields.Label
+      SELF.Dyn.AddFieldToKey(SELF.Keys.Label, lbl, CHOOSE(SELF.Comps.Descending, 0, 1), SELF.Comps.Rank)
+    END
+  END
+  IF SELF.Dyn.FixFormat()
+    SELF.Err = 'DEFINITION_UNREADABLE'
+    SELF.ErrMsg = 'DynFile could not build the structure: ' &amp; FILEERRORCODE() &amp; ' ' &amp; CLIP(FILEERROR())
+    RETURN 2
+  END
+  SELF.F &amp;= SELF.Dyn.GetFileRef()
+  RETURN 0
+
+tpsSchema.Open PROCEDURE()
+rec   &amp;GROUP
+n     LONG
+i     LONG
+  CODE
+  SHARE(SELF.F)
+  CASE ERRORCODE()
+  OF 0
+  OF 47
+    SELF.Err = 'DEFINITION_MISMATCH'
+    SELF.ErrMsg = 'Driver rejected the reconstructed structure (47): ' &amp; CLIP(FILEERRORCODE()) &amp; ' ' &amp; CLIP(FILEERROR())
+    RETURN 2
+  OF 2 OROF 3
+    SELF.Err = 'FILE_NOT_FOUND'; SELF.ErrMsg = CLIP(ERROR()); RETURN 2
+  ELSE
+    SELF.Err = 'DRIVER'; SELF.ErrMsg = ERRORCODE() &amp; ' ' &amp; CLIP(ERROR()) &amp; ' / ' &amp; CLIP(FILEERRORCODE()) &amp; ' ' &amp; CLIP(FILEERROR()); RETURN 2
+  END
+  ! map schema field numbers to WHAT() indexes by label
+  rec &amp;= SELF.F{PROP:Record}
+  n = SELF.F{PROP:Fields}
+  FREE(SELF.Who)
+  LOOP i = 1 TO RECORDS(SELF.Fields)
+    GET(SELF.Fields, i)
+    SELF.Who.FieldNbr = i; SELF.Who.Idx = 0
+    LOOP j = 1 TO n
+      IF UPPER(CLIP(WHO(rec, j))) = UPPER(CLIP(SELF.Fields.Label)) THEN SELF.Who.Idx = j; BREAK.
+    END
+    ADD(SELF.Who)
+    IF SELF.Who.Idx = 0
+      CLOSE(SELF.F)
+      SELF.Err = 'DEFINITION_UNREADABLE'; SELF.ErrMsg = 'Field ' &amp; CLIP(SELF.Fields.Label) &amp; ' is not visible in the opened record buffer'
+      RETURN 2
+    END
+  END
+  RETURN 0
+
+tpsSchema.FieldRef PROCEDURE(LONG fieldNbr, LONG elem)
+rec   &amp;GROUP
+r     ANY
+  CODE
+  r &amp;= NULL
+  IF fieldNbr &lt; 1 OR fieldNbr &gt; RECORDS(SELF.Fields) THEN RETURN r.
+  GET(SELF.Who, fieldNbr)                     ! Who is in FieldNbr order, position = FieldNbr
+  rec &amp;= SELF.F{PROP:Record}
+  IF elem &gt; 0 THEN r &amp;= WHAT(rec, SELF.Who.Idx, elem) ELSE r &amp;= WHAT(rec, SELF.Who.Idx).
+  RETURN r
+
+! elem is a single flattened 1-based element index. For a DIM(a,b) field the caller computes
+! (e1 - 1) * b + e2. For a leaf inside a DIM(n) group the caller passes the group element,
+! since WHAT addresses the leaf's storage within that group element. 0 means scalar.
+
+tpsSchema.MemoRef PROCEDURE(LONG memoNbr)
+r  ANY
+  CODE
+  r &amp;= SELF.F{PROP:Field, -memoNbr}
+  RETURN r
+
+tpsSchema.KeyRef PROCEDURE(LONG keyNbr)
+  CODE
+  GET(SELF.Keys, keyNbr)
+  RETURN SELF.Dyn.GetKeyRef(SELF.Keys.Label)</code></pre>
+          <code>Path</code> and <code>Owner</code> are new STRING members set by <code>Load</code>. <code>j</code> is a local in <code>Open</code>; <code>Who</code> is a <code>WhoQ</code> member (declared in the .inc next to the other queues) allocated in <code>Construct</code> and disposed in <code>Destruct</code>. <code>FieldRef</code> returns a null ANY for a bad field number; callers treat null as a <code>DRIVER</code> error.</li>
+
+          <li class="step"><span class="t">DESCRIBE reports records.</span> The temporary DESCRIBE path now does Load, Parse, <code>Build(TpsDrv)</code>, Open, then <code>DescribeJson(Out, RECORDS(Sch.F))</code>, then <code>CLOSE(Sch.F)</code>. Extend <code>tests\describe.ps1</code> to assert <code>records</code> equals 3, 5, 2, 2, 3, 2 for ALLTYPES, KEYS, GROUPS, MEMOS, NOKEY, SECRET.</li>
+
+          <li class="step"><span class="t">Run it.</span> <code>powershell -File tests\describe.ps1</code>.
+            <div class="expect">All six open, record counts match. A 47 on any file means a mapping decision from Task 4 is wrong for the driver even though it matched the oracle text: print <code>FILEERRORCODE()</code>, which names the object, index and property, and fix that mapping. Typical first offenders: the memo <code>Binary</code> bit, DECIMAL <code>Size</code>, CSTRING size. Record the final mapping table in the notes.</div></li>
+
+          <li class="step"><span class="t">Negative test.</span> Temporarily change the parser to add 1 to every STRING size, rebuild, run DESCRIBE on ALLTYPES.
+            <div class="expect"><code>DEFINITION_MISMATCH</code>, exit 2, message containing the FIELD index the driver rejected. Revert the change, rebuild, re-run describe.ps1 green.</div></li>
+
+          <li class="step"><span class="t">Commit.</span> <code>git commit -am "tpsSchema: DynFile build, shared open, error 47 mapping, record counts"</code></li>
+        </ol>
+      </section>
+
+      <!-- ======================================================================= -->
+      <section class="task">
+        <h2>Task 6 <span class="tasknum">&middot; tpsSql: tokenizer, parser, column resolution, expression builder, --parse-only</span></h2>
+        <p>Deliverable: any statement in the spec grammar becomes a <code>Stmt</code> record; everything else is a precise error. <code>--parse-only</code> exposes it, and a statement file with expected output is the regression check.</p>
+        <div class="files">
+          <div><span class="k">Create</span> <code>tpsSql.inc</code>, <code>tpsSql.clw</code>, <code>tests\parser.sql</code>, <code>tests\parser.expected.txt</code>, <code>tests\parser.ps1</code>; <span class="k">Modify</span> <code>tpscli.cwproj</code>, <code>tpscli.clw</code> (replace the temporary DESCRIBE dispatch)</div>
+          <div><span class="k">Consumes</span> <code>tpsSchema.Fields</code>, <code>FindField</code>, <code>Prefix</code></div>
+          <div><span class="k">Produces</span> <code>tpsSql.Parse(STRING sql),LONG</code>; <code>tpsSql.Stmt</code> group; <code>tpsSql.Err/ErrMsg/ErrPos/ErrToken/ErrColumn</code>; <code>tpsSql.Cols</code> queue (SELECT list / INSERT columns / SET targets), <code>tpsSql.Vals</code> queue (parallel literals), <code>tpsSql.Order</code> queue</div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Write the regression file first.</span> <code>tests\parser.sql</code>, one statement per line (blank lines and lines starting with <code>--</code> ignored). Include at least: DESCRIBE with bracket path; SELECT * ; SELECT with list, WHERE using every operator, AND/OR/NOT/parentheses, LIKE, IN, NOT IN, a DATE compare, a TIME compare, ORDER BY two columns mixed direction, LIMIT, LIMIT OFFSET, a group path <code>ADDR.CITY</code>, an array element <code>ARR[2]</code>; INSERT with list; UPDATE with two SETs; DELETE with WHERE; then rejections: UPDATE without WHERE, DELETE without WHERE, DELETE with LIMIT, JOIN, COUNT(*), IS NULL, arithmetic <code>A + 1</code>, unknown column, duplicate INSERT column, mismatched INSERT counts, unquoted path with backslash, two statements separated by semicolon, an unterminated string. Each runs against <code>[testdata\ALLTYPES.TPS]</code> or <code>[testdata\GROUPS.TPS]</code>.
+          <code>tests\parser.ps1</code> runs each line through <code>tpscli.exe --parse-only "&lt;line&gt;"</code>, appends stdout and <code>EXIT=n</code>, and diffs the concatenation against <code>tests\parser.expected.txt</code>. Write the expected file by hand from the spec for the error cases (code and message) and for successes as <code>{ "ok": true, "op": "select", "parse_only": true, "complete": true }</code> etc.
+            <div class="expect">Run now: every line fails with "Parser not implemented yet". That is the red state.</div></li>
+
+          <li class="step"><span class="t">Write <code>tpsSql.inc</code>.</span>
+<pre><code>  OMIT('_EndTpsSql_',_TpsSqlPresent_)
+_TpsSqlPresent_ EQUATE(1)
+  INCLUDE('StringTheory.inc'),ONCE
+  INCLUDE('tpsSchema.inc'),ONCE
+
+TK:Ident  EQUATE(1)
+TK:Num    EQUATE(2)
+TK:Str    EQUATE(3)
+TK:Op     EQUATE(4)
+TK:Path   EQUATE(5)
+TK:Eof    EQUATE(6)
+
+OP:Describe EQUATE(1)
+OP:Select   EQUATE(2)
+OP:Insert   EQUATE(3)
+OP:Update   EQUATE(4)
+OP:Delete   EQUATE(5)
+
+TokQ      QUEUE,TYPE
+Kind        BYTE
+Text        STRING(1024)
+Pos         LONG
+          END
+ColQ      QUEUE,TYPE               ! a resolved column reference
+Path        STRING(128)            ! canonical qualified path, upper (ADDR.GEO.LAT, PHONES[2].KIND)
+Prefix      STRING(128)            ! Path minus the last label, used to name expanded leaves
+FieldNbr    LONG                   ! 0 for memo
+MemoNbr     LONG
+GrpElem     LONG                   ! element of an enclosing dimmed group, 0 = none
+Elem        LONG                   ! 0 scalar, else 1-based element
+Elem2       LONG                   ! second subscript for DIM(a,b) leaves
+Expr        STRING(96)             ! Clarion expression text: PRE:LABEL or PRE:LABEL[n] or PRE:LABEL[n,m]
+          END
+
+ValQ      QUEUE,TYPE
+Kind        BYTE                   ! TK:Num or TK:Str
+Text        &amp;STRING                ! exact-length decoded literal, NEW'd by the tokenizer, disposed in Destruct
+Len         LONG
+          END
+OrdQ      QUEUE,TYPE
+FieldNbr    LONG
+Elem        LONG
+Desc        BYTE
+          END
+
+tpsSql    CLASS,TYPE,MODULE('tpsSql.clw'),LINK('tpsSql.clw')
+Sch         &amp;tpsSchema
+Toks        &amp;TokQ
+Cur         LONG
+Op          BYTE
+Path        STRING(260)
+Star        BYTE
+Cols        &amp;ColQ
+Vals        &amp;ValQ
+Order       &amp;OrdQ
+Where       CSTRING(8192)
+HasWhere    BYTE
+Limit       LONG
+HasLimit    BYTE
+Offset      LONG
+Err         STRING(24)
+ErrMsg      STRING(512)
+ErrPos      LONG
+ErrToken    STRING(64)
+ErrColumn   STRING(128)
+Construct   PROCEDURE()
+Destruct    PROCEDURE()
+Tokenize    PROCEDURE(STRING sql),LONG
+ParsePath   PROCEDURE(),LONG                  ! after DESCRIBE/FROM/INTO/UPDATE
+Parse       PROCEDURE(STRING sql),LONG        ! statement head only (op + path)
+ParseBody   PROCEDURE(),LONG                  ! after schema is loaded
+Peek        PROCEDURE(),STRING
+PeekKind    PROCEDURE(),BYTE
+Take        PROCEDURE(),STRING
+Expect      PROCEDURE(STRING word),LONG
+ColumnRef   PROCEDURE(*ColQ c),LONG           ! parses IDENT([n])(.IDENT([n]))*
+Expr        PROCEDURE(),STRING                ! OR level
+ExprAnd     PROCEDURE(),STRING
+ExprNot     PROCEDURE(),STRING
+ExprCmp     PROCEDURE(),STRING
+Literal     PROCEDURE(LONG fieldNbr),STRING   ! typed literal to Clarion expression text
+ValidDate   PROCEDURE(STRING s, *LONG clarionDate),BYTE   ! strict YYYY-MM-DD, year 1801..2999, round-trips Y/M/D
+ValidTime   PROCEDURE(STRING s, *LONG clarionTime),BYTE   ! HH:MM[:SS[.hh]], all digits, in range
+FlatElem    PROCEDURE(ColQ c, SchFieldQ f),LONG       ! single WHAT element index from GrpElem/Elem/Elem2
+Fail        PROCEDURE(STRING code, STRING msg),LONG
+          END
+  _EndTpsSql_</code></pre></li>
+
+          <li class="step"><span class="t">Tokenizer.</span> Single pass over the string. Identifiers <code>[A-Za-z_][A-Za-z0-9_]*</code> (kept upper). Numbers <code>-?[0-9]+(\.[0-9]+)?</code> only where a value is expected (the unary minus is handled in <code>Literal</code>, the tokenizer emits <code>-</code> as an op). Strings in single quotes with doubled quotes; an unterminated string is <code>SYNTAX</code> at its start position. A <code>[</code> that immediately follows DESCRIBE, FROM, INTO or UPDATE starts a bracket path: read to the matching <code>]</code> and emit <code>TK:Path</code> with the brackets stripped. Any other <code>[</code> is an ordinary op token so subscripts tokenize as <code>[</code>, number, <code>]</code>. Operators: <code>= &lt;&gt; != &lt; &gt; &lt;= &gt;= ( ) , . [ ] * ;</code>. A <code>;</code> anywhere except trailing is <code>SYNTAX "Only one statement per invocation"</code>. Anything else: <code>SYNTAX "Unexpected character"</code> with position.</li>
+
+          <li class="step"><span class="t">Statement head.</span> <code>Parse</code> tokenizes, reads the first ident: DESCRIBE, SELECT, INSERT, UPDATE, DELETE, else <code>SYNTAX</code>. It then finds the path: DESCRIBE &rarr; next token; SELECT &rarr; token after FROM; INSERT &rarr; after INTO; UPDATE &rarr; next; DELETE &rarr; after FROM. <code>TK:Path</code> is taken verbatim; a bare <code>TK:Ident</code> is accepted as a relative name; anything else (e.g. an ident followed by <code>:</code> or containing <code>\</code>) is <code>SYNTAX "Table path must be in square brackets"</code>. The caller then loads the schema and calls <code>ParseBody</code>. This two-phase split exists because column validation needs the schema and the schema needs the path.</li>
+
+          <li class="step"><span class="t">Body grammar.</span> Recursive descent following spec &sect;3. Key rules:
+            <ul>
+              <li>SELECT list: <code>*</code> or comma list of column refs. A ref that resolves to a GROUP or to a whole dimmed field is stored once with <code>Elem = 0</code>; the executor expands it. Then optional WHERE, ORDER BY (list of ref [ASC|DESC]), LIMIT n [OFFSET m]. Trailing tokens: <code>SYNTAX "Unexpected token"</code>.</li>
+              <li>INSERT: <code>(</code> refs <code>)</code> VALUES <code>(</code> literals <code>)</code>. Ref count must equal literal count (<code>SYNTAX</code>), no duplicate ref (<code>SYNTAX</code>), each ref must be a scalar leaf or element (a GROUP or whole array: <code>UNSUPPORTED "Assign individual leaves"</code>).</li>
+              <li>UPDATE: SET ref = literal (, ...) then WHERE required (<code>WHERE_REQUIRED</code>). LIMIT or OFFSET present: <code>UNSUPPORTED</code>.</li>
+              <li>DELETE: WHERE required; LIMIT/OFFSET: <code>UNSUPPORTED</code>.</li>
+              <li>The words JOIN, GROUP (followed by BY), HAVING, DISTINCT, UNION, COUNT, SUM, MIN, MAX, AVG, IS, NULL, and the ops <code>+ - / *</code> inside an expression are recognised specifically so the error says <code>UNSUPPORTED</code> with the construct named, not a bare syntax error.</li>
+            </ul></li>
+
+          <li class="step"><span class="t">Column resolution.</span> <code>ColumnRef</code> reads <code>IDENT</code>, optional <code>[n]</code>, then any number of <code>.IDENT[n]?</code>. The last ident is looked up with <code>Sch.FindField</code> (case-insensitive on <code>Label</code>), then memos. Not found: <code>UNKNOWN_COLUMN</code> with the valid names listed in <code>ErrMsg</code> (comma separated, at most 40 then "..."). The parent chain is checked: each preceding ident must be the label of the enclosing group at that level (<code>UNKNOWN_COLUMN "X is not inside Y"</code>). Subscripts: a subscript on a non-dimmed field, a missing subscript where one is needed for assignment, or an out-of-range value is <code>UNKNOWN_COLUMN</code> with a message saying which. A subscript on a dimmed GROUP is kept as the element for every leaf under it (<code>ColQ.GrpElem</code>), so <code>PHONES[2].KIND</code> resolves to field KIND with <code>GrpElem = 2</code>; a dimmed leaf inside a dimmed group carries both (<code>GrpElem</code> and <code>Elem</code>). Two-dimensional leaves (<code>GRID[2][3]</code>) take two consecutive subscripts into <code>Elem</code> and <code>Elem2</code>. The expression text for these is <code>PRE:LABEL[e]</code> or <code>PRE:LABEL[e1,e2]</code> (Clarion's array subscript syntax); whether EVALUATE accepts a subscript on a group-member array is confirmed in Task 7 on <code>PHONES[2].KIND</code>. <code>Expr</code> text is <code>PRE:LABEL</code> or <code>PRE:LABEL[n]</code>, which is what <code>BIND(file)</code> exposes (spec &sect;5 chose synthetic <code>_Fn</code> names; real labels are unique per file so the collision argument does not apply, and the deviation is recorded in the notes).</li>
+
+          <li class="step"><span class="t">Expression builder.</span> Precedence OR &lt; AND &lt; NOT &lt; comparison. <code>ExprCmp</code>: <code>ref op literal</code> or <code>literal op ref</code> or <code>ref LIKE str</code> / <code>ref [NOT] IN (list)</code> or <code>( expr )</code>. Output text:
+<pre><code>=            -&gt;  PRE:F = lit
+&lt;&gt; or !=     -&gt;  PRE:F &lt;&gt; lit
+LIKE 'A%_'   -&gt;  MATCH(PRE:F,'A*?',1)
+IN ('a','b') -&gt;  INLIST(PRE:F,'a','b')
+NOT IN       -&gt;  INLIST(PRE:F,'a','b') = 0
+NOT x        -&gt;  NOT (x)
+a AND b      -&gt;  (a AND b)
+a OR b       -&gt;  (a OR b)</code></pre>
+          <code>Literal(fieldNbr)</code> converts by the column's type: DATE column and a string literal <code>'YYYY-MM-DD'</code> &rarr; the Clarion date number via <code>DATE(m,d,y)</code> computed now (invalid date: <code>VALUE_OUT_OF_RANGE</code>); TIME column and <code>'HH:MM[:SS[.hh]]'</code> &rarr; the Clarion time number <code>(h*3600 + m*60 + s)*100 + hh + 1</code>; numeric columns require <code>TK:Num</code> (a string literal against a numeric column: <code>VALUE_OUT_OF_RANGE</code>); string columns require <code>TK:Str</code>, emitted as a Clarion literal: apostrophes doubled, and every <code>&lt;</code> and <code>{</code> written as <code>&lt;60&gt;</code> and <code>&lt;123&gt;</code> so the runtime does not treat them as character-code or repeat sequences. LIKE patterns cannot protect a literal <code>*</code> or <code>?</code> (MATCH has no escape in wildcard mode), so a LIKE pattern containing either is rejected with <code>UNSUPPORTED "LIKE cannot match a literal * or ?"</code>; the parser then turns <code>%</code> into <code>*</code> and <code>_</code> into <code>?</code>. Recorded as the fourth documented ceiling in the README (with the 15+15 digit literal, the four-component sort fallback, and the 4096-argument guard). Date literals go through <code>tpsSql.ValidDate</code> and time literals through <code>tpsSql.ValidTime</code> (strict digits, ranges, YEAR/MONTH/DAY round-trip), the same routines INSERT uses via <code>SELF.Sql</code>. <code>1 = 1</code> (two literals) is allowed so <code>WHERE 1 = 1</code> works as the spec says.</li>
+
+          <li class="step"><span class="t">Wire <code>--parse-only</code> and the real dispatch.</span> In <code>tpscli.clw</code>: <code>Sql.Parse(Opt.Sql)</code> &rarr; on error print <code>{ "ok": false, "op": &lt;op or null&gt;, "error": { "code", "message", "position", "token" }, "outcome": "none", "complete": true }</code> exit 1. Then <code>Sch.Load(Sql.Path, Opt.Owner)</code>, <code>Sch.Parse()</code> &rarr; on error exit 2 with the schema error. Then <code>Sql.ParseBody()</code> &rarr; on error the exit code follows the error code (<code>VALUE_OUT_OF_RANGE</code> is 3, everything else from the parser is 1) and includes <code>"column"</code> for UNKNOWN_COLUMN and VALUE_OUT_OF_RANGE. If <code>Opt.ParseOnly</code>: print the parse-only success object, exit 0. Otherwise fall through to the executor (Task 7 onward; for now print <code>UNSUPPORTED "Executor not implemented"</code>). DESCRIBE still runs Build+Open+DescribeJson here.</li>
+
+          <li class="step"><span class="t">Run <code>tests\parser.ps1</code>.</span>
+            <div class="expect">Zero diff against the expected file. Where the expected file was wrong (a message worded differently than you implemented), fix the expected file only if the new wording is at least as specific; otherwise fix the code.</div></li>
+
+          <li class="step"><span class="t">Commit.</span> <code>git add -A; git commit -m "tpsSql: tokenizer, parser, column resolution, expression builder, --parse-only"</code></li>
+        </ol>
+      </section>
+
+      <!-- ======================================================================= -->
+      <section class="task">
+        <h2>Task 7 <span class="tasknum">&middot; tpsExec: SELECT with JSON rows and --table</span></h2>
+        <p>Deliverable: SELECT returns typed, formatted rows in the spec's JSON shape, honours WHERE via EVALUATE, uses a key when ORDER BY matches one, sorts in memory otherwise, and applies OFFSET, LIMIT and the truncation probe.</p>
+        <div class="files">
+          <div><span class="k">Create</span> <code>tpsExec.inc</code>, <code>tpsExec.clw</code>, <code>tests\select.ps1</code>; <span class="k">Modify</span> <code>tpscli.cwproj</code>, <code>tpscli.clw</code>, <code>tpsOut.inc/.clw</code> (add <code>Table</code> grid renderer)</div>
+          <div><span class="k">Consumes</span> <code>tpsSchema.F</code>, <code>FieldRef</code>, <code>MemoRef</code>, <code>KeyRef</code>, <code>Fields</code>, <code>Keys</code>, <code>Comps</code>; <code>tpsSql.Cols/Order/Where/Limit/Offset/Star</code></div>
+          <div><span class="k">Produces</span> <code>tpsExec.Run(),LONG</code>; <code>tpsExec.Format(LONG fieldNbr, LONG elem),STRING</code> (JSON value text); <code>tpsExec.ExpandCols()</code> filling <code>Out</code> column list <code>OutColQ</code> (Name, FieldNbr, MemoNbr, Elem, Type)</div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Write the failing test.</span> <code>tests\select.ps1</code> runs these and compares whole stdout to inline expected JSON (write expected values from the rows inserted in Task 2):
+<pre><code>SELECT ID, STR, D, DT, TM, ARR[2] FROM [testdata\ALLTYPES.TPS] WHERE ID = 1
+SELECT * FROM [testdata\GROUPS.TPS] ORDER BY ID LIMIT 1
+SELECT ID FROM [testdata\KEYS.TPS] WHERE NAME LIKE '%a%' ORDER BY AMOUNT DESC, ID
+SELECT ID, CODE FROM [testdata\KEYS.TPS] ORDER BY CODE                (must return all 5 rows: OptKey is optional and must NOT be used)
+SELECT ID, NAME FROM [testdata\KEYS.TPS] WHERE CODE IN ('A','E') ORDER BY NAME
+SELECT ID FROM [testdata\KEYS.TPS] ORDER BY ID LIMIT 2 OFFSET 1
+SELECT ID FROM [testdata\KEYS.TPS] WHERE ID &gt; 999
+SELECT ID, NOTES, BIN, PIC FROM [testdata\MEMOS.TPS] WHERE ID = 1
+SELECT ID FROM [testdata\SECRET.TPS] (with --owner s3cret)
+SELECT ID FROM [testdata\KEYS.TPS] LIMIT 2                       (expect truncated true)
+SELECT ID FROM [testdata\KEYS.TPS] LIMIT 5                       (expect truncated false)</code></pre>
+          Expected for the first: <code>"rows": [[1,"alpha","12345.67","2026-09-15","13:45:30.00",20]]</code> with column types LONG/STRING/DECIMAL/DATE/TIME/SHORT. Add <code>SELECT ID, PD FROM [testdata\ALLTYPES.TPS] WHERE ID = 1</code> expecting <code>"-1.005"</code> with type PDECIMAL, <code>SELECT ID FROM [testdata\GROUPS.TPS] WHERE PHONES[2].KIND = 'M' ORDER BY ID</code> expecting both rows (both fixture rows have 'M' there), and <code>SELECT ADDR.CITY FROM [testdata\GROUPS.TPS] WHERE ID = 1</code> whose column must be named <code>ADDR.CITY</code>, not <code>CITY</code>. The GROUPS star row expands to <code>ID, ADDR.LINE1, ADDR.CITY, ADDR.GEO.LAT, ADDR.GEO.LON, PHONES[1].KIND, PHONES[1].NUMBER, PHONES[2].KIND, PHONES[2].NUMBER, RAW, RAWL, GRID[1][1] .. GRID[2][3]</code> (six GRID columns).
+            <div class="expect">Red: "Executor not implemented".</div></li>
+
+          <li class="step"><span class="t">Write <code>tpsExec.inc</code>.</span>
+<pre><code>  OMIT('_EndTpsExec_',_TpsExecPresent_)
+_TpsExecPresent_ EQUATE(1)
+  INCLUDE('tpsSchema.inc'),ONCE
+  INCLUDE('tpsSql.inc'),ONCE
+  INCLUDE('tpsOut.inc'),ONCE
+
+ConvQ     QUEUE,TYPE               ! validated literal per Sql.Cols entry
+Num         DECIMAL(31,15)
+Txt         &amp;STRING
+TxtLen      LONG
+IsNum       BYTE
+          END
+OutColQ   QUEUE,TYPE
+Name        STRING(128)
+FieldNbr    LONG
+MemoNbr     LONG
+Elem        LONG
+Type        STRING(12)
+          END
+PosQ      QUEUE,TYPE               ! candidates for update/delete, or sort buffer for select
+K1          DECIMAL(31,15)         ! up to four typed ORDER BY components; strings compare as STRING
+S1          STRING(255)
+K2          DECIMAL(31,15)
+S2          STRING(255)
+K3          DECIMAL(31,15)
+S3          STRING(255)
+K4          DECIMAL(31,15)
+S4          STRING(255)
+RowId       STRING(255)
+Pos         STRING(512)
+          END
+
+tpsExec   CLASS,TYPE,MODULE('tpsExec.clw'),LINK('tpsExec.clw')
+Sch         &amp;tpsSchema
+Sql         &amp;tpsSql
+Out         &amp;tpsOut
+Rows        StringTheory           ! buffered JSON rows
+Warnings    StringTheory
+ErrCode     STRING(24)
+ErrCol      STRING(128)
+ErrMsg      STRING(512)
+Cols        &amp;OutColQ
+Conv        &amp;ConvQ
+Construct   PROCEDURE()             ! Cols &amp;= NEW OutColQ; Conv &amp;= NEW ConvQ
+Destruct    PROCEDURE()             ! dispose every Conv.Txt, then both queues
+Run         PROCEDURE(),LONG
+ExpandCols  PROCEDURE()
+AddLeaf     PROCEDURE(LONG fieldNbr, STRING namePrefix, LONG elem)
+Format      PROCEDURE(LONG fieldNbr, LONG elem),STRING
+FormatMemo  PROCEDURE(LONG memoNbr),STRING
+Matches     PROCEDURE(),BYTE       ! EVALUATE(Where) on current record
+ChooseKey   PROCEDURE(*BYTE reverse),LONG    ! 0 = none matches ORDER BY
+DoSelect    PROCEDURE(),LONG
+DoInsert    PROCEDURE(),LONG
+DoUpdate    PROCEDURE(),LONG
+DoDelete    PROCEDURE(),LONG
+Validate    PROCEDURE(LONG colIdx),LONG       ! converts Sql.Vals[i] into Conv[i], no buffer access
+Assign      PROCEDURE(LONG colIdx)            ! Sql.Cols[i] := Conv[i], after Validate succeeded
+Range       PROCEDURE(LONG colIdx, STRING why),LONG   ! sets VALUE_OUT_OF_RANGE, returns 3
+Mutate      PROCEDURE(BYTE isDelete),LONG
+Undo        PROCEDURE(),STRING               ! ROLLBACK; 'rolled_back' or 'unknown'
+RowIdText   PROCEDURE(),STRING               ! primary/unique key values of the current buffer, else position hex
+ErrOut      PROCEDURE(STRING op, STRING code, STRING msg, STRING outcome, LONG exitCode, &lt;STRING errExtra&gt;, &lt;STRING topExtra&gt;),LONG
+          END
+
+  _EndTpsExec_</code></pre></li>
+
+          <li class="step"><span class="t">Column expansion and formatting.</span>
+<pre><code>tpsExec.ExpandCols PROCEDURE()
+i   LONG
+  CODE
+  IF SELF.Sql.Star
+    LOOP i = 1 TO RECORDS(SELF.Sch.Fields)
+      GET(SELF.Sch.Fields, i)
+      IF SELF.Sch.Fields.Parent = 0 THEN SELF.AddLeaf(i, '', 0).
+    END
+    LOOP i = 1 TO RECORDS(SELF.Sch.Memos)
+      GET(SELF.Sch.Memos, i)
+      CLEAR(SELF.Cols); SELF.Cols.Name = SELF.Sch.Memos.Label; SELF.Cols.MemoNbr = i
+      SELF.Cols.Type = CHOOSE(SELF.Sch.Memos.IsBlob, 'BLOB', 'MEMO'); ADD(SELF.Cols)
+    END
+  ELSE
+    LOOP i = 1 TO RECORDS(SELF.Sql.Cols)
+      GET(SELF.Sql.Cols, i)
+      IF SELF.Sql.Cols.MemoNbr
+        GET(SELF.Sch.Memos, SELF.Sql.Cols.MemoNbr)
+        CLEAR(SELF.Cols); SELF.Cols.Name = SELF.Sql.Cols.Path; SELF.Cols.MemoNbr = SELF.Sql.Cols.MemoNbr
+        SELF.Cols.Type = CHOOSE(SELF.Sch.Memos.IsBlob, 'BLOB', 'MEMO'); ADD(SELF.Cols)
+      ELSE
+        GET(SELF.Sch.Fields, SELF.Sql.Cols.FieldNbr)
+        ! Prefix = qualified path minus the last label; FlatElem folds GrpElem/Elem/Elem2 into one WHAT index
+        SELF.AddLeaf(SELF.Sql.Cols.FieldNbr, SELF.Sql.Cols.Prefix, SELF.Sql.FlatElem(SELF.Sql.Cols, SELF.Sch.Fields))
+      END
+    END
+  END
+
+tpsExec.AddLeaf PROCEDURE(LONG fieldNbr, STRING namePrefix, LONG elem)
+f     LIKE(SchFieldQ)
+e     LONG
+j     LONG
+nm    STRING(128)
+  CODE
+  GET(SELF.Sch.Fields, fieldNbr); f = SELF.Sch.Fields
+  nm = CLIP(namePrefix) &amp; CLIP(f.Label)
+  IF f.Type = 'GROUP'
+    ! groups: recurse into direct children; a dimmed group repeats per element with [n] in the name
+    LOOP e = 1 TO CHOOSE(f.Elements &gt; 1, f.Elements, 1)
+      LOOP j = fieldNbr+1 TO RECORDS(SELF.Sch.Fields)
+        GET(SELF.Sch.Fields, j)
+        IF SELF.Sch.Fields.Parent = fieldNbr
+          SELF.AddLeaf(j, CLIP(nm) &amp; CHOOSE(f.Elements &gt; 1, '[' &amp; e &amp; ']', '') &amp; '.', CHOOSE(f.Elements &gt; 1, e, 0))
+        END
+      END
+    END
+    RETURN
+  END
+  IF f.Type = 'DECIMAL' AND f.IsPacked THEN SELF.Cols.Type = 'PDECIMAL'.   ! set after the ADDs below via a final PUT; see note
+  IF f.Elements &gt; 1 AND elem = 0
+    LOOP e = 1 TO f.Elements
+      CLEAR(SELF.Cols)
+      IF f.Dim2 &gt; 0
+        SELF.Cols.Name = CLIP(nm) &amp; '[' &amp; ((e - 1) / f.Dim2 + 1) &amp; '][' &amp; ((e - 1) % f.Dim2 + 1) &amp; ']'
+      ELSE
+        SELF.Cols.Name = CLIP(nm) &amp; '[' &amp; e &amp; ']'
+      END
+      SELF.Cols.FieldNbr = fieldNbr; SELF.Cols.Elem = e; SELF.Cols.Type = f.Type; ADD(SELF.Cols)
+    END
+    RETURN
+  END
+  CLEAR(SELF.Cols)
+  IF elem &gt; 0 AND f.Elements &gt; 1
+    IF f.Dim2 &gt; 0
+      nm = CLIP(nm) &amp; '[' &amp; ((elem - 1) / f.Dim2 + 1) &amp; '][' &amp; ((elem - 1) % f.Dim2 + 1) &amp; ']'
+    ELSE
+      nm = CLIP(nm) &amp; '[' &amp; elem &amp; ']'
+    END
+  END
+  SELF.Cols.Name = nm
+  SELF.Cols.FieldNbr = fieldNbr; SELF.Cols.Elem = elem; SELF.Cols.Type = f.Type; ADD(SELF.Cols)</code></pre>
+          A leaf inside a dimmed group is reached with <code>WHAT(rec, idx, e)</code> where <code>e</code> is the group element: pass the group element down as <code>elem</code> (that is what the recursive call does). A two-dimensional leaf (<code>GRID[2][3]</code>, declared <code>DIM(2,3)</code>) is addressed with one flattened index, <code>(e1 - 1) * dim2 + e2</code>, because <code>WHAT</code> takes a single element number; <code>SchFieldQ.Elements</code> holds the product and <code>SchFieldQ.Dim2</code> the second extent (from the definition, if TPS records it separately; else 2-D fields are reported as one-dimensional with <code>Elements</code> elements and the notes say so). A leaf inside a dimmed group gets the group element as its index; a leaf that is both inside a dimmed group and dimmed itself combines them, <code>(GrpElem - 1) * Elements + leafIndex</code>, because WHAT addresses the flattened storage of the group array (Task 7 confirms this on a <code>PHONES[2].NUMBER</code>-style case by adding <code>Ext STRING(2),DIM(2)</code> inside PHONES in the corpus and selecting <code>PHONES[2].EXT[2]</code>). <code>tpsSql.FlatElem</code> implements exactly that arithmetic and every caller in Tasks 7-9 uses <code>SELF.Sql.FlatElem(...)</code>. The corpus GROUPS file carries <code>Grid SHORT,DIM(2,3)</code> for this. PDECIMAL: the TPS type code table has one BCD code; Task 4 records what the oracle reports for <code>PD</code>. If DynFile reports type <code>PDECIMAL</code> for it, the definition must carry a distinguishing bit (compare the raw field bytes of <code>D</code> and <code>PD</code> in <code>--dump-def</code>), pin it as <code>SchFieldQ.IsPacked</code>, and emit <code>Type = 'PDECIMAL'</code> to DynFile; formatting and assignment treat both identically. Formatting:
+<pre><code>tpsExec.Format PROCEDURE(LONG fieldNbr, LONG elem)
+v    ANY
+d    LONG
+t    LONG
+s    STRING(4096)
+h    LONG
+m    LONG
+sec  LONG
+hh   LONG
+  CODE
+  GET(SELF.Sch.Fields, fieldNbr)
+  v &amp;= SELF.Sch.FieldRef(fieldNbr, elem)
+  CASE SELF.Sch.Fields.Type
+  OF 'DATE'
+    d = v
+    IF d = 0 THEN RETURN '""'.
+    RETURN '"' &amp; YEAR(d) &amp; '-' &amp; FORMAT(MONTH(d), @N02) &amp; '-' &amp; FORMAT(DAY(d), @N02) &amp; '"'
+  OF 'TIME'
+    t = v
+    IF t = 0 THEN RETURN '""'.
+    t -= 1; hh = t % 100; t = t / 100; sec = t % 60; t = t / 60; m = t % 60; h = t / 60
+    RETURN '"' &amp; FORMAT(h, @N02) &amp; ':' &amp; FORMAT(m, @N02) &amp; ':' &amp; FORMAT(sec, @N02) &amp; '.' &amp; FORMAT(hh, @N02) &amp; '"'
+  OF 'DECIMAL' OROF 'PDECIMAL'
+    s = v                                   ! DECIMAL to STRING keeps the declared places
+    RETURN '"' &amp; CLIP(LEFT(s)) &amp; '"'
+  OF 'STRING' OROF 'CSTRING' OROF 'PSTRING' OROF 'GROUP'
+    s = v
+    RETURN SELF.Out.JStr(CLIP(s))
+  ELSE                                       ! BYTE SHORT USHORT LONG ULONG SREAL REAL
+    s = v
+    RETURN CLIP(LEFT(s))
+  END
+
+! Format and FormatMemo return '' with ErrCode set on failure; DoSelect checks ErrCode after every
+! cell and aborts the statement with that code (exit 1 for UNSUPPORTED, 3 for DRIVER).
+tpsExec.FormatMemo PROCEDURE(LONG memoNbr)
+v    ANY
+st   StringTheory
+b    &amp;BLOB
+  CODE
+  GET(SELF.Sch.Memos, memoNbr)
+  IF SELF.Sch.Memos.IsBlob
+    b &amp;= SELF.Sch.F{PROP:Blob, memoNbr}
+    IF b &amp;= NULL THEN SELF.ErrCode = 'UNSUPPORTED'; SELF.ErrMsg = 'BLOB access not available on dynamic files'; RETURN ''.
+    IF b{PROP:Size} = 0 THEN RETURN '""'.
+    st.SetValue(b[0 : b{PROP:Size}-1])
+    IF st.Base64Encode(st:NoWrap) &lt;&gt; st:ok THEN SELF.ErrCode = 'DRIVER'; SELF.ErrMsg = 'base64 encode failed'; RETURN ''.
+    RETURN SELF.Out.JStr(st.GetValue())
+  END
+  v &amp;= SELF.Sch.MemoRef(memoNbr)
+  IF v &amp;= NULL THEN SELF.ErrCode = 'UNSUPPORTED'; SELF.ErrMsg = 'MEMO access not available on dynamic files'; RETURN ''.
+  RETURN SELF.Out.JStr(CLIP(v))</code></pre>
+          Two runtime facts to confirm the first time this compiles and runs against MEMOS.TPS, and record in the notes: (a) that <code>F{PROP:Field, -n}</code> yields the memo (if it returns null, try <code>SELF.Sch.Dyn.GetField(label)</code>; if neither works, any statement that references a MEMO column fails with <code>UNSUPPORTED "MEMO access not available on dynamic files"</code>, never a row with a substituted null, and the gap is logged for the owner); (b) that <code>F{PROP:Blob, n}</code> yields a usable <code>&amp;BLOB</code>; if not, BLOB columns fail the same way. <code>SELECT *</code> on a file with an unreachable memo therefore fails; the caller lists columns explicitly.</li>
+
+          <li class="step"><span class="t">Key choice and the scan.</span>
+<pre><code>tpsExec.ChooseKey PROCEDURE(*BYTE reverse)
+k     LONG
+n     LONG
+j     LONG
+ok    BYTE
+fwd   BYTE
+bwd   BYTE
+  CODE
+  reverse = 0
+  IF RECORDS(SELF.Sql.Order) = 0 THEN RETURN 0.
+  LOOP k = 1 TO RECORDS(SELF.Sch.Keys)
+    GET(SELF.Sch.Keys, k)
+    IF SELF.Sch.Keys.Opt THEN CYCLE.
+    fwd = 1; bwd = 1; n = 0
+    LOOP j = 1 TO RECORDS(SELF.Sch.Comps)
+      GET(SELF.Sch.Comps, j)
+      IF SELF.Sch.Comps.KeyNbr &lt;&gt; k THEN CYCLE.
+      n += 1
+      IF n &gt; RECORDS(SELF.Sql.Order) THEN BREAK.
+      GET(SELF.Sql.Order, n)
+      IF SELF.Sql.Order.FieldNbr &lt;&gt; SELF.Sch.Comps.FieldNbr OR SELF.Sql.Order.Elem &lt;&gt; 0 THEN fwd = 0; bwd = 0; BREAK.
+      IF SELF.Sql.Order.Desc = SELF.Sch.Comps.Descending THEN bwd = 0 ELSE fwd = 0.
+    END
+    IF n &lt; RECORDS(SELF.Sql.Order) THEN CYCLE.       ! key shorter than ORDER BY
+    IF fwd THEN RETURN k.
+    IF bwd THEN reverse = 1; RETURN k.
+  END
+  RETURN 0
+
+tpsExec.Matches PROCEDURE()
+r  STRING(20)
+  CODE
+  IF NOT SELF.Sql.HasWhere THEN RETURN 1.
+  r = EVALUATE(SELF.Sql.Where)
+  IF ERRORCODE() THEN RETURN 2.                       ! caller reports SYNTAX with the expression
+  RETURN CHOOSE(r = '1' OR (NUMERIC(r) AND r &lt;&gt; 0), 1, 0)
+
+! Optional keys omit rows whose components are blank or zero, so they are never used for ORDER BY.
+! ChooseKey skips a key with Opt = 1; the sort fallback handles that ORDER BY instead.</code></pre>
+          <code>DoSelect</code>: <code>rec &amp;= SELF.Sch.F{PROP:Record}; BIND(rec)</code> (the record GROUP, which is what ABC's FileManager binds too); <code>ExpandCols</code>; choose key; if a key: <code>SET(key)</code> and loop <code>NEXT(F)</code> (or <code>PREVIOUS(F)</code> when reverse; after <code>SET(key)</code> the first PREVIOUS returns the last record); else if ORDER BY present but no usable key: full scan collecting <code>PosQ</code> with up to four typed components (numeric, date and time values into <code>Kn</code> as DECIMAL(31,15) at full precision; strings into <code>Sn</code> exactly as stored, no case change), then one <code>SORT(PosQ, spec)</code> where <code>spec</code> is built from the ORDER BY as a comma list of <code>+PosQ.K1</code> / <code>-PosQ.S2</code> etc., so each component sorts by its own type and direction (more than four ORDER BY columns, a string component wider than 255, or a numeric component outside DECIMAL(31,15): <code>UNSUPPORTED "ORDER BY needs a key for this column"</code>; these are documented ceilings of the fallback sort), then <code>REGET</code> each position in order (<code>! ponytail: whole result sorted in memory, add a temp-file sort if a file with millions of rows ever needs a non-key ORDER BY</code>); else <code>SET(F)</code> and <code>NEXT</code>. Every <code>NEXT</code>/<code>PREVIOUS</code> is checked: error 33 (<code>BadRecErr</code>, end of file) ends the walk; any other error aborts with <code>DRIVER</code>. For each record that <code>Matches()</code> returns 1: skip while <code>skipped &lt; Offset</code>; if <code>Limit &gt; 0 AND count = Limit</code> then set <code>truncated = 1</code> and stop (this is the probe: the row that would be number Limit+1 is the proof); else append the row. Effective limit is <code>Sql.Limit</code> if <code>HasLimit</code> else <code>Opt.LimitDefault</code>; 0 means no cap. <code>Matches() = 2</code> aborts with <code>SYNTAX</code> and the generated expression; nothing that was buffered is printed. <code>UNBIND</code> everything at the end (<code>POPBIND</code> after a <code>PUSHBIND</code> at the start is the simplest). Output: columns array from <code>Cols</code>, then the buffered rows, <code>row_count</code>, <code>truncated</code>, <code>complete</code>.</li>
+
+          <li class="step"><span class="t">Table renderer.</span> <code>tpsOut.Table(OutColQ cols, StringTheory rows, LONG count, BYTE truncated)</code>: rows were buffered as JSON arrays; for the grid keep a parallel plain queue of cell strings instead (add <code>CellQ</code> with Row LONG, Col LONG, Text STRING(255)) filled alongside the JSON when <code>Opt.Table</code> is set. Compute each column width as max(len(name), max cell), left-align text, right-align numeric types, dashes line, then <code>(n rows)</code> or <code>(n rows, truncated by LIMIT)</code>. Errors in table mode print <code>ERROR CODE: message</code> as the last line.</li>
+
+          <li class="step"><span class="t">Run <code>tests\select.ps1</code>.</span>
+            <div class="expect">All ten pass. The LIKE test proves MATCH with mode 1; the IN test proves INLIST; the DESC test proves the reverse key walk on DescKey (ORDER BY AMOUNT DESC, ID matches DescKey forward, actually: components are -Amount, +Id, so it is a forward walk; add an <code>ORDER BY AMOUNT ASC, ID DESC</code> case to exercise the reverse walk). Record in the notes whether EVALUATE accepted <code>PRE:LABEL[n]</code> subscripts; if it did not, the array element case in WHERE becomes <code>UNSUPPORTED</code> and the spec deviation is logged.</div></li>
+
+          <li class="step"><span class="t">Commit.</span> <code>git add -A; git commit -m "tpsExec: SELECT with key selection, EVALUATE filter, JSON and table output"</code></li>
+        </ol>
+      </section>
+
+      <!-- ======================================================================= -->
+      <section class="task">
+        <h2>Task 8 <span class="tasknum">&middot; INSERT</span></h2>
+        <p>Deliverable: typed assignment of literals into the record buffer with the spec's conversion rules, one ADD, duplicate-key and out-of-range errors with <code>outcome</code>.</p>
+        <div class="files">
+          <div><span class="k">Modify</span> <code>tpsExec.clw</code> (<code>Assign</code>, <code>DoInsert</code>), <code>tests\insert.ps1</code></div>
+          <div><span class="k">Produces</span> <code>tpsExec.Validate(LONG colIdx),LONG</code> and <code>tpsExec.Assign(LONG colIdx)</code>, used again by UPDATE. Validate converts the literal into <code>Conv</code> (a <code>ConvQ</code> parallel to <code>Sql.Cols</code>) and touches no buffer; Assign copies <code>Conv</code> into the field. All Validates run before the first mutation.</div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Failing test.</span> <code>tests\insert.ps1</code> works on a copy: <code>Copy-Item testdata\ALLTYPES.TPS testdata\work\ALLTYPES.TPS -Force</code>, then:
+<pre><code>INSERT INTO [testdata\work\ALLTYPES.TPS] (ID, STR, D, DT, TM, ARR[3]) VALUES (9, 'nine', 9.995, '2026-01-31', '23:59:59', 7)
+  -&gt; { "ok": true, "op": "insert", "affected": 1, "complete": true }
+SELECT ID, STR, D, DT, TM, ARR[3] FROM [...] WHERE ID = 9   -&gt; 9,"nine","10.00"?  (see rounding note) ,"2026-01-31","23:59:59.00",7
+INSERT ... (ID) VALUES (9)                  -&gt; DUPLICATE_KEY, key IDKEY, outcome none, exit 3
+INSERT ... (ID, STR) VALUES (10, 'this string is far longer than twenty characters')
+  -&gt; ok, affected 1, warnings [STRING_TRUNCATED on STR]
+INSERT ... (ID, DT) VALUES (11, '2026-02-30')   -&gt; VALUE_OUT_OF_RANGE column DT, outcome none, exit 3
+INSERT ... (ID, B) VALUES (12, 300)              -&gt; VALUE_OUT_OF_RANGE column B
+INSERT ... (ID, S) VALUES (13, 1.5)              -&gt; VALUE_OUT_OF_RANGE column S (fraction)
+INSERT ... (ID, D) VALUES (14, 123456.78)        -&gt; VALUE_OUT_OF_RANGE column D (7 digits, 2 places: max 99999.99)</code></pre>
+          Rounding: <code>9.995</code> into DECIMAL(7,2) rounds half away from zero to <code>10.00</code>. Put that expectation in the file.</li>
+
+          <li class="step"><span class="t">Implement <code>Validate</code> and <code>Assign</code>.</span> <code>Validate</code> is the routine below with every <code>v = ...</code> replaced by storing into <code>SELF.Conv</code> (numbers into <code>Num</code> with <code>IsNum = 1</code>; strings and memo text into a NEW <code>Txt</code> with <code>TxtLen = lit.Len</code> (the tokenizer stores each literal as an exact-length <code>&amp;STRING</code> plus its length), so a short value never trips the truncation check; decoded BLOB bytes likewise). <code>Assign(colIdx)</code> then does only <code>v &amp;= FieldRef(...); v = Conv.Num</code> or <code>v = Conv.Txt</code>, or the BLOB size-and-slice copy. Shown here as one routine for readability:
+<pre><code>tpsExec.Assign PROCEDURE(LONG colIdx)
+v     ANY
+f     LIKE(SchFieldQ)
+lit   LIKE(ValQ)
+n     REAL
+dec   DECIMAL(31,15)
+d     LONG
+t     LONG
+st    StringTheory
+b     &amp;BLOB
+  CODE
+  GET(SELF.Sql.Cols, colIdx); GET(SELF.Sql.Vals, colIdx); lit = SELF.Sql.Vals
+  IF SELF.Sql.Cols.MemoNbr
+    GET(SELF.Sch.Memos, SELF.Sql.Cols.MemoNbr)
+    IF lit.Kind &lt;&gt; TK:Str THEN RETURN SELF.Range(colIdx, 'needs a string literal').
+    IF SELF.Sch.Memos.IsBlob
+      IF NOT MATCH(lit.Text, '^([A-Za-z0-9+/]{{4})*([A-Za-z0-9+/]{{2}==|[A-Za-z0-9+/]{{3}=)?$', Match:Regular) THEN RETURN SELF.Range(colIdx, 'is not valid base64').
+      st.SetValue(lit.Text)
+      IF st.Base64Decode() &lt;&gt; st:ok THEN RETURN SELF.Range(colIdx, 'is not valid base64').
+      b &amp;= SELF.Sch.F{PROP:Blob, SELF.Sql.Cols.MemoNbr}
+      b{PROP:Size} = st.Length()
+      IF st.Length() THEN b[0 : st.Length()-1] = st.GetValue().
+    ELSE
+      v &amp;= SELF.Sch.MemoRef(SELF.Sql.Cols.MemoNbr); v = lit.Text
+    END
+    RETURN 0
+  END
+  GET(SELF.Sch.Fields, SELF.Sql.Cols.FieldNbr); f = SELF.Sch.Fields
+  v &amp;= SELF.Sch.FieldRef(SELF.Sql.Cols.FieldNbr, SELF.Sql.FlatElem(SELF.Sql.Cols, f))
+  CASE f.Type
+  OF 'BYTE' OROF 'SHORT' OROF 'USHORT' OROF 'LONG' OROF 'ULONG'
+    IF lit.Kind &lt;&gt; TK:Num OR INSTRING('.', lit.Text, 1, 1) THEN RETURN SELF.Range(colIdx, 'needs an integer').
+    dec = lit.Text
+    CASE f.Type
+    OF 'BYTE'   ; IF dec &lt; 0 OR dec &gt; 255 THEN RETURN SELF.Range(colIdx, 'must be 0..255').
+    OF 'SHORT'  ; IF dec &lt; -32768 OR dec &gt; 32767 THEN RETURN SELF.Range(colIdx, 'must be -32768..32767').
+    OF 'USHORT' ; IF dec &lt; 0 OR dec &gt; 65535 THEN RETURN SELF.Range(colIdx, 'must be 0..65535').
+    OF 'LONG'   ; IF dec &lt; -2147483648 OR dec &gt; 2147483647 THEN RETURN SELF.Range(colIdx, 'must fit a 32-bit signed integer').
+    OF 'ULONG'  ; IF dec &lt; 0 OR dec &gt; 4294967295 THEN RETURN SELF.Range(colIdx, 'must be 0..4294967295').
+    END
+    v = dec
+  OF 'SREAL' OROF 'REAL'
+    IF lit.Kind &lt;&gt; TK:Num THEN RETURN SELF.Range(colIdx, 'needs a number').
+    v = lit.Text
+  OF 'DECIMAL' OROF 'PDECIMAL'
+    IF lit.Kind &lt;&gt; TK:Num THEN RETURN SELF.Range(colIdx, 'needs a number').
+    ! documented ceiling: DECIMAL(31,15) is the widest literal accepted
+    IF NOT MATCH(lit.Text, '^-?[0-9]{{1,15}(\.[0-9]{{1,15})?$', Match:Regular)
+      RETURN SELF.Range(colIdx, 'has more digits than tpscli handles (15 integer, 15 fraction)')
+    END
+    dec = lit.Text                                                  ! DECIMAL(31,15) holds every literal the regex admits
+    dec = ROUND(dec, 10 ^ (-f.Places))                             ! Clarion ROUND is half away from zero
+    IF ABS(dec) &gt;= 10 ^ (f.Digits - f.Places) THEN RETURN SELF.Range(colIdx, 'exceeds DECIMAL(' &amp; f.Digits &amp; ',' &amp; f.Places &amp; ')').
+    v = dec
+  OF 'DATE'
+    IF lit.Kind &lt;&gt; TK:Str THEN RETURN SELF.Range(colIdx, 'needs a ''YYYY-MM-DD'' string').
+    IF lit.Text = '' THEN v = 0; RETURN 0.
+    IF NOT SELF.Sql.ValidDate(lit.Text, d) THEN RETURN SELF.Range(colIdx, 'is not a valid YYYY-MM-DD date between 1801 and 2999').
+    v = d
+  OF 'TIME'
+    IF lit.Kind &lt;&gt; TK:Str THEN RETURN SELF.Range(colIdx, 'needs an ''HH:MM[:SS[.hh]]'' string').
+    IF lit.Text = '' THEN v = 0; RETURN 0.
+    IF NOT SELF.Sql.ValidTime(lit.Text, t) THEN RETURN SELF.Range(colIdx, 'is not a valid HH:MM[:SS[.hh]] time').
+    v = t
+  OF 'STRING' OROF 'CSTRING' OROF 'PSTRING'
+    IF lit.Kind &lt;&gt; TK:Str THEN RETURN SELF.Range(colIdx, 'needs a string literal').
+    IF SELF.Conv.TxtLen &gt; f.Size - CHOOSE(f.Type = 'STRING', 0, 1)
+      SELF.Warnings.Append(CHOOSE(SELF.Warnings.Length() = 0, '', ',') &amp; '{{ "code": "STRING_TRUNCATED", "column": ' &amp; SELF.Out.JStr(SELF.Sql.Cols.Path) |
+                           &amp; ', "message": "Value truncated to ' &amp; f.Size &amp; ' characters" }')
+    END
+    v = lit.Text
+  ELSE
+    RETURN SELF.Range(colIdx, 'cannot be assigned (' &amp; CLIP(f.Type) &amp; ')')
+  END
+  RETURN 0</code></pre>
+          <code>Range(colIdx, why)</code> sets <code>SELF.ErrCode = 'VALUE_OUT_OF_RANGE'</code>, <code>ErrCol = Path</code>, <code>ErrMsg = Path &amp; ' ' &amp; why</code> and returns 3. <code>tpsSql.ValidTime</code> splits on <code>:</code> and <code>.</code>, requires all-digit parts and 0..23, 0..59, 0..59, 0..99, and returns <code>(h*3600 + m*60 + s)*100 + hh + 1</code>. <code>tpsSql.ValidDate(s, out)</code> requires <code>MATCH(s, '^[0-9]{{4}-[0-9]{{2}-[0-9]{{2}$', Match:Regular)</code>, year 1801..2999, month 1..12, day 1..31, computes <code>DATE(mo, d, y)</code> and accepts only when <code>YEAR</code>, <code>MONTH</code> and <code>DAY</code> of the result equal the input. DECIMAL <code>Digits</code> is the total digit count from the definition.</li>
+
+          <li class="step"><span class="t">Implement <code>DoInsert</code>.</span> Loop <code>Validate(i)</code> for every column first, returning on the first error with <code>outcome "none"</code> and exit 3. Then <code>rec &amp;= F{PROP:Record}; CLEAR(rec)</code>, loop <code>Assign(i)</code>, then <code>ADD(F)</code>: error 40 &rarr; <code>DUPLICATE_KEY</code> with <code>"key"</code> = the label of the key the driver names in <code>ERROR()</code> if present, else the first unique key; any other error &rarr; <code>DRIVER</code> with codes; both <code>outcome "none"</code>, exit 3. Success prints <code>affected 1</code> plus <code>warnings</code> when non-empty.</li>
+
+          <li class="step"><span class="t">Run <code>tests\insert.ps1</code>.</span>
+            <div class="expect">All cases match. Also run <code>DESCRIBE</code> on the work copy: <code>records</code> is 5 (3 + two successful inserts).</div></li>
+
+          <li class="step"><span class="t">Commit.</span> <code>git add -A; git commit -m "tpsExec: INSERT with typed conversion and range checks"</code></li>
+        </ol>
+      </section>
+
+      <!-- ======================================================================= -->
+      <section class="task">
+        <h2>Task 9 <span class="tasknum">&middot; UPDATE and DELETE, two-pass, transactional</span></h2>
+        <p>Deliverable: multi-row UPDATE and DELETE with the exact HOLD/REGET/LOGOUT/COMMIT/ROLLBACK protocol from spec &sect;5, <code>matched</code>/<code>affected</code>/<code>outcome</code> semantics, and a demonstrated rollback on a held record.</p>
+        <div class="files">
+          <div><span class="k">Modify</span> <code>tpsExec.clw</code> (<code>DoUpdate</code>, <code>DoDelete</code>, shared <code>Mutate(BYTE isDelete)</code>), <code>tests\update.ps1</code>, <code>tests\hold.clw</code> + <code>tests\hold.cwproj</code> (a helper that opens a file shared and HOLDs one record for N seconds)</div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Failing tests.</span> <code>tests\update.ps1</code> on a fresh copy of KEYS.TPS:
+<pre><code>UPDATE [work\KEYS.TPS] SET CODE = 'Z' WHERE CODE = ''          -&gt; DUPLICATE_KEY (OptKey is unique), outcome rolled_back, matched 2, affected 0, exit 3
+SELECT ID, CODE FROM [work\KEYS.TPS] WHERE ID IN (2,4) ORDER BY ID  -&gt; [[2,""],[4,""]]   (rollback proven)
+UPDATE [work\KEYS.TPS] SET NAME = 'zulu' WHERE CODE = ''        -&gt; matched 2, affected 2
+SELECT ID FROM [work\KEYS.TPS] WHERE NAME = 'zulu' ORDER BY ID   -&gt; [[2],[4]]
+UPDATE [work\KEYS.TPS] SET AMOUNT = 100 WHERE ID = 1            -&gt; matched 1, affected 1   (changes a key component)
+UPDATE [work\KEYS.TPS] SET NAME = NAME ... (not allowed: literal only) -&gt; SYNTAX
+UPDATE [work\KEYS.TPS] SET ID = 2 WHERE ID = 3                  -&gt; DUPLICATE_KEY, outcome rolled_back, matched 1, affected 0, exit 3
+DELETE FROM [work\KEYS.TPS] WHERE AMOUNT &lt; 3                    -&gt; matched 2, affected 2
+DESCRIBE [work\KEYS.TPS]                                        -&gt; records 3
+DELETE FROM [work\KEYS.TPS] WHERE 1 = 1                         -&gt; matched 3, affected 3; records 0</code></pre>
+          Then the hold case on a fresh five-row copy: build <code>tests\hold.exe</code> (static FILE declaration matching KEYS, opens shared, sets <code>KY:Id = 2</code>, <code>HOLD(Keys, 1)</code> then <code>GET(Keys, KY:PKey)</code>, checks <code>ERRORCODE() = 0</code>, writes the file <code>work\held.flag</code>, sleeps 8 s, <code>RELEASE</code>, deletes the flag); start it in the background, wait until <code>held.flag</code> exists, run <code>DELETE FROM [work\KEYS.TPS] WHERE ID &gt; 0</code>.
+            <div class="expect">Red now. Final expectation for the hold case: <code>RECORD_HELD</code>, <code>error.row</code> "2", <code>outcome rolled_back</code>, <code>matched 5</code>, <code>affected 0</code>, exit 3, and a following DESCRIBE shows records 5 (nothing deleted).</div></li>
+
+          <li class="step"><span class="t">Implement <code>Mutate</code>.</span> For UPDATE, every SET literal goes through <code>Validate</code> before pass 1, so a bad literal returns <code>VALUE_OUT_OF_RANGE</code> with <code>outcome "none"</code> and no scan. Pass 1 stores the row identity (<code>RowIdText()</code>) next to each bookmark so a failed REGET can still name the row. Every driver failure snapshots <code>ERRORCODE()</code>, <code>ERROR()</code>, <code>FILEERRORCODE()</code> and <code>FILEERROR()</code> into locals before <code>Undo</code> or <code>POPBIND</code> run.
+<pre><code>tpsExec.Mutate PROCEDURE(BYTE isDelete)
+cands   PosQ
+rec     &amp;GROUP
+i       LONG
+j       LONG
+r       BYTE
+held    BYTE
+pk      STRING(255)
+e       LONG
+em      STRING(255)
+fe      STRING(255)
+fm      STRING(255)
+oc      STRING(12)
+affected LONG
+  CODE
+  rec &amp;= SELF.Sch.F{PROP:Record}
+  PUSHBIND; BIND(rec)
+  ! pass 1: candidates in file order
+  IF NOT isDelete
+    LOOP j = 1 TO RECORDS(SELF.Sql.Cols)
+      IF SELF.Validate(j) THEN POPBIND; RETURN SELF.ErrOut('update', SELF.ErrCode, SELF.ErrMsg, 'none', 3, '"column": ' &amp; SELF.Out.JStr(SELF.ErrCol)).
+    END
+  END
+  SET(SELF.Sch.F)
+  LOOP
+    NEXT(SELF.Sch.F)
+    e = ERRORCODE()
+    IF e = 33 THEN BREAK.                                   ! end of file
+    IF e THEN em = ERROR(); POPBIND; RETURN SELF.ErrOut(CHOOSE(isDelete,'delete','update'), 'DRIVER', 'NEXT: ' &amp; e &amp; ' ' &amp; CLIP(em), 'none', 3).
+    r = SELF.Matches()
+    IF r = 2
+      POPBIND
+      RETURN SELF.ErrOut(CHOOSE(isDelete,'delete','update'), 'SYNTAX', 'Runtime rejected the filter expression: ' &amp; SELF.Sql.Where, 'none', 1)
+    END
+    ! r = 0: not a candidate
+    IF r THEN cands.Pos = POSITION(SELF.Sch.F); cands.RowId = SELF.RowIdText(); ADD(cands).
+  END
+  IF RECORDS(cands) = 0
+    POPBIND
+    SELF.Out.Line('{{ "ok": true, "op": "' &amp; CHOOSE(isDelete,'delete','update') &amp; '", "matched": 0, "affected": 0, "complete": true }')
+    RETURN 0
+  END
+  ! pass 2
+  LOGOUT(2, SELF.Sch.F)
+  IF ERRORCODE()
+    e = ERRORCODE(); em = ERROR(); fe = FILEERRORCODE(); fm = FILEERROR(); POPBIND
+    RETURN SELF.ErrOut(CHOOSE(isDelete,'delete','update'), 'DRIVER', |
+                       'LOGOUT failed: ' &amp; e &amp; ' ' &amp; CLIP(em) &amp; ' / ' &amp; CLIP(fe) &amp; ' ' &amp; CLIP(fm), 'none', 3, '', |
+                       '"matched": ' &amp; RECORDS(cands) &amp; ', "affected": 0')
+  END
+  LOOP i = 1 TO RECORDS(cands)
+    GET(cands, i)
+    HOLD(SELF.Sch.F, 1)
+    REGET(SELF.Sch.F, cands.Pos)
+    e = ERRORCODE(); em = ERROR(); fe = FILEERRORCODE(); fm = FILEERROR()
+    IF e = 43 THEN pk = cands.RowId; oc = SELF.Undo(); POPBIND
+      RETURN SELF.ErrOut(CHOOSE(isDelete,'delete','update'), 'RECORD_HELD', |
+                         'Record held by another process (' &amp; CLIP(pk) &amp; '). Statement ' |
+                         &amp; CHOOSE(oc = 'rolled_back', 'rolled back.', 'NOT confirmed rolled back.'), oc, 3, |
+                         '"row": ' &amp; SELF.Out.JStr(pk), '"matched": ' &amp; RECORDS(cands) &amp; CHOOSE(oc = 'rolled_back', ', "affected": 0', ''))
+    END
+    IF e
+      RELEASE(SELF.Sch.F); oc = SELF.Undo(); POPBIND
+      RETURN SELF.ErrOut(CHOOSE(isDelete,'delete','update'), 'DRIVER', |
+                         'REGET ' &amp; CLIP(cands.RowId) &amp; ': ' &amp; e &amp; ' ' &amp; CLIP(em) &amp; ' / ' &amp; CLIP(fe) &amp; ' ' &amp; CLIP(fm), oc, 3, |
+                         '"row": ' &amp; SELF.Out.JStr(cands.RowId), '"matched": ' &amp; RECORDS(cands) &amp; CHOOSE(oc = 'rolled_back', ', "affected": 0', ''))
+    END
+    held = 1
+    r = SELF.Matches()
+    IF r = 2
+      RELEASE(SELF.Sch.F); oc = SELF.Undo(); POPBIND
+      RETURN SELF.ErrOut(CHOOSE(isDelete,'delete','update'), 'SYNTAX', 'Runtime rejected the filter expression: ' &amp; SELF.Sql.Where, |
+                         oc, 1, '', '"matched": ' &amp; RECORDS(cands))
+    END
+    IF r = 0 THEN RELEASE(SELF.Sch.F); CYCLE.               ! no longer matches: skip, counts in matched only
+    IF isDelete
+      DELETE(SELF.Sch.F)
+    ELSE
+      LOOP j = 1 TO RECORDS(SELF.Sql.Cols); SELF.Assign(j); END       ! already validated
+      PUT(SELF.Sch.F)
+    END
+    e = ERRORCODE(); em = ERROR(); fe = FILEERRORCODE(); fm = FILEERROR()
+    IF e
+      RELEASE(SELF.Sch.F); pk = cands.RowId; oc = SELF.Undo(); POPBIND
+      RETURN SELF.ErrOut(CHOOSE(isDelete,'delete','update'), CHOOSE(e = 40, 'DUPLICATE_KEY', 'DRIVER'), |
+                         CLIP(em) &amp; ' at ' &amp; CLIP(pk) &amp; CHOOSE(e = 40, '', ' / ' &amp; CLIP(fe) &amp; ' ' &amp; CLIP(fm)), oc, 3, |
+                         '"row": ' &amp; SELF.Out.JStr(pk), '"matched": ' &amp; RECORDS(cands) &amp; CHOOSE(oc = 'rolled_back', ', "affected": 0', ''))
+    END
+    affected += 1
+  END
+  COMMIT
+  e = ERRORCODE(); em = ERROR(); fe = FILEERRORCODE(); fm = FILEERROR()
+  IF e
+    oc = SELF.Undo(); POPBIND
+    RETURN SELF.ErrOut(CHOOSE(isDelete,'delete','update'), 'DRIVER', |
+                       'COMMIT failed: ' &amp; e &amp; ' ' &amp; CLIP(em) &amp; ' / ' &amp; CLIP(fe) &amp; ' ' &amp; CLIP(fm), oc, 3, '', |
+                       '"matched": ' &amp; RECORDS(cands) &amp; CHOOSE(oc = 'rolled_back', ', "affected": 0', ''))
+  END
+  POPBIND
+  SELF.Out.Line('{{ "ok": true, "op": "' &amp; CHOOSE(isDelete,'delete','update') &amp; '", "matched": ' &amp; RECORDS(cands) &amp; ', "affected": ' &amp; affected |
+                &amp; CHOOSE(SELF.Warnings.Length() = 0, '', ', "warnings": [' &amp; SELF.Warnings.GetValue() &amp; ']') &amp; ', "complete": true }')
+  RETURN 0</code></pre>
+          <code>Undo()</code> does <code>ROLLBACK</code> and returns <code>'rolled_back'</code> when <code>ERRORCODE() = 0</code>, else <code>'unknown'</code>. <code>RowIdText()</code> returns the primary (or first unique) key's component values joined with <code>'|'</code> from the current buffer, or <code>POSITION</code> as hex when the file has no unique key. Error 43 is <code>IsHeldErr</code> (<code>ERRORS.CLW</code>); no other code is treated as held. A REGET failure of any kind, including 35 (record deleted by another process between the passes), is a statement failure with rollback, as the spec requires. <code>DoUpdate</code> and <code>DoDelete</code> are one-line wrappers.</li>
+
+          <li class="step"><span class="t">Run <code>tests\update.ps1</code> including the hold case.</span>
+            <div class="expect">All green. If <code>HOLD(F,1)</code> followed by <code>REGET</code> reports the held record with a code other than 43, stop and check <code>ERRORS.CLW</code> for what that code means before changing the check; record the finding. If ROLLBACK does not restore the pre-statement rows in the DUPLICATE_KEY case (records/values unchanged afterwards), the LOGOUT did not take: confirm the driver returned no error from LOGOUT and that <code>ClaTPSl.lib</code> is the linked driver.</div></li>
+
+          <li class="step"><span class="t">Commit.</span> <code>git add -A; git commit -m "tpsExec: UPDATE and DELETE, two-pass with LOGOUT/COMMIT and rollback"</code></li>
+        </ol>
+      </section>
+
+      <!-- ======================================================================= -->
+      <section class="task">
+        <h2>Task 10 <span class="tasknum">&middot; verify.ps1, README, simplify, final commit</span></h2>
+        <p>Deliverable: the spec &sect;7 checks as one script that exits non-zero on any failure, a README that documents the surface and the deviations, a /simplify pass, and the release commit.</p>
+        <div class="files">
+          <div><span class="k">Create</span> <code>verify.ps1</code>, <code>README.md</code>; <span class="k">Modify</span> <code>docs\implementation-notes.html</code></div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Write <code>verify.ps1</code>.</span> Parameters: <code>-Corpus</code> (default <code>testdata</code>), <code>-Extra &lt;dir&gt;</code> for real-world files (the dtpos test-store copies; pass the folder that holds them, they are never committed). Steps, each printing PASS/FAIL and accumulating:
+            <ol class="plain">
+              <li>Build both projects with <code>tools\build.ps1</code>; run <code>mkcorpus.exe</code> to regenerate the corpus.</li>
+              <li><code>tests\describe.ps1</code>, <code>tests\parser.ps1</code>, <code>tests\select.ps1</code>, <code>tests\insert.ps1</code>, <code>tests\update.ps1</code>.</li>
+              <li>Round trip on every corpus file and every file in <code>-Extra</code>: DESCRIBE (records N), then INSERT one row built from DESCRIBE: for every unique key's components use values proven absent: numbers are the column's SELECT max plus 1; strings are <code>'~'</code> repeated to the size, and a SELECT with that exact value must return zero rows first, else the file is skipped with a printed note (unique keys that would still collide are the only skip reason); for every other writable scalar leaf a type-derived literal that fits (numbers 7, DECIMAL 1.5 rounded to its places, strings <code>'r'</code> repeated to min(size, 3), dates '2026-01-02', times '01:02:03', MEMO 'memo', BLOB <code>'AQID'</code>), skipping the OVER side of an overlay pair; SELECT it back by the key and compare every value to the literal after applying the output formatting rules (decimal scale, time <code>.00</code>); UPDATE every writable leaf to a second set of values; SELECT and compare; DELETE it; DESCRIBE (records N). Files without a unique key run the same sequence addressed by all inserted values in the WHERE, and the corpus gains <code>NOKEY.TPS</code> (two columns, no keys) in Task 2 so that path is exercised.</li>
+              <li>Dictionary parity for <code>-Extra</code> files: <code>verify.ps1 -Expected &lt;dir&gt;</code> takes a folder of oracle-format JSON produced by running the Task 2 <code>Dump</code> procedure against the dictionary-declared FILE structures (a one-off <code>mkexpected</code> program generated from the dtpos dictionary, kept in the dtpos repo, not here); each <code>--dump-schema</code> output is compared to it exactly as <code>tests\describe.ps1</code> does.</li>
+              <li>Integrity after the round trip: a hidden <code>--walk-key &lt;name&gt;</code> option walks exactly that key with <code>SET(key)</code>/<code>NEXT</code> and prints the row count and whether every consecutive pair was in key order. For every key of every file the count must equal <code>records</code> (for an optional key: <code>records</code> minus the rows whose components are all blank or zero, computed by a SELECT), and the ordered flag must be true. TPSFix has no verified command-line interface, so it is not in the script; instead <code>verify.ps1</code> requires a <code>-TpsFixLog &lt;file&gt;</code> argument when <code>-Extra</code> is given and FAILs unless that log (saved from a manual TPSFix run over the same files, same day) contains no error lines. That makes the manual step a checked input rather than a reminder.</li>
+              <li>Shared access: start <code>tests\hold.exe</code> on the work copy of KEYS, run a SELECT (must succeed) and the DELETE (must be RECORD_HELD with rolled_back), as in Task 9.</li>
+              <li>Performance: take the largest file, read its first non-optional key and that key's first component from DESCRIBE, run <code>SELECT &lt;comp&gt; FROM [f] ORDER BY &lt;comp&gt; LIMIT 1</code> five times under <code>Measure-Command</code>, require <code>ok: true</code> and one row each time, report the median; FAIL over 250 ms.</li>
+            </ol>
+          Success is decided by the script's own comparisons; the exe's exit code is one input, never the verdict.</li>
+
+          <li class="step"><span class="t">Run it.</span> <code>powershell -File verify.ps1</code>, then with <code>-Extra</code> pointing at a folder of copied dtpos TPS files.
+            <div class="expect">All PASS. For any <code>-Extra</code> file that fails with <code>UNSUPPORTED_FIELD_TYPE</code> or <code>DEFINITION_UNREADABLE</code>, record the file, the type code or the definition length in the notes; those become the next corpus additions, not a reason to loosen the fail-closed rule.</div></li>
+
+          <li class="step"><span class="t">README.</span> Sections: what it is, the exact invocation and options, the SQL dialect table from spec &sect;3, the response contract from &sect;4, error codes and exit codes from &sect;8, the deviations list (no VIEW so ORDER BY without a matching key sorts in memory; real field labels bound instead of <code>_Fn</code>; PRIMARY bit outcome from Task 4; MEMO/BLOB access outcome from Task 7; TPSFix replaced by key-walk integrity check), and the one-line build command.</li>
+
+          <li class="step"><span class="t">Simplify.</span> Run <code>/simplify</code> on the repo; apply its fixes; re-run <code>verify.ps1</code>.
+            <div class="expect">Still all PASS.</div></li>
+
+          <li class="step"><span class="t">Final commit and tag.</span> <code>git add -A; git commit -m "tpscli 0.1.0: verify script, README"; git tag v0.1.0</code>. Close the implementation notes with the final mapping table and the list of deviations.</li>
+        </ol>
+      </section>
+
+      <hr>
+      <h2>Risks and how the plan meets them</h2>
+      <table>
+        <thead><tr><th>Risk</th><th>Where it is caught</th></tr></thead>
+        <tbody>
+          <tr><td>Reconstructed layout differs from what the driver stored.</td><td>Task 4 diffs against DynFile's own reading of a real FILE; Task 5 opens through the driver, where error 47 rejects any mismatch; Task 10 round-trips every corpus and real-world file.</td></tr>
+          <tr><td>Key PRIMARY bit and memo BINARY bit are not documented.</td><td>Task 4 prints raw flags against the oracle and pins the observed bit, or records that it is not recoverable.</td></tr>
+          <tr><td>Clarion LONG arithmetic might not wrap, breaking decryption.</td><td>Task 3 step 1 proves it before the port is written.</td></tr>
+          <tr><td>VIEW cannot be used on a DFD file.</td><td>Known before coding; the executor is designed around SET/NEXT + EVALUATE and an in-memory sort fallback (ceiling marked in code).</td></tr>
+          <tr><td>Memo and BLOB access on a dynamic file may not go through <code>PROP:Field</code>/<code>PROP:Blob</code>.</td><td>Task 7 verifies on MEMOS.TPS and has a defined fallback and a documented deviation.</td></tr>
+          <tr><td>The exe links as GUI-subsystem and shells do not wait for it.</td><td><code>tpscli.exp</code> with <code>NAME 'tpscli' CUI</code>; build.ps1 refuses any image whose subsystem is not 3; Task 1 tests the wait from cmd and PowerShell before anything else is built.</td></tr>
+          <tr><td>HOLD timeout error code might not be 43 on this driver build.</td><td>Task 9 treats only 43 (<code>IsHeldErr</code>) as held; the <code>hold.exe</code> test confirms it, and any other code is investigated in <code>ERRORS.CLW</code> before the check changes.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Self-review</h2>
+      <ul>
+        <li><strong>Spec coverage:</strong> &sect;3 surface (Tasks 1, 6), &sect;4 examples and contract (Tasks 6-9 emit every member; Task 7 truncation probe; Task 8 warnings; Task 9 outcome), &sect;5 units (Tasks 3-9), DynFile lifecycle and silent FixFormat (Task 5), binding (Task 7, with the label-instead-of-<code>_Fn</code> deviation), &sect;6 build (Task 1), &sect;7 checks (Tasks 2, 4, 10), &sect;8 codes (every code is produced by a named task; <code>OWNER_REQUIRED</code>/<code>OWNER_WRONG</code> Task 3, <code>UNSUPPORTED_FIELD_TYPE</code> Task 4, <code>DEFINITION_MISMATCH</code> Task 5).</li>
+        <li><strong>Gaps accepted with a reason:</strong> the spec's VIEW-based execution is replaced because FIXFORMAT only accepts a NEW file; TPSFix in the verification loop is replaced by a key-walk check because its CLI is unverified. Both are recorded as deviations for the owner in the notes and README.</li>
+        <li><strong>Placeholders:</strong> the Task 2 row list uses ellipses in the plan text only and instructs the implementer to write every row; the Task 4 reconciliation step deliberately lists both outcomes for each unknown encoding because the oracle decides, not the plan.</li>
+        <li><strong>Codex plan review round 3:</strong> 5 residuals and 1 inconsistency applied: FlatElem is a declared tpsSql method combining group element and leaf subscripts, 2-D names in expansion, RLE extended-count bounds, Overrun checked in Walk, NEXT diagnostic snapshot; LIKE literal wildcards kept as a documented ceiling.</li>
+        <li><strong>Codex plan review round 2:</strong> 17 residual gaps and 6 new issues applied: kb name shadowing, WhoQ instead of a dynamic LONG array, single flattened WHAT index with FlatElem, PDECIMAL and DIM(a,b) reconciliation in Task 4, MEMO/BLOB failures abort the statement, HaveTable guard, LIKE literal wildcard rejected, BIND(rec) in Mutate, ValQ exact-length literals, ValidDate/ValidTime in tpsSql, Conv and Cols allocation, 4096-argument guard error, record-header bounds and 0x01 marker checks, FILEERROR snapshots on LOGOUT/COMMIT, risks table corrected, TPSFix log as a checked verify input, NOKEY and GRID corpus additions with corrected expectations; documented ceilings kept: 15.15-digit literals, four ORDER BY sort components, 255-char string sort keys.</li>
+        <li><strong>Codex plan review round 1:</strong> 41 findings applied: static ClaDFl, delayed-expansion exit test, dynamic argv/stdin buffers with checked I/O, bounds-checked TPS reader that fails closed, single-table guard, corrected parent and OVER resolution, internal schema dump for parity, Build takes the driver FILE, sized WhoIndex with unresolved-field failure, BIND on the record group, optional keys excluded from ORDER BY, typed sort fallback, qualified projection names, PDECIMAL, dimmed-group and 2-D addressing, bracket tokenizing only in table positions, Clarion literal escaping, strict date and base64 validation, validate-before-mutate with ConvQ, error 43 only, snapshot driver errors before cleanup, row identity captured in pass 1, unique-CODE test corrected, hold fixture with readiness flag, NOKEY corpus file, per-file round-trip fixtures, direct key walk, keyed performance query, memo/blob failures fail the statement.</li>
+        <li><strong>Type consistency:</strong> <code>tpsSchema.Fields/Keys/Comps/Memos</code> queue names and members are used identically in Tasks 4, 5, 6, 7; <code>FieldRef(nbr, elem)</code> and <code>MemoRef(nbr)</code> signatures match between Task 5 and Tasks 7-8; <code>ColQ</code> members <code>Path/Prefix/FieldNbr/MemoNbr/GrpElem/Elem/Elem2/Expr</code> match between Task 6 and Tasks 7-9; <code>ErrOut(op, code, msg, outcome, exit, errExtra, topExtra),LONG</code> is the same in Tasks 7-9: <code>errExtra</code> goes inside the <code>error</code> object (row, column, key, driver codes), <code>topExtra</code> at the top level (matched, affected); it prints and returns <code>exitCode</code>.</li>
+        <li><strong>Ablation:</strong> <code>tpsDynFile</code> exists only to silence the modal MESSAGE, and Task 5 cannot run in a console without it. <code>OutColQ</code> is needed because <code>SELECT *</code> expands groups and arrays into names the SQL never contained. <code>PosQ</code> serves both the sort fallback and the two-pass mutation. No other abstraction was added; JSON is emitted by string concatenation rather than jFiles because escaping is the only hard part and <code>JStr</code> is fifteen lines.</li>
+      </ul>
+
+    </main>
+  </div>
+</body>
+</html>

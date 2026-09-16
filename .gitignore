@@ -1,0 +1,5 @@
+obj/
+map/
+*.exe
+testdata/*.TPS
+testdata/work/
