@@ -2,10 +2,11 @@
   INCLUDE('StringTheory.inc'),ONCE
   INCLUDE('tpsOut.inc'),ONCE
   INCLUDE('tpsSchema.inc'),ONCE
+  INCLUDE('tpsSql.inc'),ONCE
   MAP
     ParseArgs()
     DumpDef()
-    DoDescribe()
+    Dispatch()
   END
 
 TpsDrv     FILE,DRIVER('TOPSPEED'),NAME('tpsdrv.tps'),PRE(TD)
@@ -34,9 +35,7 @@ TPSCLI_VERSION  EQUATE('0.1.0')
   IF Opt.Sql &= NULL OR LEN(CLIP(Opt.Sql)) = 0
     Out.Fail('SYNTAX', 'No SQL statement given. Pass it as the first argument or on stdin.', 1)
   END
-  IF UPPER(SUB(LEFT(Opt.Sql), 1, 8)) = 'DESCRIBE' THEN DoDescribe().
-  ! Tasks 6-9 replace this line with parse + execute.
-  Out.Fail('SYNTAX', 'Parser not implemented yet', 1)
+  Dispatch()
 
 ParseArgs  PROCEDURE()
 n     LONG
@@ -115,38 +114,80 @@ hexln  StringTheory
   END
   HALT(0)
 
-! Temporary DESCRIBE dispatch (Task 4); Task 6 replaces this with the real parser.
-DoDescribe  PROCEDURE()
-sql   StringTheory
-lb    LONG
-rb    LONG
-path  STRING(260)
-sch   tpsSchema
-rc    LONG
+! Real dispatch (Task 6): tokenize + parse the statement head, load the schema the path names,
+! then either run DESCRIBE (Build+Open+DescribeJson) or finish parsing the body and either
+! report --parse-only success or hand off to the executor (Task 7 onward).
+Dispatch  PROCEDURE()
+Stmt      tpsSql
+Sc        tpsSchema
+rc        LONG
+opName    STRING(12)
+exitCode  LONG
+errJs     StringTheory
   CODE
-  sql.SetValue(Opt.Sql)
-  lb = INSTRING('[', sql.GetValue(), 1, 1)
-  IF lb > 0 THEN rb = INSTRING(']', sql.GetValue(), 1, lb+1).
-  IF lb = 0 OR rb = 0
-    Out.Fail('SYNTAX', 'DESCRIBE requires a bracketed file path', 1)
-  END
-  path = sql.Sub(lb+1, rb-lb-1)
-  rc = sch.Load(CLIP(path), Opt.Owner)
-  IF rc = 0 THEN rc = sch.Parse().
+  Stmt.Sch &= Sc
+  rc = Stmt.Parse(Opt.Sql)
   IF rc <> 0
-    Out.Line('{{ "ok": false, "op": "describe", "error": {{ "code": ' & Out.JStr(CLIP(sch.Err)) & ', "message": ' & Out.JStr(CLIP(sch.ErrMsg)) & ' }, "complete": true }')
+    CASE Stmt.Op
+    OF OP:Describe ; opName = 'describe'
+    OF OP:Select   ; opName = 'select'
+    OF OP:Insert   ; opName = 'insert'
+    OF OP:Update   ; opName = 'update'
+    OF OP:Delete   ; opName = 'delete'
+    ELSE            ; opName = ''
+    END
+    exitCode = CHOOSE(Stmt.Err = 'VALUE_OUT_OF_RANGE', 3, 1)
+    errJs.SetValue('{{ "ok": false, "op": ' & CHOOSE(CLIP(opName) = '', 'null', Out.JStr(CLIP(opName))) & ', "error": {{ "code": ' & Out.JStr(CLIP(Stmt.Err)) & ', "message": ' & Out.JStr(CLIP(Stmt.ErrMsg)) & ', "position": ' & Stmt.ErrPos & ', "token": ' & Out.JStr(CLIP(Stmt.ErrToken)))
+    IF Stmt.Err = 'UNKNOWN_COLUMN' OR Stmt.Err = 'VALUE_OUT_OF_RANGE' THEN errJs.Append(', "column": ' & Out.JStr(CLIP(Stmt.ErrColumn))).
+    errJs.Append(' }, "outcome": "none", "complete": true }')
+    Out.Line(errJs.GetValue())
+    HALT(exitCode)
+  END
+  CASE Stmt.Op
+  OF OP:Describe ; opName = 'describe'
+  OF OP:Select   ; opName = 'select'
+  OF OP:Insert   ; opName = 'insert'
+  OF OP:Update   ; opName = 'update'
+  OF OP:Delete   ; opName = 'delete'
+  END
+
+  rc = Sc.Load(CLIP(Stmt.Path), Opt.Owner)
+  IF rc = 0 THEN rc = Sc.Parse().
+  IF rc <> 0
+    Out.Line('{{ "ok": false, "op": ' & Out.JStr(CLIP(opName)) & ', "error": {{ "code": ' & Out.JStr(CLIP(Sc.Err)) & ', "message": ' & Out.JStr(CLIP(Sc.ErrMsg)) & ' }, "complete": true }')
     HALT(2)
   END
-  IF Opt.WantDumpSchema
-    Out.Line(sch.SchemaDumpJson(Out))
+
+  IF Stmt.Op = OP:Describe
+    IF Opt.WantDumpSchema
+      Out.Line(Sc.SchemaDumpJson(Out))
+      HALT(0)
+    END
+    rc = Sc.Build(TpsDrv)
+    IF rc = 0 THEN rc = Sc.Open().
+    IF rc <> 0
+      Out.Line('{{ "ok": false, "op": "describe", "error": {{ "code": ' & Out.JStr(CLIP(Sc.Err)) & ', "message": ' & Out.JStr(CLIP(Sc.ErrMsg)) & ' }, "complete": true }')
+      HALT(2)
+    END
+    Out.Line(Sc.DescribeJson(Out, RECORDS(Sc.F)))
+    CLOSE(Sc.F)
     HALT(0)
   END
-  rc = sch.Build(TpsDrv)
-  IF rc = 0 THEN rc = sch.Open().
+
+  rc = Stmt.ParseBody()
   IF rc <> 0
-    Out.Line('{{ "ok": false, "op": "describe", "error": {{ "code": ' & Out.JStr(CLIP(sch.Err)) & ', "message": ' & Out.JStr(CLIP(sch.ErrMsg)) & ' }, "complete": true }')
-    HALT(2)
+    exitCode = CHOOSE(Stmt.Err = 'VALUE_OUT_OF_RANGE', 3, 1)
+    errJs.SetValue('{{ "ok": false, "op": ' & Out.JStr(CLIP(opName)) & ', "error": {{ "code": ' & Out.JStr(CLIP(Stmt.Err)) & ', "message": ' & Out.JStr(CLIP(Stmt.ErrMsg)) & ', "position": ' & Stmt.ErrPos & ', "token": ' & Out.JStr(CLIP(Stmt.ErrToken)))
+    IF Stmt.Err = 'UNKNOWN_COLUMN' OR Stmt.Err = 'VALUE_OUT_OF_RANGE' THEN errJs.Append(', "column": ' & Out.JStr(CLIP(Stmt.ErrColumn))).
+    errJs.Append(' }, "outcome": "none", "complete": true }')
+    Out.Line(errJs.GetValue())
+    HALT(exitCode)
   END
-  Out.Line(sch.DescribeJson(Out, RECORDS(sch.F)))
-  CLOSE(sch.F)
-  HALT(0)
+
+  IF Opt.ParseOnly
+    Out.Line('{{ "ok": true, "op": ' & Out.JStr(CLIP(opName)) & ', "parse_only": true, "complete": true }')
+    HALT(0)
+  END
+
+  Out.Line('{{ "ok": false, "op": ' & Out.JStr(CLIP(opName)) & ', "error": {{ "code": "UNSUPPORTED", "message": "Executor not implemented" }, "outcome": "none", "complete": true }')
+  HALT(1)

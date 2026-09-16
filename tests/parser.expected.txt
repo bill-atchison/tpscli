@@ -1,0 +1,132 @@
+DESCRIBE [testdata\ALLTYPES.TPS]
+{ "ok": true, "op": "describe", "file": "testdata\\ALLTYPES.TPS", "encrypted": false, "records": 3, "columns": [{"name":"ID","type":"LONG"},{"name":"B","type":"BYTE"},{"name":"S","type":"SHORT"},{"name":"US","type":"USHORT"},{"name":"UL","type":"ULONG"},{"name":"SR","type":"SREAL"},{"name":"R","type":"REAL"},{"name":"D","type":"DECIMAL","size":7,"places":2},{"name":"DT","type":"DATE"},{"name":"TM","type":"TIME"},{"name":"STR","type":"STRING","size":20},{"name":"CSTR","type":"CSTRING","size":21},{"name":"PSTR","type":"PSTRING","size":21},{"name":"PIC","type":"STRING","size":9},{"name":"ARR","type":"SHORT","dim":4}], "keys": [{"name":"IDKEY","primary":true,"unique":true,"components":[{"col":"ID","asc":true}]}], "complete": true }
+EXIT=0
+SELECT * FROM [testdata\ALLTYPES.TPS]
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID, STR, D FROM [testdata\ALLTYPES.TPS]
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE ID = 1
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE ID <> 1
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE ID != 1
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE ID < 5
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE ID > 5
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE ID <= 5
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE ID >= 5
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE (ID = 1 OR ID = 2) AND NOT ID = 3
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE STR LIKE 'AB%'
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE ID IN (1, 2, 3)
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE ID NOT IN (1, 2, 3)
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE DT = '2026-09-15'
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE TM = '13:45:00'
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE 1 = 1
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] ORDER BY ID DESC, STR ASC
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] LIMIT 10
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ID FROM [testdata\ALLTYPES.TPS] LIMIT 10 OFFSET 5
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ADDR.CITY FROM [testdata\GROUPS.TPS]
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT PHONES[1].KIND FROM [testdata\GROUPS.TPS]
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+SELECT ARR[2] FROM [testdata\ALLTYPES.TPS]
+{ "ok": true, "op": "select", "parse_only": true, "complete": true }
+EXIT=0
+INSERT INTO [testdata\ALLTYPES.TPS] (ID, STR) VALUES (99, 'HELLO')
+{ "ok": true, "op": "insert", "parse_only": true, "complete": true }
+EXIT=0
+UPDATE [testdata\ALLTYPES.TPS] SET STR = 'X', B = 1 WHERE ID = 1
+{ "ok": true, "op": "update", "parse_only": true, "complete": true }
+EXIT=0
+DELETE FROM [testdata\ALLTYPES.TPS] WHERE ID = 1
+{ "ok": true, "op": "delete", "parse_only": true, "complete": true }
+EXIT=0
+UPDATE [testdata\ALLTYPES.TPS] SET STR = 'X'
+{ "ok": false, "op": "update", "error": { "code": "WHERE_REQUIRED", "message": "UPDATE without WHERE is refused. Use WHERE 1 = 1 to update every row.", "position": 45, "token": "<eof>" }, "outcome": "none", "complete": true }
+EXIT=1
+DELETE FROM [testdata\ALLTYPES.TPS]
+{ "ok": false, "op": "delete", "error": { "code": "WHERE_REQUIRED", "message": "DELETE without WHERE is refused. Use WHERE 1 = 1 to delete every row.", "position": 36, "token": "<eof>" }, "outcome": "none", "complete": true }
+EXIT=1
+DELETE FROM [testdata\ALLTYPES.TPS] WHERE ID = 1 LIMIT 5
+{ "ok": false, "op": "delete", "error": { "code": "UNSUPPORTED", "message": "LIMIT is not supported on DELETE", "position": 50, "token": "LIMIT" }, "outcome": "none", "complete": true }
+EXIT=1
+UPDATE [testdata\ALLTYPES.TPS] SET STR = 'X' WHERE ID = 1 LIMIT 5
+{ "ok": false, "op": "update", "error": { "code": "UNSUPPORTED", "message": "LIMIT is not supported on UPDATE", "position": 59, "token": "LIMIT" }, "outcome": "none", "complete": true }
+EXIT=1
+SELECT ID FROM [testdata\ALLTYPES.TPS] JOIN OTHER
+{ "ok": false, "op": "select", "error": { "code": "UNSUPPORTED", "message": "JOIN is not supported", "position": 40, "token": "JOIN" }, "outcome": "none", "complete": true }
+EXIT=1
+SELECT COUNT(*) FROM [testdata\ALLTYPES.TPS]
+{ "ok": false, "op": "select", "error": { "code": "UNSUPPORTED", "message": "Aggregate functions are not supported (COUNT)", "position": 8, "token": "COUNT" }, "outcome": "none", "complete": true }
+EXIT=1
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE STR IS NULL
+{ "ok": false, "op": "select", "error": { "code": "UNSUPPORTED", "message": "IS NULL is not supported; TPS has no NULL", "position": 50, "token": "IS" }, "outcome": "none", "complete": true }
+EXIT=1
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE ID + 1 = 2
+{ "ok": false, "op": "select", "error": { "code": "UNSUPPORTED", "message": "Arithmetic expressions are not supported", "position": 49, "token": "+" }, "outcome": "none", "complete": true }
+EXIT=1
+SELECT NOPE FROM [testdata\ALLTYPES.TPS]
+{ "ok": false, "op": "select", "error": { "code": "UNKNOWN_COLUMN", "message": "Unknown column NOPE; valid columns: ID, B, S, US, UL, SR, R, D, DT, TM, STR, CSTR, PSTR, PIC, ARR", "position": 8, "token": "NOPE", "column": "NOPE" }, "outcome": "none", "complete": true }
+EXIT=1
+INSERT INTO [testdata\ALLTYPES.TPS] (ID, ID) VALUES (1, 2)
+{ "ok": false, "op": "insert", "error": { "code": "SYNTAX", "message": "ID is specified more than once", "position": 44, "token": "ID" }, "outcome": "none", "complete": true }
+EXIT=1
+INSERT INTO [testdata\ALLTYPES.TPS] (ID, STR) VALUES (1)
+{ "ok": false, "op": "insert", "error": { "code": "SYNTAX", "message": "INSERT column count does not match value count", "position": 56, "token": ")" }, "outcome": "none", "complete": true }
+EXIT=1
+DESCRIBE testdata\ALLTYPES.TPS
+{ "ok": false, "op": null, "error": { "code": "SYNTAX", "message": "Unexpected character \\ at position 18", "position": 18, "token": "\\" }, "outcome": "none", "complete": true }
+EXIT=1
+SELECT ID FROM [testdata\ALLTYPES.TPS]; SELECT ID FROM [testdata\ALLTYPES.TPS]
+{ "ok": false, "op": null, "error": { "code": "SYNTAX", "message": "Only one statement per invocation", "position": 39, "token": ";" }, "outcome": "none", "complete": true }
+EXIT=1
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE STR = 'ABC
+{ "ok": false, "op": null, "error": { "code": "SYNTAX", "message": "Unterminated string literal", "position": 52, "token": "'" }, "outcome": "none", "complete": true }
+EXIT=1
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE STR LIKE 'A*B'
+{ "ok": false, "op": "select", "error": { "code": "UNSUPPORTED", "message": "LIKE cannot match a literal * or ?", "position": 55, "token": "A*B" }, "outcome": "none", "complete": true }
+EXIT=1
+SELECT GRID[2][2] FROM [testdata\GROUPS.TPS]
+{ "ok": false, "op": "select", "error": { "code": "UNKNOWN_COLUMN", "message": "GRID does not have a second dimension", "position": 8, "token": "GRID", "column": "GRID" }, "outcome": "none", "complete": true }
+EXIT=1
+INSERT INTO [testdata\GROUPS.TPS] (ID, ADDR) VALUES (1, 'x')
+{ "ok": false, "op": "insert", "error": { "code": "UNSUPPORTED", "message": "ADDR is a GROUP; assign individual leaves", "position": 44, "token": "ADDR" }, "outcome": "none", "complete": true }
+EXIT=1
+INSERT INTO [testdata\ALLTYPES.TPS] (ID, ARR) VALUES (1, 1)
+{ "ok": false, "op": "insert", "error": { "code": "UNKNOWN_COLUMN", "message": "ARR needs a subscript, e.g. ARR[1]", "position": 45, "token": "ARR", "column": "ARR" }, "outcome": "none", "complete": true }
+EXIT=1
