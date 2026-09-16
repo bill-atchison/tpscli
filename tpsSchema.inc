@@ -51,6 +51,10 @@ Binary       BYTE
 Flags        LONG
            END
 
+tpsDynFile CLASS(DynFile),TYPE,MODULE('tpsSchema.clw'),LINK('tpsSchema.clw')
+FixFormat    PROCEDURE(),LONG,PROC       ! shadows the modal one
+           END
+
 tpsSchema  CLASS,TYPE,MODULE('tpsSchema.clw'),LINK('tpsSchema.clw')
 st           &StringTheory
 buf          &STRING
@@ -71,6 +75,9 @@ Fields       &SchFieldQ
 Keys         &SchKeyQ
 Comps        &SchKeyCompQ
 Memos        &SchMemoQ
+Who          &WhoQ
+F            &FILE
+Dyn          &tpsDynFile
 Construct    PROCEDURE()
 Destruct     PROCEDURE()
 Load         PROCEDURE(STRING path, STRING owner),LONG
@@ -88,5 +95,10 @@ Parse        PROCEDURE(),LONG                ! fills Fields/Keys/Comps/Memos fro
 SchemaDumpJson PROCEDURE(tpsOut o),STRING    ! oracle vocabulary, hidden --dump-schema
 DescribeJson PROCEDURE(tpsOut o, LONG records),STRING   ! public DESCRIBE shape, spec §4
 FindField    PROCEDURE(STRING label),LONG    ! case-insensitive, 0 = not found
+Build        PROCEDURE(FILE driver),LONG     ! builds SELF.F through DynFile from Fields/Keys/Comps/Memos
+Open         PROCEDURE(),LONG                ! SHARE(SELF.F), maps field numbers to WHAT() indexes into Who
+FieldRef     PROCEDURE(LONG fieldNbr, LONG elem),*?   ! null ANY for a bad field number
+MemoRef      PROCEDURE(LONG memoNbr),STRING           ! memo/blob content by value; no addressable reference exists
+KeyRef       PROCEDURE(LONG keyNbr),*KEY
            END
   _EndTpsSchema_

@@ -4,12 +4,12 @@ $root = Split-Path -Parent $PSScriptRoot
 $exe = Join-Path $root 'tpscli.exe'
 
 $files = @(
-    @{ name = 'ALLTYPES'; owner = $null },
-    @{ name = 'KEYS';     owner = $null },
-    @{ name = 'GROUPS';   owner = $null },
-    @{ name = 'MEMOS';    owner = $null },
-    @{ name = 'NOKEY';    owner = $null },
-    @{ name = 'SECRET';   owner = 's3cret' }
+    @{ name = 'ALLTYPES'; owner = $null; records = 3 },
+    @{ name = 'KEYS';     owner = $null; records = 5 },
+    @{ name = 'GROUPS';   owner = $null; records = 2 },
+    @{ name = 'MEMOS';    owner = $null; records = 2 },
+    @{ name = 'NOKEY';    owner = $null; records = 3 },
+    @{ name = 'SECRET';   owner = 's3cret'; records = 2 }
 )
 
 $mismatches = 0
@@ -96,6 +96,32 @@ foreach ($f in $files) {
             }
         }
     }
+
+    # public DESCRIBE path (no --dump-schema): opens the file through DynFile and reports records
+    $dArgList = @()
+    if ($f.owner) { $dArgList += @('--owner', $f.owner) }
+    $dArgList += "DESCRIBE [$tpsPath]"
+
+    Push-Location $root
+    try {
+        $dRawOut = & $exe @dArgList 2>&1
+    } finally {
+        Pop-Location
+    }
+
+    try {
+        $dAct = ($dRawOut -join "`n") | ConvertFrom-Json
+    } catch {
+        Report "$name.describe" 'output' 'valid JSON' ($dRawOut -join ' | ')
+        continue
+    }
+
+    if ($null -eq $dAct) {
+        Report "$name.describe" 'output' 'valid JSON' '<null>'
+        continue
+    }
+
+    CmpProp "$name.describe" (@{ records = $f.records }) $dAct @('records')
 }
 
 if ($mismatches -gt 0) {

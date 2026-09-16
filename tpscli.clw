@@ -8,6 +8,12 @@
     DoDescribe()
   END
 
+TpsDrv     FILE,DRIVER('TOPSPEED'),NAME('tpsdrv.tps'),PRE(TD)
+Record       RECORD
+Dummy          BYTE
+             END
+           END
+
 Out        tpsOut
 Opt        GROUP
 Owner        STRING(64)
@@ -133,7 +139,14 @@ rc    LONG
   END
   IF Opt.WantDumpSchema
     Out.Line(sch.SchemaDumpJson(Out))
-  ELSE
-    Out.Line(sch.DescribeJson(Out, -1))
+    HALT(0)
   END
+  rc = sch.Build(TpsDrv)
+  IF rc = 0 THEN rc = sch.Open().
+  IF rc <> 0
+    Out.Line('{{ "ok": false, "op": "describe", "error": {{ "code": ' & Out.JStr(CLIP(sch.Err)) & ', "message": ' & Out.JStr(CLIP(sch.ErrMsg)) & ' }, "complete": true }')
+    HALT(2)
+  END
+  Out.Line(sch.DescribeJson(Out, RECORDS(sch.F)))
+  CLOSE(sch.F)
   HALT(0)

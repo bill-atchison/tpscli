@@ -14,12 +14,16 @@ tpsSchema.Construct  PROCEDURE()
   SELF.st &= NEW StringTheory
   SELF.Fields &= NEW SchFieldQ; SELF.Keys &= NEW SchKeyQ
   SELF.Comps  &= NEW SchKeyCompQ; SELF.Memos &= NEW SchMemoQ
+  SELF.Who &= NEW WhoQ
+  SELF.Dyn &= NEW tpsDynFile
 
 tpsSchema.Destruct   PROCEDURE()
   CODE
   DISPOSE(SELF.st)
   DISPOSE(SELF.Fields); DISPOSE(SELF.Keys)
   DISPOSE(SELF.Comps); DISPOSE(SELF.Memos)
+  DISPOSE(SELF.Who)
+  DISPOSE(SELF.Dyn)
   IF NOT SELF.Def &= NULL THEN DISPOSE(SELF.Def).
 
 tpsSchema.Bad  PROCEDURE(STRING why)
@@ -610,3 +614,133 @@ nbr  LONG
     js.Append(']')
   END
   js.Append('}')
+
+! ---- Task 5: DynFile build and shared open ----
+
+tpsDynFile.FixFormat PROCEDURE()
+  CODE
+  IF ~SELF.StructCreated THEN SELF.CreateStruct().
+  FIXFORMAT(SELF.rDynF)
+  RETURN ERRORCODE()
+
+tpsSchema.Build PROCEDURE(FILE driver)
+fg   LIKE(TFieldGrp)
+kg   LIKE(TKeyGrp)
+mg   LIKE(TMemoGrp)
+i    LONG
+j    LONG
+lbl  STRING(64)
+  CODE
+  SELF.Dyn.ResetAll()
+  SELF.Dyn.SetDriver(driver)          ! the caller passes its static TOPSPEED placeholder
+  SELF.Dyn.SetName(SELF.Path)
+  SELF.Dyn.SetPrefix(SELF.Prefix)
+  IF SELF.Encrypted THEN SELF.Dyn.SetOwner(SELF.Owner); SELF.Dyn.SetEncrypt(1).
+  SELF.Dyn.SetCreate(0)
+  LOOP i = 1 TO RECORDS(SELF.Fields)
+    GET(SELF.Fields, i)
+    CLEAR(fg)
+    fg.FieldNbr = i; fg.Label = SELF.Fields.Label; fg.Type = SELF.Fields.Type
+    fg.Size = SELF.Fields.Size; fg.Places = SELF.Fields.Places
+    fg.Dim = CHOOSE(SELF.Fields.Elements > 1, SELF.Fields.Elements, 0)
+    fg.Over = SELF.Fields.Over; fg.Fields = SELF.Fields.Fields; fg.Picture = SELF.Fields.Picture
+    SELF.Dyn.AddField(fg)
+  END
+  LOOP i = 1 TO RECORDS(SELF.Memos)
+    GET(SELF.Memos, i)
+    CLEAR(mg)
+    mg.MemoNbr = -i; mg.Label = SELF.Memos.Label
+    mg.Type = CHOOSE(SELF.Memos.IsBlob, 'B', 'M'); mg.Binary = SELF.Memos.Binary; mg.size = SELF.Memos.Bytes
+    SELF.Dyn.AddMemo(mg)
+  END
+  LOOP i = 1 TO RECORDS(SELF.Keys)
+    GET(SELF.Keys, i)
+    CLEAR(kg)
+    kg.KeyNbr = i; kg.Label = SELF.Keys.Label; kg.Type = CHOOSE(SELF.Keys.IsKey, 'K', 'I')
+    kg.Dup = SELF.Keys.Dup; kg.Primary = SELF.Keys.Primary; kg.NoCase = SELF.Keys.NoCase; kg.Opt = SELF.Keys.Opt
+    SELF.Dyn.AddKey(kg)
+    LOOP j = 1 TO RECORDS(SELF.Comps)
+      GET(SELF.Comps, j)
+      IF SELF.Comps.KeyNbr <> i THEN CYCLE.
+      GET(SELF.Fields, SELF.Comps.FieldNbr); lbl = SELF.Fields.Label
+      SELF.Dyn.AddFieldToKey(SELF.Keys.Label, lbl, CHOOSE(SELF.Comps.Descending, 0, 1), SELF.Comps.Rank)
+    END
+  END
+  IF SELF.Dyn.FixFormat()
+    SELF.Err = 'DEFINITION_UNREADABLE'
+    SELF.ErrMsg = 'DynFile could not build the structure: ' & FILEERRORCODE() & ' ' & CLIP(FILEERROR())
+    RETURN 2
+  END
+  SELF.F &= SELF.Dyn.GetFileRef()
+  RETURN 0
+
+tpsSchema.Open PROCEDURE()
+rec   &GROUP
+n     LONG
+i     LONG
+j     LONG
+full  STRING(80)
+  CODE
+  SHARE(SELF.F)
+  CASE ERRORCODE()
+  OF 0
+  OF 47
+    SELF.Err = 'DEFINITION_MISMATCH'
+    SELF.ErrMsg = 'Driver rejected the reconstructed structure (47): ' & CLIP(FILEERRORCODE()) & ' ' & CLIP(FILEERROR())
+    RETURN 2
+  OF 2 OROF 3
+    SELF.Err = 'FILE_NOT_FOUND'; SELF.ErrMsg = CLIP(ERROR()); RETURN 2
+  ELSE
+    SELF.Err = 'DRIVER'; SELF.ErrMsg = ERRORCODE() & ' ' & CLIP(ERROR()) & ' / ' & CLIP(FILEERRORCODE()) & ' ' & CLIP(FILEERROR()); RETURN 2
+  END
+  ! map schema field numbers to WHAT() indexes by label
+  rec &= SELF.F{PROP:Record}
+  n = SELF.F{PROP:Fields}
+  FREE(SELF.Who)
+  LOOP i = 1 TO RECORDS(SELF.Fields)
+    GET(SELF.Fields, i)
+    full = CLIP(SELF.Prefix) & ':' & CLIP(SELF.Fields.Label)   ! WHO() returns the driver's PREFIX:label form
+    SELF.Who.FieldNbr = i; SELF.Who.Idx = 0
+    LOOP j = 1 TO n
+      IF UPPER(CLIP(WHO(rec, j))) = UPPER(CLIP(full)) THEN SELF.Who.Idx = j; BREAK.
+    END
+    ADD(SELF.Who)
+    IF SELF.Who.Idx = 0
+      CLOSE(SELF.F)
+      SELF.Err = 'DEFINITION_UNREADABLE'; SELF.ErrMsg = 'Field ' & CLIP(SELF.Fields.Label) & ' is not visible in the opened record buffer'
+      RETURN 2
+    END
+  END
+  RETURN 0
+
+tpsSchema.FieldRef PROCEDURE(LONG fieldNbr, LONG elem)
+rec   &GROUP
+r     ANY
+  CODE
+  r &= NULL
+  IF fieldNbr < 1 OR fieldNbr > RECORDS(SELF.Fields) THEN RETURN r.
+  GET(SELF.Who, fieldNbr)                     ! Who is in FieldNbr order, position = FieldNbr
+  rec &= SELF.F{PROP:Record}
+  IF elem > 0 THEN r &= WHAT(rec, SELF.Who.Idx, elem) ELSE r &= WHAT(rec, SELF.Who.Idx).
+  RETURN r
+
+! elem is a single flattened 1-based element index. For a DIM(a,b) field the caller computes
+! (e1 - 1) * b + e2. For a leaf inside a DIM(n) group the caller passes the group element,
+! since WHAT addresses the leaf's storage within that group element. 0 means scalar.
+
+! PROP:Field is a value-returning property (Get field number of key component n / n'th field)
+! used only on KEY structures throughout the Clarion12 tree, never reference-assigned and never
+! on a FILE; there is no addressable memory for a memo's content (the driver fetches it on
+! demand), so a *? reference is not obtainable. DynFile.clw's own GrabData routine reads/writes
+! a memo's content on a FILE by value through PROP:Value with a negative index; MemoRef follows
+! that proven pattern instead of the brief's PROP:Field reference, which failed to compile
+! ("Illegal reference assignment or equivalence").
+tpsSchema.MemoRef PROCEDURE(LONG memoNbr)
+  CODE
+  IF memoNbr < 1 OR memoNbr > RECORDS(SELF.Memos) THEN RETURN ''.
+  RETURN SELF.F{PROP:Value, -memoNbr}
+
+tpsSchema.KeyRef PROCEDURE(LONG keyNbr)
+  CODE
+  GET(SELF.Keys, keyNbr)
+  RETURN SELF.Dyn.GetKeyRef(SELF.Keys.Label)
