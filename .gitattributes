@@ -1,0 +1,10 @@
+* text=auto
+*.clw text eol=crlf
+*.inc text eol=crlf
+*.exp text eol=crlf
+*.cwproj text eol=crlf
+*.ps1 text eol=crlf
+*.sql text eol=crlf
+*.txt text eol=crlf
+*.md text eol=crlf
+*.html text eol=crlf

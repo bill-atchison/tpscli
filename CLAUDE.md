@@ -6,7 +6,7 @@ Hand-coded project. No `.app`, no templates, no generator, no IDE required. Buil
 
 - Spec: `docs/mySuperpower/specs/2026-09-15-tpscli-design.html`
 - Plan: `docs/mySuperpower/plans/2026-09-15-tpscli.html` (task by task, TDD; Task 1 creates the cwproj/exp/clw files). The plan says `C:\Projects\tpscli`; this repo is `C:\Projects\GitHub\tpscli`.
-- Running decisions log: `docs/implementation-notes.html` (created in Task 1, append every task)
+- Running decisions log: `docs/mySuperpower/implementation-notes/2026-09-16-tpscli.html` (controller-owned; implementers put findings in their reports)
 
 ## Layout (from the plan)
 
