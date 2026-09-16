@@ -118,3 +118,9 @@ INSERT INTO [testdata\GROUPS.TPS] (ID, ADDR) VALUES (1, 'x')
 
 -- INSERT assigning a whole array with no subscript
 INSERT INTO [testdata\ALLTYPES.TPS] (ID, ARR) VALUES (1, 1)
+
+-- GROUP BY is rejected
+SELECT ID FROM [testdata\ALLTYPES.TPS] GROUP BY ID
+
+-- a bare GROUP is resolved as a column reference (not a reserved word by itself)
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE GROUP = 1

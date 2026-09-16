@@ -104,7 +104,7 @@ SELECT NOPE FROM [testdata\ALLTYPES.TPS]
 { "ok": false, "op": "select", "error": { "code": "UNKNOWN_COLUMN", "message": "Unknown column NOPE; valid columns: ID, B, S, US, UL, SR, R, D, DT, TM, STR, CSTR, PSTR, PIC, ARR", "position": 8, "token": "NOPE", "column": "NOPE" }, "outcome": "none", "complete": true }
 EXIT=1
 INSERT INTO [testdata\ALLTYPES.TPS] (ID, ID) VALUES (1, 2)
-{ "ok": false, "op": "insert", "error": { "code": "SYNTAX", "message": "ID is specified more than once", "position": 44, "token": "ID" }, "outcome": "none", "complete": true }
+{ "ok": false, "op": "insert", "error": { "code": "SYNTAX", "message": "ID is specified more than once", "position": 42, "token": "ID" }, "outcome": "none", "complete": true }
 EXIT=1
 INSERT INTO [testdata\ALLTYPES.TPS] (ID, STR) VALUES (1)
 { "ok": false, "op": "insert", "error": { "code": "SYNTAX", "message": "INSERT column count does not match value count", "position": 56, "token": ")" }, "outcome": "none", "complete": true }
@@ -129,4 +129,10 @@ INSERT INTO [testdata\GROUPS.TPS] (ID, ADDR) VALUES (1, 'x')
 EXIT=1
 INSERT INTO [testdata\ALLTYPES.TPS] (ID, ARR) VALUES (1, 1)
 { "ok": false, "op": "insert", "error": { "code": "UNKNOWN_COLUMN", "message": "ARR needs a subscript, e.g. ARR[1]", "position": 45, "token": "ARR", "column": "ARR" }, "outcome": "none", "complete": true }
+EXIT=1
+SELECT ID FROM [testdata\ALLTYPES.TPS] GROUP BY ID
+{ "ok": false, "op": "select", "error": { "code": "UNSUPPORTED", "message": "GROUP BY is not supported", "position": 40, "token": "GROUP" }, "outcome": "none", "complete": true }
+EXIT=1
+SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE GROUP = 1
+{ "ok": false, "op": "select", "error": { "code": "UNKNOWN_COLUMN", "message": "Unknown column GROUP; valid columns: ID, B, S, US, UL, SR, R, D, DT, TM, STR, CSTR, PSTR, PIC, ARR", "position": 46, "token": "GROUP", "column": "GROUP" }, "outcome": "none", "complete": true }
 EXIT=1

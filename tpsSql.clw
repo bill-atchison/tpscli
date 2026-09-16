@@ -3,9 +3,10 @@
   MAP
     SqlAllDigits(STRING s),BYTE
     SqlEscapeStr(STRING s),STRING
-    SqlUnsupportedWord(STRING w),STRING
+    SqlUnsupportedWord(STRING w, STRING nextTok),STRING
     SqlLitConvert(tpsSql s, LONG fieldNbr, BYTE kind, STRING rawText, BYTE neg, StringTheory outp),LONG
     SqlCurPos(tpsSql s),LONG
+    SqlPeekNext(tpsSql s),STRING
     SqlRequireLeaf(tpsSql s, ColQ c),LONG
     SqlCaptureValue(tpsSql s, LONG fieldNbr),LONG
   END
@@ -609,7 +610,7 @@ uw         STRING(64)
 
   leftPos = SqlCurPos(SELF)
   IF SELF.PeekKind() = TK:Ident
-    uw = SqlUnsupportedWord(SELF.Peek())
+    uw = SqlUnsupportedWord(SELF.Peek(), SqlPeekNext(SELF))
     IF uw <> ''
       SELF.ErrPos = leftPos; SELF.ErrToken = SELF.Peek()
       SELF.Fail('UNSUPPORTED', uw)
@@ -705,7 +706,7 @@ uw         STRING(64)
 
   pos = SqlCurPos(SELF)
   IF SELF.PeekKind() = TK:Ident
-    uw = SqlUnsupportedWord(SELF.Peek())
+    uw = SqlUnsupportedWord(SELF.Peek(), SqlPeekNext(SELF))
     IF uw <> ''
       SELF.ErrPos = pos; SELF.ErrToken = SELF.Peek()
       SELF.Fail('UNSUPPORTED', uw)
@@ -760,12 +761,13 @@ uw         STRING(64)
 ! ---- statement body: SELECT / INSERT / UPDATE / DELETE, after Sch is loaded ----
 
 tpsSql.ParseBody PROCEDURE()
-c    ColQ
-i    LONG
-j    LONG
-w    STRING(24)
-uw   STRING(64)
-fnbr LONG
+c      ColQ
+i      LONG
+j      LONG
+w      STRING(24)
+uw     STRING(64)
+fnbr   LONG
+colPos LONG
   CODE
   SELF.Err = ''; SELF.ErrMsg = ''; SELF.ErrPos = 0; SELF.ErrToken = ''; SELF.ErrColumn = ''
   FREE(SELF.Cols); FREE(SELF.Vals); FREE(SELF.Order)
@@ -780,7 +782,7 @@ fnbr LONG
       SELF.Take(); SELF.Star = 1
     ELSE
       LOOP
-        uw = SqlUnsupportedWord(SELF.Peek())
+        uw = SqlUnsupportedWord(SELF.Peek(), SqlPeekNext(SELF))
         IF SELF.PeekKind() = TK:Ident AND uw <> ''
           SELF.ErrPos = SqlCurPos(SELF); SELF.ErrToken = SELF.Peek()
           RETURN SELF.Fail('UNSUPPORTED', uw)
@@ -802,12 +804,13 @@ fnbr LONG
     SELF.Take()                                  ! path token
     IF SELF.Expect('(') <> 0 THEN RETURN 1.
     LOOP
+      colPos = SqlCurPos(SELF)
       IF SELF.ColumnRef(c) <> 0 THEN RETURN 1.
       IF SqlRequireLeaf(SELF, c) <> 0 THEN RETURN 1.
       LOOP j = 1 TO RECORDS(SELF.Cols)
         GET(SELF.Cols, j)
         IF UPPER(SELF.Cols.Path) = UPPER(c.Path)
-          SELF.ErrColumn = c.Path; SELF.ErrPos = SqlCurPos(SELF); SELF.ErrToken = c.Path
+          SELF.ErrColumn = c.Path; SELF.ErrPos = colPos; SELF.ErrToken = c.Path
           RETURN SELF.Fail('SYNTAX', CLIP(c.Path) & ' is specified more than once')
         END
       END
@@ -840,12 +843,13 @@ fnbr LONG
     SELF.Take()                                  ! path token
     IF SELF.Expect('SET') <> 0 THEN RETURN 1.
     LOOP
+      colPos = SqlCurPos(SELF)
       IF SELF.ColumnRef(c) <> 0 THEN RETURN 1.
       IF SqlRequireLeaf(SELF, c) <> 0 THEN RETURN 1.
       LOOP j = 1 TO RECORDS(SELF.Cols)
         GET(SELF.Cols, j)
         IF UPPER(SELF.Cols.Path) = UPPER(c.Path)
-          SELF.ErrColumn = c.Path; SELF.ErrPos = SqlCurPos(SELF); SELF.ErrToken = c.Path
+          SELF.ErrColumn = c.Path; SELF.ErrPos = colPos; SELF.ErrToken = c.Path
           RETURN SELF.Fail('SYNTAX', CLIP(c.Path) & ' is specified more than once')
         END
       END
@@ -932,7 +936,7 @@ LimitOffsetRoutine ROUTINE
   END
 
 TrailingRoutine ROUTINE
-  uw = SqlUnsupportedWord(SELF.Peek())
+  uw = SqlUnsupportedWord(SELF.Peek(), SqlPeekNext(SELF))
   IF SELF.PeekKind() = TK:Ident AND uw <> ''
     SELF.ErrPos = SqlCurPos(SELF); SELF.ErrToken = SELF.Peek()
     RETURN SELF.Fail('UNSUPPORTED', uw)
@@ -952,6 +956,13 @@ SqlCurPos PROCEDURE(tpsSql s)
     GET(s.Toks, RECORDS(s.Toks))
   END
   RETURN s.Toks.Pos
+
+! the token one past the current one, without consuming anything; used for GROUP-BY lookahead
+SqlPeekNext PROCEDURE(tpsSql s)
+  CODE
+  IF s.Cur + 1 > RECORDS(s.Toks) THEN RETURN ''.
+  GET(s.Toks, s.Cur + 1)
+  RETURN CLIP(s.Toks.Text)
 
 SqlAllDigits PROCEDURE(STRING s)
 i LONG
@@ -973,13 +984,15 @@ st StringTheory
   st.Replace('{{', '<123>')
   RETURN st.GetValue()
 
-SqlUnsupportedWord PROCEDURE(STRING w)
+SqlUnsupportedWord PROCEDURE(STRING w, STRING nextTok)
 u STRING(24)
   CODE
   u = UPPER(CLIP(w))
   CASE u
   OF 'JOIN'     ; RETURN 'JOIN is not supported'
-  OF 'GROUP'    ; RETURN 'GROUP BY is not supported'
+  OF 'GROUP'
+    IF UPPER(CLIP(nextTok)) = 'BY' THEN RETURN 'GROUP BY is not supported'.
+    RETURN ''
   OF 'HAVING'   ; RETURN 'HAVING is not supported'
   OF 'DISTINCT' ; RETURN 'DISTINCT is not supported'
   OF 'UNION'    ; RETURN 'UNION is not supported'
