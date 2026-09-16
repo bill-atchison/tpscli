@@ -1,0 +1,1 @@
+{ "file": "NOKEY", "fields": [{"nbr":1,"label":"NK:CODE","type":"STRING","size":4,"places":0,"dim":0,"over":0,"fields":0,"picture":""},{"nbr":2,"label":"NK:QTY","type":"LONG","size":4,"places":0,"dim":0,"over":0,"fields":0,"picture":""}], "memos": [], "keys": [] }
