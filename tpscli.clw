@@ -43,12 +43,12 @@ seen  BYTE
     OF '--parse-only'     ; Opt.ParseOnly = 1
     OF '--limit-default'
       n += 1
-      IF NOT MATCH(CLIP(COMMAND(n)), '^[0-9]' & CHR(123) & '1,10' & CHR(125) & '$', Match:Regular) OR COMMAND(n) > 2147483647
+      IF NOT MATCH(CLIP(COMMAND(n)), '^[0-9]+$', Match:Regular) OR LEN(CLIP(COMMAND(n))) > 10 OR COMMAND(n) > 2147483647
         Out.Fail('SYNTAX', '--limit-default needs a non-negative integer up to 2147483647', 1)
       END
       Opt.LimitDefault = COMMAND(n)
     OF '--version'
-      Out.Line('{ "ok": true, "op": null, "version": "' & TPSCLI_VERSION & '", "complete": true }')
+      Out.Line('{{ "ok": true, "op": null, "version": "' & TPSCLI_VERSION & '", "complete": true }')
       HALT(0)
     ELSE
       IF SUB(a, 1, 2) = '--' THEN Out.Fail('SYNTAX', 'Unknown option ' & CLIP(a), 1).

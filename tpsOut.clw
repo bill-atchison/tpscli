@@ -42,18 +42,21 @@ c    BYTE
   st.Replace('<13>', '\r')
   st.Replace('<10>', '\n')
   st.Replace('<9>', '\t')
-  LOOP i = 1 TO st.Length()
+  i = 1
+  LOOP WHILE i <= st.Length()
     c = VAL(st.valueptr[i])
     IF c < 32
-      st.SetSlice(i, i, '\u00' & SUB('0123456789abcdef', BSHIFT(c,-4)+1, 1) & SUB('0123456789abcdef', BAND(c,0Fh)+1, 1))
-      i += 5
+      st.ReplaceSlice(i, i, '\u00' & SUB('0123456789abcdef', BSHIFT(c,-4)+1, 1) & SUB('0123456789abcdef', BAND(c,0Fh)+1, 1))
+      i += 6
+    ELSE
+      i += 1
     END
   END
   RETURN '"' & st.GetValue() & '"'
 
 tpsOut.Fail  PROCEDURE(STRING code, STRING msg, LONG exitCode, <STRING extraJson>)
   CODE
-  SELF.Line('{ "ok": false, "op": null, "error": { "code": ' & SELF.JStr(code) & ', "message": ' & SELF.JStr(msg) & ' }' |
+  SELF.Line('{{ "ok": false, "op": null, "error": {{ "code": ' & SELF.JStr(code) & ', "message": ' & SELF.JStr(msg) & ' }' |
             & CHOOSE(OMITTED(extraJson) OR extraJson = '', '', ', ' & extraJson) & ', "complete": true }')
   HALT(exitCode)
 
