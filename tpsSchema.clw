@@ -405,7 +405,10 @@ groupEnd LONG
         IF SELF.Fields.Offset = myOfs THEN target = j; BREAK.
       END
       GET(SELF.Fields, i); SELF.Fields.Over = target; PUT(SELF.Fields)
-      IF target = 0 THEN RETURN SELF.Bad('OVER field ' & CLIP(SELF.Fields.Label) & ' has no field at its offset').
+      IF target = 0
+        DO Restore
+        RETURN SELF.Bad('OVER field ' & CLIP(SELF.Fields.Label) & ' has no field at its offset')
+      END
     END
   END
   LOOP i = 1 TO nM
@@ -413,6 +416,7 @@ groupEnd LONG
     full = SELF.ZStr(o)
     IF full = ''
       IF SELF.U8(o) <> 1
+        DO Restore
         RETURN SELF.Bad('memo entry marker byte is not 0x01')
       END
       o += 1
@@ -431,6 +435,7 @@ groupEnd LONG
     full = SELF.ZStr(o)
     IF full = ''
       IF SELF.U8(o) <> 1
+        DO Restore
         RETURN SELF.Bad('key entry marker byte is not 0x01')
       END
       o += 1
@@ -455,9 +460,20 @@ groupEnd LONG
     END
     ADD(SELF.Keys)
   END
+  ! every key component must name a real field ordinal; SchemaDumpJson/DescribeJson GET(Fields, FieldNbr)
+  ! without re-checking, so a bad ordinal is caught here rather than trusted downstream.
+  LOOP i = 1 TO RECORDS(SELF.Comps)
+    GET(SELF.Comps, i)
+    IF SELF.Comps.FieldNbr < 1 OR SELF.Comps.FieldNbr > RECORDS(SELF.Fields)
+      DO Restore
+      RETURN SELF.Bad('key ' & SELF.Comps.KeyNbr & ' component ' & SELF.Comps.Rank & ' names field ordinal ' & SELF.Comps.FieldNbr & ', outside 1..' & RECORDS(SELF.Fields))
+    END
+  END
   SELF.buf &= saveBuf; SELF.size = saveSz
   IF SELF.Overrun THEN RETURN SELF.Bad('definition record shorter than its field, memo and key counts imply').
   RETURN 0
+Restore ROUTINE
+  SELF.buf &= saveBuf; SELF.size = saveSz
 
 tpsSchema.FindField PROCEDURE(STRING label)
 i    LONG
