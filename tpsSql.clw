@@ -617,6 +617,11 @@ uw         STRING(64)
       RETURN ''
     END
     IF SELF.ColumnRef(lc) <> 0 THEN RETURN ''.
+    IF lc.GrpElem > 0
+      SELF.ErrPos = leftPos; SELF.ErrToken = lc.Path
+      SELF.Fail('UNSUPPORTED', 'Array elements in WHERE are not supported for a leaf inside a DIM''d GROUP (' & CLIP(lc.Path) & ')')
+      RETURN ''
+    END
     leftIsRef = 1
   ELSIF SELF.PeekKind() = TK:Num OR SELF.PeekKind() = TK:Str OR SELF.Peek() = '-'
     leftNeg = 0
@@ -713,6 +718,11 @@ uw         STRING(64)
       RETURN ''
     END
     IF SELF.ColumnRef(rc) <> 0 THEN RETURN ''.
+    IF rc.GrpElem > 0
+      SELF.ErrPos = pos; SELF.ErrToken = rc.Path
+      SELF.Fail('UNSUPPORTED', 'Array elements in WHERE are not supported for a leaf inside a DIM''d GROUP (' & CLIP(rc.Path) & ')')
+      RETURN ''
+    END
     rightIsRef = 1
   ELSIF SELF.PeekKind() = TK:Num OR SELF.PeekKind() = TK:Str OR SELF.Peek() = '-'
     rightIsRef = 0

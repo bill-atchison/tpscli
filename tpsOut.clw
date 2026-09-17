@@ -45,7 +45,8 @@ c    BYTE
   i = 1
   LOOP WHILE i <= st.Length()
     c = VAL(st.valueptr[i])
-    IF c < 32
+    IF c < 32 OR c >= 128         ! also escape high bytes: TPS text has no defined encoding,
+                                   ! and a raw byte >= 128 is not valid UTF-8/JSON on its own
       st.ReplaceSlice(i, i, '\u00' & SUB('0123456789abcdef', BSHIFT(c,-4)+1, 1) & SUB('0123456789abcdef', BAND(c,0Fh)+1, 1))
       i += 6
     ELSE
@@ -59,6 +60,59 @@ tpsOut.Fail  PROCEDURE(STRING code, STRING msg, LONG exitCode, <STRING extraJson
   SELF.Line('{{ "ok": false, "op": null, "error": {{ "code": ' & SELF.JStr(code) & ', "message": ' & SELF.JStr(msg) & ' }' |
             & CHOOSE(OMITTED(extraJson) OR extraJson = '', '', ', ' & extraJson) & ', "complete": true }')
   HALT(exitCode)
+
+! Left-aligned header row; data cells left-aligned for text-like columns, right-aligned for
+! numeric ones. Column width = max(header len, widest cell in that column). 2-space separator,
+! matching spec 4's worked example exactly (dash-rule width equals the data column width).
+tpsOut.Table PROCEDURE(*TblColQ cols, *TblCellQ cells, LONG count, BYTE truncated)
+nCols  LONG
+w      LONG,DIM(64)
+i      LONG
+r      LONG
+c      LONG
+idx    LONG
+line   StringTheory
+dash   StringTheory
+txt    STRING(255)
+pad    LONG
+  CODE
+  nCols = RECORDS(cols)
+  IF nCols = 0 OR nCols > 64 THEN RETURN.     ! ponytail: fixed 64-column cap on the text grid, raise if a corpus file ever needs more
+  LOOP i = 1 TO nCols
+    GET(cols, i)
+    w[i] = LEN(CLIP(cols.Name))
+  END
+  LOOP r = 1 TO count
+    LOOP c = 1 TO nCols
+      idx = (r - 1) * nCols + c
+      GET(cells, idx)
+      IF LEN(CLIP(cells.Text)) > w[c] THEN w[c] = LEN(CLIP(cells.Text)).
+    END
+  END
+  LOOP i = 1 TO nCols
+    GET(cols, i)
+    line.Append(CHOOSE(i = 1, '', '  ') & CLIP(cols.Name) & ALL(' ', w[i] - LEN(CLIP(cols.Name))))
+    dash.Append(CHOOSE(i = 1, '', '  ') & ALL('-', w[i]))
+  END
+  SELF.Line(line.GetValue())
+  SELF.Line(dash.GetValue())
+  LOOP r = 1 TO count
+    line.Free()
+    LOOP c = 1 TO nCols
+      idx = (r - 1) * nCols + c
+      GET(cells, idx)
+      txt = cells.Text
+      GET(cols, c)
+      pad = w[c] - LEN(CLIP(txt))
+      IF cols.RightAlign
+        line.Append(CHOOSE(c = 1, '', '  ') & ALL(' ', pad) & CLIP(txt))
+      ELSE
+        line.Append(CHOOSE(c = 1, '', '  ') & CLIP(txt) & ALL(' ', pad))
+      END
+    END
+    SELF.Line(line.GetValue())
+  END
+  SELF.Line('(' & count & ' rows' & CHOOSE(truncated, ', truncated by LIMIT)', ')'))
 
 tpsOut.ReadStdin PROCEDURE()
 chunk STRING(4096)

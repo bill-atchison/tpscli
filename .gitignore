@@ -4,3 +4,6 @@ map/
 testdata/*.TPS
 testdata/work/
 .superpowers/
+RT_ERROR*.LOG
+EXCEPTION*.LOG
+.claude/settings.local.json

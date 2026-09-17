@@ -22,6 +22,7 @@
     <Compile Include="tpsOut.clw" />
     <Compile Include="tpsSchema.clw" />
     <Compile Include="tpsSql.clw" />
+    <Compile Include="tpsExec.clw" />
   </ItemGroup>
   <Import Project="$(ClarionBinPath)\SoftVelocity.Build.Clarion.targets" />
 </Project>

@@ -3,6 +3,7 @@
   INCLUDE('tpsOut.inc'),ONCE
   INCLUDE('tpsSchema.inc'),ONCE
   INCLUDE('tpsSql.inc'),ONCE
+  INCLUDE('tpsExec.inc'),ONCE
   MAP
     ParseArgs()
     DumpDef()
@@ -120,6 +121,7 @@ hexln  StringTheory
 Dispatch  PROCEDURE()
 Stmt      tpsSql
 Sc        tpsSchema
+Exec      tpsExec
 rc        LONG
 opName    STRING(12)
 exitCode  LONG
@@ -140,7 +142,7 @@ errJs     StringTheory
     errJs.SetValue('{{ "ok": false, "op": ' & CHOOSE(CLIP(opName) = '', 'null', Out.JStr(CLIP(opName))) & ', "error": {{ "code": ' & Out.JStr(CLIP(Stmt.Err)) & ', "message": ' & Out.JStr(CLIP(Stmt.ErrMsg)) & ', "position": ' & Stmt.ErrPos & ', "token": ' & Out.JStr(CLIP(Stmt.ErrToken)))
     IF Stmt.Err = 'UNKNOWN_COLUMN' OR Stmt.Err = 'VALUE_OUT_OF_RANGE' THEN errJs.Append(', "column": ' & Out.JStr(CLIP(Stmt.ErrColumn))).
     errJs.Append(' }, "outcome": "none", "complete": true }')
-    Out.Line(errJs.GetValue())
+    IF Opt.Table THEN Out.Line(CLIP(Stmt.Err) & ': ' & CLIP(Stmt.ErrMsg)) ELSE Out.Line(errJs.GetValue()).
     HALT(exitCode)
   END
   CASE Stmt.Op
@@ -154,7 +156,11 @@ errJs     StringTheory
   rc = Sc.Load(CLIP(Stmt.Path), Opt.Owner)
   IF rc = 0 THEN rc = Sc.Parse().
   IF rc <> 0
-    Out.Line('{{ "ok": false, "op": ' & Out.JStr(CLIP(opName)) & ', "error": {{ "code": ' & Out.JStr(CLIP(Sc.Err)) & ', "message": ' & Out.JStr(CLIP(Sc.ErrMsg)) & ' }, "complete": true }')
+    IF Opt.Table
+      Out.Line(CLIP(Sc.Err) & ': ' & CLIP(Sc.ErrMsg))
+    ELSE
+      Out.Line('{{ "ok": false, "op": ' & Out.JStr(CLIP(opName)) & ', "error": {{ "code": ' & Out.JStr(CLIP(Sc.Err)) & ', "message": ' & Out.JStr(CLIP(Sc.ErrMsg)) & ' }, "complete": true }')
+    END
     HALT(2)
   END
 
@@ -166,7 +172,11 @@ errJs     StringTheory
     rc = Sc.Build(TpsDrv)
     IF rc = 0 THEN rc = Sc.Open().
     IF rc <> 0
-      Out.Line('{{ "ok": false, "op": "describe", "error": {{ "code": ' & Out.JStr(CLIP(Sc.Err)) & ', "message": ' & Out.JStr(CLIP(Sc.ErrMsg)) & ' }, "complete": true }')
+      IF Opt.Table
+        Out.Line(CLIP(Sc.Err) & ': ' & CLIP(Sc.ErrMsg))
+      ELSE
+        Out.Line('{{ "ok": false, "op": "describe", "error": {{ "code": ' & Out.JStr(CLIP(Sc.Err)) & ', "message": ' & Out.JStr(CLIP(Sc.ErrMsg)) & ' }, "complete": true }')
+      END
       HALT(2)
     END
     Out.Line(Sc.DescribeJson(Out, RECORDS(Sc.F)))
@@ -180,7 +190,7 @@ errJs     StringTheory
     errJs.SetValue('{{ "ok": false, "op": ' & Out.JStr(CLIP(opName)) & ', "error": {{ "code": ' & Out.JStr(CLIP(Stmt.Err)) & ', "message": ' & Out.JStr(CLIP(Stmt.ErrMsg)) & ', "position": ' & Stmt.ErrPos & ', "token": ' & Out.JStr(CLIP(Stmt.ErrToken)))
     IF Stmt.Err = 'UNKNOWN_COLUMN' OR Stmt.Err = 'VALUE_OUT_OF_RANGE' THEN errJs.Append(', "column": ' & Out.JStr(CLIP(Stmt.ErrColumn))).
     errJs.Append(' }, "outcome": "none", "complete": true }')
-    Out.Line(errJs.GetValue())
+    IF Opt.Table THEN Out.Line(CLIP(Stmt.Err) & ': ' & CLIP(Stmt.ErrMsg)) ELSE Out.Line(errJs.GetValue()).
     HALT(exitCode)
   END
 
@@ -189,5 +199,19 @@ errJs     StringTheory
     HALT(0)
   END
 
-  Out.Line('{{ "ok": false, "op": ' & Out.JStr(CLIP(opName)) & ', "error": {{ "code": "UNSUPPORTED", "message": "Executor not implemented" }, "outcome": "none", "complete": true }')
-  HALT(1)
+  rc = Sc.Build(TpsDrv)
+  IF rc = 0 THEN rc = Sc.Open().
+  IF rc <> 0
+    IF Opt.Table
+      Out.Line(CLIP(Sc.Err) & ': ' & CLIP(Sc.ErrMsg))
+    ELSE
+      Out.Line('{{ "ok": false, "op": ' & Out.JStr(CLIP(opName)) & ', "error": {{ "code": ' & Out.JStr(CLIP(Sc.Err)) & ', "message": ' & Out.JStr(CLIP(Sc.ErrMsg)) & ' }, "complete": true }')
+    END
+    HALT(2)
+  END
+
+  Exec.Sch &= Sc; Exec.Sql &= Stmt; Exec.Out &= Out
+  Exec.LimitDefault = Opt.LimitDefault; Exec.WantTable = Opt.Table
+  rc = Exec.Run()
+  CLOSE(Sc.F)
+  HALT(rc)
