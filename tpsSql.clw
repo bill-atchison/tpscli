@@ -1089,7 +1089,14 @@ usedDigits LONG
   CODE
   GET(s.Sch.Fields, fieldNbr)
   typ = s.Sch.Fields.Type; label = s.Sch.Fields.Label
-  places = s.Sch.Fields.Places; digits = s.Sch.Fields.Digits
+  ! SchFieldQ.Size (not .Digits!) holds the true total digit count for a DECIMAL field - Build()
+  ! passes fg.Size = Fields.Size to DynFile.AddField as the field's digit width, and it round-trips
+  ! correctly for e.g. ALLTYPES.D (12345.67, a 7-digit DECIMAL(7,2)) which reads back intact.
+  ! Fields.Digits is a different raw definition byte (see tpsSchema.clw's decode comment: "the file
+  ! stores packed-decimal storage bytes, not digit count"); using it here rejected every literal
+  ! needing more than 4 significant digits into that same field ("overflows DECIMAL(4,2)"),
+  ! confirmed empirically with --parse-only against testdata\ALLTYPES.TPS. See task-8-report.md.
+  places = s.Sch.Fields.Places; digits = s.Sch.Fields.Size
   CASE typ
   OF 'DATE'
     IF kind <> TK:Str
