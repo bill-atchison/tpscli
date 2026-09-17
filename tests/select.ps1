@@ -2,6 +2,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $exe = Join-Path $root 'tpscli.exe'
+. (Join-Path $PSScriptRoot 'TestHelpers.ps1')
 # Built via [char] concatenation, not a literal backslash-u escape in this source file: a
 # literal  in this file's own authoring got reinterpreted as a real control byte by the
 # tool that wrote the file. Building it here keeps the six literal ASCII characters intact.
@@ -45,6 +46,13 @@ $cases = @(
         ExtraArgs = @()
         Sql = "SELECT ID FROM [testdata\GROUPS.TPS] WHERE PHONES[2].KIND = 'M' ORDER BY ID"
         Expected = '{ "ok": false, "op": "select", "error": { "code": "UNSUPPORTED", "message": "Array elements in WHERE are not supported for a leaf inside a DIM''d GROUP (PHONES[2].KIND)", "position": 44, "token": "PHONES[2].KIND" }, "outcome": "none", "complete": true }'
+        Exit = 1
+    },
+    @{
+        Name = 'ORDER BY on a leaf inside a DIMd GROUP is UNSUPPORTED (WHAT cannot address it - see task-7-report.md)'
+        ExtraArgs = @()
+        Sql = "SELECT ID FROM [testdata\GROUPS.TPS] ORDER BY PHONES[2].KIND"
+        Expected = '{ "ok": false, "op": "select", "error": { "code": "UNSUPPORTED", "message": "ORDER BY is not supported for a leaf inside a DIM''d GROUP (PHONES[2].KIND)", "position": 47, "token": "PHONES[2].KIND" }, "outcome": "none", "complete": true }'
         Exit = 1
     },
     @{
@@ -136,20 +144,22 @@ $cases = @(
 )
 
 $failures = 0
+$timeoutMs = 20000
 
 foreach ($c in $cases) {
     $argList = @() + $c.ExtraArgs + @($c.Sql)
 
-    Push-Location $root
-    try {
-        $stdout = & $exe @argList 2>&1
-        $exit = $LASTEXITCODE
-    } finally {
-        Pop-Location
+    $result = Invoke-Tpscli_Bounded -FilePath $exe -ArgumentList $argList -WorkingDirectory $root -TimeoutMs $timeoutMs
+
+    if ($result.TimedOut) {
+        Write-Host "select.ps1: FAILED (timeout) in '$($c.Name)' - exceeded $($timeoutMs)ms, process was killed"
+        $failures++
+        continue
     }
 
-    $actual = (($stdout | Out-String)) -replace "`r`n", "`n"
+    $actual = ($result.StdOut + $result.StdErr) -replace "`r`n", "`n"
     $actual = $actual.TrimEnd("`n")
+    $exit = $result.ExitCode
     $expected = $c.Expected -replace "`r`n", "`n"
     $expected = $expected.TrimEnd("`n")
 

@@ -910,7 +910,12 @@ OrderByRoutine ROUTINE
     SELF.Take()
     IF SELF.Expect('BY') <> 0 THEN RETURN 1.
     LOOP
+      colPos = SqlCurPos(SELF)
       IF SELF.ColumnRef(c) <> 0 THEN RETURN 1.
+      IF c.GrpElem > 0
+        SELF.ErrPos = colPos; SELF.ErrToken = c.Path
+        RETURN SELF.Fail('UNSUPPORTED', 'ORDER BY is not supported for a leaf inside a DIM''d GROUP (' & CLIP(c.Path) & ')')
+      END
       CLEAR(SELF.Order)
       SELF.Order.FieldNbr = c.FieldNbr
       GET(SELF.Sch.Fields, c.FieldNbr)

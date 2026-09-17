@@ -51,6 +51,10 @@ SELECT ADDR.CITY FROM [testdata\GROUPS.TPS]
 -- a subscript on a dimmed group, carried onto its members
 SELECT PHONES[1].KIND FROM [testdata\GROUPS.TPS]
 
+-- ORDER BY on a leaf inside a DIM'd GROUP is UNSUPPORTED: WHAT() cannot address the group's
+-- occurrence for a nested leaf (see task-7-report.md)
+SELECT ID FROM [testdata\GROUPS.TPS] ORDER BY PHONES[2].KIND
+
 -- an array element
 SELECT ARR[2] FROM [testdata\ALLTYPES.TPS]
 

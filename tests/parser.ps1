@@ -4,9 +4,12 @@ $root = Split-Path -Parent $PSScriptRoot
 $exe = Join-Path $root 'tpscli.exe'
 $sqlPath = Join-Path $root 'tests\parser.sql'
 $expPath = Join-Path $root 'tests\parser.expected.txt'
+. (Join-Path $PSScriptRoot 'TestHelpers.ps1')
 
 $lines = Get-Content $sqlPath
 $out = New-Object System.Text.StringBuilder
+$timeouts = 0
+$timeoutMs = 20000
 
 foreach ($line in $lines) {
     $trimmed = $line.Trim()
@@ -16,17 +19,26 @@ foreach ($line in $lines) {
     if ($trimmed -match 'SECRET\.TPS') { $argList += @('--owner', 's3cret') }
     $argList += $trimmed
 
-    Push-Location $root
-    try {
-        $stdout = & $exe @argList 2>&1
-        $exit = $LASTEXITCODE
-    } finally {
-        Pop-Location
-    }
+    $result = Invoke-Tpscli_Bounded -FilePath $exe -ArgumentList $argList -WorkingDirectory $root -TimeoutMs $timeoutMs
 
     [void]$out.AppendLine($trimmed)
-    foreach ($l in $stdout) { [void]$out.AppendLine([string]$l) }
-    [void]$out.AppendLine("EXIT=$exit")
+    if ($result.TimedOut) {
+        Write-Host "parser.ps1: FAILED (timeout) on '$trimmed' - exceeded $($timeoutMs)ms, process was killed"
+        [void]$out.AppendLine("TIMEOUT")
+        $timeouts++
+        continue
+    }
+    $combined = ($result.StdOut + $result.StdErr) -replace "`r`n", "`n"
+    $combined = $combined.TrimEnd("`n")
+    if ($combined -ne '') {
+        foreach ($l in ($combined -split "`n")) { [void]$out.AppendLine($l) }
+    }
+    [void]$out.AppendLine("EXIT=$($result.ExitCode)")
+}
+
+if ($timeouts -gt 0) {
+    Write-Host "parser.ps1: $timeouts case(s) FAILED (timeout)"
+    exit 1
 }
 
 $actual = $out.ToString() -replace "`r`n", "`n"

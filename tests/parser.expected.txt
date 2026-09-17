@@ -64,6 +64,9 @@ EXIT=0
 SELECT PHONES[1].KIND FROM [testdata\GROUPS.TPS]
 { "ok": true, "op": "select", "parse_only": true, "complete": true }
 EXIT=0
+SELECT ID FROM [testdata\GROUPS.TPS] ORDER BY PHONES[2].KIND
+{ "ok": false, "op": "select", "error": { "code": "UNSUPPORTED", "message": "ORDER BY is not supported for a leaf inside a DIM'd GROUP (PHONES[2].KIND)", "position": 47, "token": "PHONES[2].KIND" }, "outcome": "none", "complete": true }
+EXIT=1
 SELECT ARR[2] FROM [testdata\ALLTYPES.TPS]
 { "ok": true, "op": "select", "parse_only": true, "complete": true }
 EXIT=0

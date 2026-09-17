@@ -2,6 +2,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $exe = Join-Path $root 'tpscli.exe'
+. (Join-Path $PSScriptRoot 'TestHelpers.ps1')
 
 $files = @(
     @{ name = 'ALLTYPES'; owner = $null; records = 3 },
@@ -13,6 +14,7 @@ $files = @(
 )
 
 $mismatches = 0
+$timeoutMs = 20000
 
 function Report([string]$ctx, [string]$prop, $expected, $actual) {
     Write-Host ("{0}: {1} expected={2} actual={3}" -f $ctx, $prop, $expected, $actual)
@@ -34,12 +36,12 @@ foreach ($f in $files) {
     if ($f.owner) { $argList += @('--owner', $f.owner) }
     $argList += "DESCRIBE [$tpsPath]"
 
-    Push-Location $root
-    try {
-        $rawOut = & $exe @argList 2>&1
-    } finally {
-        Pop-Location
+    $result = Invoke-Tpscli_Bounded -FilePath $exe -ArgumentList $argList -WorkingDirectory $root -TimeoutMs $timeoutMs
+    if ($result.TimedOut) {
+        Report $name 'output' 'no timeout' "FAILED (timeout, $($timeoutMs)ms)"
+        continue
     }
+    $rawOut = $result.StdOut + $result.StdErr
 
     $expPath = Join-Path $root "testdata\expected\$name.json"
     $exp = Get-Content $expPath -Raw | ConvertFrom-Json
@@ -102,12 +104,12 @@ foreach ($f in $files) {
     if ($f.owner) { $dArgList += @('--owner', $f.owner) }
     $dArgList += "DESCRIBE [$tpsPath]"
 
-    Push-Location $root
-    try {
-        $dRawOut = & $exe @dArgList 2>&1
-    } finally {
-        Pop-Location
+    $dResult = Invoke-Tpscli_Bounded -FilePath $exe -ArgumentList $dArgList -WorkingDirectory $root -TimeoutMs $timeoutMs
+    if ($dResult.TimedOut) {
+        Report "$name.describe" 'output' 'no timeout' "FAILED (timeout, $($timeoutMs)ms)"
+        continue
     }
+    $dRawOut = $dResult.StdOut + $dResult.StdErr
 
     try {
         $dAct = ($dRawOut -join "`n") | ConvertFrom-Json
