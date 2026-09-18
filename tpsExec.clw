@@ -548,11 +548,6 @@ dec   DECIMAL(31,15)
 d     LONG
 t     LONG
 st    StringTheory
-body     STRING(64)
-intPart  STRING(32)
-fracPart STRING(32)
-dotPos   LONG
-neg2     BYTE
 picTok   STRING(52)
 defTxt   STRING(64)
 picNum   DECIMAL(31,15)
@@ -589,42 +584,19 @@ picNum   DECIMAL(31,15)
 
   GET(SELF.Sch.Fields, SELF.Sql.Cols.FieldNbr); f = SELF.Sch.Fields
   CASE f.Type
+  ! Range, digit-count and overflow checks for numeric literals live in tpsSql.clw's SqlLitConvert,
+  ! which the parser applies to every INSERT/UPDATE literal before the executor runs; this branch
+  ! only converts (ablation pass, 2026-09-18: the duplicate guards here were unreachable).
   OF 'BYTE' OROF 'SHORT' OROF 'USHORT' OROF 'LONG' OROF 'ULONG'
-    IF lit.Kind <> TK:Num OR INSTRING('.', lit.Text, 1, 1) THEN RETURN SELF.Range(colIdx, 'needs an integer').
-    dec = lit.Text
-    CASE f.Type
-    OF 'BYTE'   ; IF dec < 0 OR dec > 255 THEN RETURN SELF.Range(colIdx, 'must be 0..255').
-    OF 'SHORT'  ; IF dec < -32768 OR dec > 32767 THEN RETURN SELF.Range(colIdx, 'must be -32768..32767').
-    OF 'USHORT' ; IF dec < 0 OR dec > 65535 THEN RETURN SELF.Range(colIdx, 'must be 0..65535').
-    OF 'LONG'   ; IF dec < -2147483648 OR dec > 2147483647 THEN RETURN SELF.Range(colIdx, 'must fit a 32-bit signed integer').
-    OF 'ULONG'  ; IF dec < 0 OR dec > 4294967295 THEN RETURN SELF.Range(colIdx, 'must be 0..4294967295').
-    END
-    SELF.Conv.Num = dec; SELF.Conv.IsNum = 1
+    IF lit.Kind <> TK:Num THEN RETURN SELF.Range(colIdx, 'needs an integer').
+    SELF.Conv.Num = lit.Text; SELF.Conv.IsNum = 1
   OF 'SREAL' OROF 'REAL'
     IF lit.Kind <> TK:Num THEN RETURN SELF.Range(colIdx, 'needs a number').
     SELF.Conv.Num = lit.Text; SELF.Conv.IsNum = 1
   OF 'DECIMAL' OROF 'PDECIMAL'
     IF lit.Kind <> TK:Num THEN RETURN SELF.Range(colIdx, 'needs a number').
-    ! ceiling: DECIMAL(31,15) is the widest literal accepted. MATCH(...,Match:Regular) has no
-    ! {m,n} quantifier (confirmed repo-wide, see task-1-report.md), so this checks the digit
-    ! counts by hand instead of the brief's '^-?[0-9]{1,15}(\.[0-9]{1,15})?$'.
-    body = CLIP(lit.Text)
-    neg2 = CHOOSE(SUB(body, 1, 1) = '-', 1, 0)
-    IF neg2 THEN body = SUB(body, 2, LEN(body) - 1).
-    dotPos = INSTRING('.', body, 1, 1)
-    IF dotPos = 0
-      intPart = body; fracPart = ''
-    ELSE
-      intPart = SUB(body, 1, dotPos - 1); fracPart = SUB(body, dotPos + 1, LEN(body) - dotPos)
-    END
-    IF LEN(CLIP(intPart)) < 1 OR LEN(CLIP(intPart)) > 15 OR LEN(CLIP(fracPart)) > 15 OR (dotPos > 0 AND LEN(CLIP(fracPart)) < 1)
-      RETURN SELF.Range(colIdx, 'has more digits than tpscli handles (15 integer, 15 fraction)')
-    END
-    dec = lit.Text                                                  ! DECIMAL(31,15) holds every literal the check above admits
+    dec = lit.Text
     dec = ROUND(dec, 10 ^ (-f.Places))                              ! Clarion ROUND is half away from zero
-    ! SchFieldQ.Size (not .Digits) is the true total digit count for a DECIMAL field - see the fix
-    ! and its comment in tpsSql.clw's SqlLitConvert, discovered while building this routine.
-    IF ABS(dec) >= 10 ^ (f.Size - f.Places) THEN RETURN SELF.Range(colIdx, 'exceeds DECIMAL(' & f.Size & ',' & f.Places & ')').
     SELF.Conv.Num = dec; SELF.Conv.IsNum = 1
   OF 'DATE'
     IF lit.Kind <> TK:Str THEN RETURN SELF.Range(colIdx, 'needs a ''YYYY-MM-DD'' string').
