@@ -65,8 +65,13 @@ tpsOut.Fail  PROCEDURE(STRING code, STRING msg, LONG exitCode, <STRING extraJson
 ! numeric ones. Column width = max(header len, widest cell in that column). 2-space separator,
 ! matching spec 4's worked example exactly (dash-rule width equals the data column width).
 tpsOut.Table PROCEDURE(*TblColQ cols, *TblCellQ cells, LONG count, BYTE truncated)
+! Column widths live in a queue, not a fixed array: the old LONG,DIM(64) made a result with more
+! than 64 columns print NOTHING AT ALL - no header, no rows, no summary - and still exit 0
+! (final-review I4). SELECT * on a real file with 70 fields is an ordinary case.
+w      QUEUE,PRE(WQ)
+Val      LONG
+       END
 nCols  LONG
-w      LONG,DIM(64)
 i      LONG
 r      LONG
 c      LONG
@@ -77,22 +82,23 @@ txt    STRING(255)
 pad    LONG
   CODE
   nCols = RECORDS(cols)
-  IF nCols = 0 OR nCols > 64 THEN RETURN.     ! ponytail: fixed 64-column cap on the text grid, raise if a corpus file ever needs more
+  IF nCols = 0 THEN RETURN.
   LOOP i = 1 TO nCols
     GET(cols, i)
-    w[i] = LEN(CLIP(cols.Name))
+    WQ:Val = LEN(CLIP(cols.Name)); ADD(w)
   END
   LOOP r = 1 TO count
     LOOP c = 1 TO nCols
       idx = (r - 1) * nCols + c
       GET(cells, idx)
-      IF LEN(CLIP(cells.Text)) > w[c] THEN w[c] = LEN(CLIP(cells.Text)).
+      GET(w, c)
+      IF LEN(CLIP(cells.Text)) > WQ:Val THEN WQ:Val = LEN(CLIP(cells.Text)); PUT(w).
     END
   END
   LOOP i = 1 TO nCols
-    GET(cols, i)
-    line.Append(CHOOSE(i = 1, '', '  ') & CLIP(cols.Name) & ALL(' ', w[i] - LEN(CLIP(cols.Name))))
-    dash.Append(CHOOSE(i = 1, '', '  ') & ALL('-', w[i]))
+    GET(cols, i); GET(w, i)
+    line.Append(CHOOSE(i = 1, '', '  ') & CLIP(cols.Name) & ALL(' ', WQ:Val - LEN(CLIP(cols.Name))))
+    dash.Append(CHOOSE(i = 1, '', '  ') & ALL('-', WQ:Val))
   END
   SELF.Line(line.GetValue())
   SELF.Line(dash.GetValue())
@@ -102,8 +108,8 @@ pad    LONG
       idx = (r - 1) * nCols + c
       GET(cells, idx)
       txt = cells.Text
-      GET(cols, c)
-      pad = w[c] - LEN(CLIP(txt))
+      GET(cols, c); GET(w, c)
+      pad = WQ:Val - LEN(CLIP(txt))
       IF cols.RightAlign
         line.Append(CHOOSE(c = 1, '', '  ') & ALL(' ', pad) & CLIP(txt))
       ELSE

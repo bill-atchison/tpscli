@@ -178,6 +178,30 @@ Invoke-Case 'SELECT it back: base64 round-trips through the BLOB write' @() `
     '{ "ok": true, "op": "select", "columns": [{"name":"ID","type":"LONG"},{"name":"TITLE","type":"STRING"},{"name":"PIC","type":"BLOB"}], "rows": [[3,"blobtest","UE5HPw=="]], "row_count": 1, "truncated": false, "complete": true }' `
     0
 
+# ---- a BLOB larger than the old fixed buffers, end to end (final-review C1 and C2).
+# 3150 bytes of payload is 4200 base64 characters: longer than the tokenizer's old
+# TokQ.Text STRING(1024), so the literal used to reach the write path already cut to 1024
+# characters (768 bytes stored) with ok: true and exit 0; and longer than DoSelect's old
+# cellJson STRING(4096), so reading it back used to emit an unterminated JSON string literal
+# in a response that still ended "complete": true. This case asserts the exact bytes both ways.
+# MEMOS.TPS's NOTES is a MEMO(1000), which the driver caps below 1024, so the BLOB column is
+# the only column in this corpus that can carry a value past either buffer.
+
+$bigBytes = New-Object byte[] 3150
+for ($i = 0; $i -lt 3150; $i++) { $bigBytes[$i] = [byte](($i % 251) + 1) }
+$bigB64 = [Convert]::ToBase64String($bigBytes)
+if ($bigB64.Length -ne 4200) { Write-Host "insert.ps1: FAILED - base64 fixture is $($bigB64.Length) chars, expected 4200"; $failures++ }
+
+Invoke-Case 'INSERT: a 3150-byte BLOB from a 4200-character base64 literal' @() `
+    "INSERT INTO [testdata\work\MEMOS.TPS] (ID, TITLE, PIC) VALUES (4, 'bigblob', '$bigB64')" `
+    '{ "ok": true, "op": "insert", "affected": 1, "complete": true }' `
+    0
+
+Invoke-Case 'SELECT it back: all 3150 bytes survive, and the response is still valid JSON' @() `
+    "SELECT ID, PIC FROM [testdata\work\MEMOS.TPS] WHERE ID = 4" `
+    ('{ "ok": true, "op": "select", "columns": [{"name":"ID","type":"LONG"},{"name":"PIC","type":"BLOB"}], "rows": [[4,"' + $bigB64 + '"]], "row_count": 1, "truncated": false, "complete": true }') `
+    0
+
 # ---- final sanity: task-8-brief.md's own verification step - the primary work copy has exactly
 # 5 records (3 original + the 2 successful inserts above; every other case above failed validation
 # and never reached ADD()).

@@ -45,6 +45,14 @@ S4          STRING(255),NAME('S4')
 RowId       STRING(255)
 Pos         STRING(512)
           END
+! Mutate's pass-1 candidate list. It used to reuse SortQ, whose eight unused sort slots cost
+! ~1 KB per matched row on top of these two fields: DELETE over a million-row file asked the
+! 32-bit exe for ~1.8 GB and failed as a modal runtime dialog (final-review I10). Not named
+! "PosQ" - see the SortQ comment above for why that name crashes NEW.
+CandQ     QUEUE,TYPE
+RowId       STRING(255)
+Pos         STRING(512)
+          END
 tpsExec   CLASS,TYPE,MODULE('tpsExec.clw'),LINK('tpsExec.clw')
 Sch         &tpsSchema
 Sql         &tpsSql

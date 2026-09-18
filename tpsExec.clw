@@ -159,7 +159,9 @@ mi   LONG
 hh   LONG
 g    SchFieldQ
 grp  ANY
-raw  STRING(512)
+raw  &STRING
+gsz  LONG
+st   StringTheory
 relOfs LONG
 elemSize LONG
 rec  &GROUP
@@ -180,11 +182,23 @@ parentNbr LONG
       SELF.ErrCode = 'DRIVER'; SELF.ErrMsg = 'WHAT could not read ' & CLIP(g.Label) & '[' & grpElem & ']'
       RETURN ''
     END
+    ! The slice buffer is sized from the schema, not a fixed STRING(512): a group occurrence
+    ! bigger than the buffer used to return a blank or short leaf with ok: true (final-review I5).
+    gsz = CHOOSE(g.Elements > 1, g.Bytes / g.Elements, g.Bytes)
+    IF gsz < 1 THEN gsz = 1.
+    raw &= NEW STRING(gsz)
     raw = grp
     GET(SELF.Sch.Fields, fieldNbr)
     elemSize = CHOOSE(SELF.Sch.Fields.Elements > 1, SELF.Sch.Fields.Bytes / SELF.Sch.Fields.Elements, SELF.Sch.Fields.Size)
     relOfs = SELF.Sch.Fields.Offset - g.Offset + (CHOOSE(elem > 0, elem - 1, 0)) * elemSize
-    RETURN SELF.Out.JStr(CLIP(SUB(raw, relOfs + 1, elemSize)))
+    IF relOfs < 0 OR relOfs + elemSize > gsz
+      DISPOSE(raw)
+      SELF.ErrCode = 'UNSUPPORTED'; SELF.ErrMsg = 'Cannot locate ' & CLIP(SELF.Sch.Fields.Label) & ' inside ' & CLIP(g.Label) & '[' & grpElem & ']'
+      RETURN ''
+    END
+    st.SetValue(CLIP(SUB(raw, relOfs + 1, elemSize)))
+    DISPOSE(raw)
+    RETURN SELF.Out.JStr(st.GetValue())
   END
   v &= SELF.Sch.FieldRef(fieldNbr, elem)
   CASE SELF.Sch.Fields.Type
@@ -201,8 +215,10 @@ parentNbr LONG
     s = v                                   ! DECIMAL to STRING keeps the declared places
     RETURN '"' & CLIP(LEFT(s)) & '"'
   OF 'STRING' OROF 'CSTRING' OROF 'PSTRING' OROF 'GROUP'
-    s = v
-    RETURN SELF.Out.JStr(CLIP(s))
+    ! Not the fixed `s` buffer: a STRING or GROUP wider than it was truncated into the response
+    ! with ok: true (final-review C1). The numeric branches below are bounded by their types.
+    st.SetValue(v)
+    RETURN SELF.Out.JStr(CLIP(st.GetValue()))
   ELSE                                       ! BYTE SHORT USHORT LONG ULONG SREAL REAL
     s = v
     RETURN CLIP(LEFT(s))
@@ -298,7 +314,9 @@ fld       STRING(2)
 v         ANY
 outp      StringTheory
 first     BYTE
-cellJson  STRING(4096)
+cell      StringTheory            ! one formatted cell; never a fixed buffer - a memo, BLOB or wide
+                                   ! STRING over 4 KB used to be cut here, leaving an unterminated
+                                   ! JSON string in a response that still said ok: true (C1)
 tcells    &TblCellQ
 tcols     &TblColQ
   CODE
@@ -446,19 +464,19 @@ EmitRow ROUTINE
     LOOP j = 1 TO RECORDS(SELF.Cols)
       GET(SELF.Cols, j)
       IF SELF.Cols.MemoNbr
-        cellJson = SELF.FormatMemo(SELF.Cols.MemoNbr)
+        cell.SetValue(SELF.FormatMemo(SELF.Cols.MemoNbr))
       ELSE
-        cellJson = SELF.Format(SELF.Cols.FieldNbr, SELF.Cols.GrpElem, SELF.Cols.Elem)
+        cell.SetValue(SELF.Format(SELF.Cols.FieldNbr, SELF.Cols.GrpElem, SELF.Cols.Elem))
       END
       IF SELF.ErrCode <> ''
         failRc = SELF.ErrOut('select', SELF.ErrCode, SELF.ErrMsg, 'none', CHOOSE(SELF.ErrCode = 'DRIVER', 3, 1))
         SELF.ErrCode = ''
         BREAK
       END
-      outp.Append(CHOOSE(first, '', ',') & CLIP(cellJson))
+      outp.Append(CHOOSE(first, '', ',') & cell.GetValue())
       first = 0
       IF SELF.WantTable
-        CLEAR(tcells); tcells.Text = TpsExecUnjson(CLIP(cellJson)); ADD(tcells)
+        CLEAR(tcells); tcells.Text = TpsExecUnjson(cell.GetValue()); ADD(tcells)
       END
     END
     IF failRc = 0
@@ -703,7 +721,7 @@ tpsExec.Range PROCEDURE(LONG colIdx, STRING why)
 ! Every driver failure snapshots ERRORCODE/ERROR/FILEERRORCODE/FILEERROR into locals first, because
 ! Undo() (ROLLBACK) and POPBIND both run before the message is built and would otherwise clear them.
 tpsExec.Mutate PROCEDURE(BYTE isDelete)
-cands    SortQ                      ! candidate rows from pass 1 (SortQ, not "PosQ" - see tpsExec.inc)
+cands    CandQ                      ! candidate rows from pass 1 (RowId + Pos only - see tpsExec.inc)
 rec      &GROUP
 opName   STRING(6)
 i        LONG
