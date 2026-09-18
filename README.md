@@ -183,7 +183,10 @@ behaviour a caller can see, not an internal note.
   same shape. Only the hidden `--dump-schema` output carries the `"K"`/`"I"` distinction.
 - **An `INDEX` walks zero rows until it is BUILT.** The TopSpeed driver populates an `INDEX`
   only on `BUILD`, which tpscli never issues, so a file whose index was never built has an
-  empty index. The corpus's `IDX` is in that state and `verify.ps1` records it as a note.
+  empty index. The corpus's `IDX` is in that state and `verify.ps1` records it as a note. For
+  the same reason `ORDER BY` never selects an `INDEX`: ordering by an unbuilt one would return
+  no rows with `ok: true`, so only real keys are eligible and everything else falls back to the
+  in-memory sort.
 - **MEMO and BLOB access.** MEMO content is read and written through `F{PROP:Value,-n}` and BLOB
   content through `F{PROP:Blob,-n}`, with base64 in and out for BLOB. There is no addressable
   memo reference, so memos are handled by value.
@@ -192,10 +195,17 @@ behaviour a caller can see, not an internal note.
   `UNSUPPORTED`, and `INSERT`/`UPDATE` assignment to it is `UNSUPPORTED` ("Assign leaves inside
   a dimmed group"). Plain array subscripts (`ARR[2]`) and plain nested GROUP members
   (`ADDR.GEO.LAT`) work everywhere.
-- **A `STRING` declared with a picture does not round-trip a literal.** `ALLTYPES.PIC` is
-  `STRING(@N9.2)`. tpscli treats it as a plain `STRING`, but the Clarion runtime deformats and
-  reformats the value on assignment, so writing `'rrr'` stores `00000.00` and writing `'7'`
-  stores `00007.00`, with no warning. `verify.ps1` leaves such a column out of its round trip and records it as a note.
+- **A `STRING` declared with a picture does not round-trip a literal, and a literal the
+  picture cannot read is refused.** `ALLTYPES.PIC` is `STRING(@N9.2)`. Its reported type is
+  plain `STRING`, but the Clarion runtime deformats and reformats the value on assignment, so
+  `'7'` and `'00007.00'` both store `00007.00`. A literal carrying no digit at all, such as
+  `'rrr'`, cannot be stored: it would land as the picture's zero, `00000.00`. That is a
+  conversion failure, so `INSERT` and `UPDATE` refuse it with `VALUE_OUT_OF_RANGE` and the
+  message `<column> does not match picture @<picture>` rather than writing it silently. The
+  empty literal is accepted and stores the picture's zero, which is what an unassigned column
+  holds anyway. Because no literal survives a picture column unchanged, `verify.ps1` leaves
+  such a column out of its generic round trip, records it as a note, and separately asserts
+  that writing `'rrr'` to it is refused.
 - **`DECIMAL` output trims trailing fraction zeros.** `10.00` in a `DECIMAL(7,2)` prints `"10"`,
   and zero prints `"0"`.
 - **`INSERT`/`UPDATE` literal validation happens at parse time**, so a `VALUE_OUT_OF_RANGE` for a

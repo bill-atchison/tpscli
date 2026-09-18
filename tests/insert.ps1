@@ -11,6 +11,7 @@ $workDir = Join-Path $root 'testdata\work'
 New-Item -ItemType Directory -Force -Path $workDir | Out-Null
 Copy-Item (Join-Path $root 'testdata\ALLTYPES.TPS') (Join-Path $workDir 'ALLTYPES.TPS') -Force
 Copy-Item (Join-Path $root 'testdata\ALLTYPES.TPS') (Join-Path $workDir 'ALLTYPES_DEC.TPS') -Force
+Copy-Item (Join-Path $root 'testdata\ALLTYPES.TPS') (Join-Path $workDir 'ALLTYPES_PIC.TPS') -Force
 Copy-Item (Join-Path $root 'testdata\MEMOS.TPS') (Join-Path $workDir 'MEMOS.TPS') -Force
 
 $timeoutMs = 20000
@@ -113,6 +114,54 @@ Invoke-Case 'INSERT: DECIMAL value needing 7 significant digits now succeeds (re
 Invoke-Case 'SELECT it back: full 7-digit precision round-trips' @() `
     "SELECT ID, D FROM [testdata\work\ALLTYPES_DEC.TPS] WHERE ID = 50" `
     '{ "ok": true, "op": "select", "columns": [{"name":"ID","type":"LONG"},{"name":"D","type":"DECIMAL"}], "rows": [[50,"54321.99"]], "row_count": 1, "truncated": false, "complete": true }' `
+    0
+
+# ---- picture STRING: a STRING declared with a picture (AT:Pic is STRING(@N9.2)) is deformatted
+# and reformatted by the Clarion runtime on assignment, so a literal the picture cannot read used
+# to be stored silently as the picture's zero: 'rrr' became '00000.00' on a write that reported
+# ok: true. Spec section 8 calls every conversion failure VALUE_OUT_OF_RANGE, so it is refused.
+# Measured with a --selftest probe against @N9.2: DEFORMAT returns a blank string for a literal
+# carrying no digit at all and the digits it found otherwise. These run on their own work copy so
+# the ALLTYPES record-count check at the bottom is unaffected.
+
+Invoke-Case 'INSERT: picture STRING rejects a literal the picture cannot read' @() `
+    "INSERT INTO [testdata\work\ALLTYPES_PIC.TPS] (ID, PIC) VALUES (20, 'rrr')" `
+    '{ "ok": false, "op": "insert", "error": { "code": "VALUE_OUT_OF_RANGE", "message": "PIC does not match picture @N9.2", "column": "PIC" }, "outcome": "none", "complete": true }' `
+    3
+
+Invoke-Case 'INSERT: picture STRING accepts a bare number' @() `
+    "INSERT INTO [testdata\work\ALLTYPES_PIC.TPS] (ID, PIC) VALUES (21, '7')" `
+    '{ "ok": true, "op": "insert", "affected": 1, "complete": true }' `
+    0
+
+Invoke-Case 'INSERT: picture STRING accepts an already formatted value' @() `
+    "INSERT INTO [testdata\work\ALLTYPES_PIC.TPS] (ID, PIC) VALUES (22, '00007.00')" `
+    '{ "ok": true, "op": "insert", "affected": 1, "complete": true }' `
+    0
+
+Invoke-Case 'INSERT: picture STRING accepts the empty literal' @() `
+    "INSERT INTO [testdata\work\ALLTYPES_PIC.TPS] (ID, PIC) VALUES (23, '')" `
+    '{ "ok": true, "op": "insert", "affected": 1, "complete": true }' `
+    0
+
+# '7' and '00007.00' both land on the same stored bytes; the empty literal stores the picture's
+# zero, which is what an unassigned column would hold anyway.
+Invoke-Case 'SELECT the picture rows back: both accepted forms store 00007.00' @() `
+    "SELECT ID, PIC FROM [testdata\work\ALLTYPES_PIC.TPS] WHERE ID > 19 ORDER BY ID" `
+    '{ "ok": true, "op": "select", "columns": [{"name":"ID","type":"LONG"},{"name":"PIC","type":"STRING"}], "rows": [[21,"00007.00"],[22,"00007.00"],[23,"00000.00"]], "row_count": 3, "truncated": false, "complete": true }' `
+    0
+
+# The picture check lives in tpsExec.Validate, which both DoInsert and Mutate call, so the
+# UPDATE path is refused by the same rule.
+Invoke-Case 'UPDATE: picture STRING rejects the same literal, outcome none' @() `
+    "UPDATE [testdata\work\ALLTYPES_PIC.TPS] SET PIC = 'rrr' WHERE ID = 21" `
+    '{ "ok": false, "op": "update", "error": { "code": "VALUE_OUT_OF_RANGE", "message": "PIC does not match picture @N9.2", "column": "PIC" }, "outcome": "none", "complete": true }' `
+    3
+
+# A plain STRING has no picture and is untouched by the rule.
+Invoke-Case 'UPDATE: a plain STRING still accepts the same literal' @() `
+    "UPDATE [testdata\work\ALLTYPES_PIC.TPS] SET STR = 'rrr' WHERE ID = 21" `
+    '{ "ok": true, "op": "update", "matched": 1, "affected": 1, "complete": true }' `
     0
 
 # ---- BLOB write: unverified per task-8-brief.md ("try it; if it does not compile or work, report

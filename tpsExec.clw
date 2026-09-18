@@ -5,6 +5,7 @@
     TpsExecUnjson(STRING js),STRING
     TpsExecPad2(LONG n),STRING
     TpsExecValidBase64(STRING s),BYTE
+    TpsExecHasDigit(STRING s),BYTE
   END
 
 ! ---- construction ----
@@ -256,6 +257,7 @@ bwd   BYTE
   LOOP k = 1 TO RECORDS(SELF.Sch.Keys)
     GET(SELF.Sch.Keys, k)
     IF SELF.Sch.Keys.Opt THEN CYCLE.
+    IF NOT SELF.Sch.Keys.IsKey THEN CYCLE.   ! an INDEX is populated only by BUILD, which tpscli never issues, so an unbuilt one walks zero rows
     fwd = 1; bwd = 1; n = 0
     LOOP j = 1 TO RECORDS(SELF.Sch.Comps)
       GET(SELF.Sch.Comps, j)
@@ -551,6 +553,9 @@ intPart  STRING(32)
 fracPart STRING(32)
 dotPos   LONG
 neg2     BYTE
+picTok   STRING(52)
+defTxt   STRING(64)
+picNum   DECIMAL(31,15)
   CODE
   GET(SELF.Sql.Cols, colIdx); GET(SELF.Sql.Vals, colIdx); lit = SELF.Sql.Vals
   CLEAR(SELF.Conv)
@@ -637,6 +642,22 @@ neg2     BYTE
     SELF.Conv.Num = t; SELF.Conv.IsNum = 1
   OF 'STRING' OROF 'CSTRING' OROF 'PSTRING'
     IF lit.Kind <> TK:Str THEN RETURN SELF.Range(colIdx, 'needs a string literal').
+    ! A STRING declared with a picture is deformatted and reformatted by the Clarion runtime on
+    ! assignment, so a literal the picture cannot read is stored as the picture's zero: 'rrr'
+    ! into a STRING(@N9.2) becomes '00000.00'. That is a conversion failure, and spec section 8
+    ! says every conversion failure is VALUE_OUT_OF_RANGE, so it is refused here rather than
+    ! written silently. Measured with a --selftest probe against @N9.2 (task-10 fix round 1):
+    ! DEFORMAT returns a blank string for a literal carrying no digit at all ('rrr' -> '') and
+    ! the digits it found otherwise ('7' -> '7', '00007.00' -> '00007.0', '0' -> '0'). The
+    ! digit test keeps a legitimate zero ('0', whose deformat is numerically 0) acceptable.
+    IF CLIP(f.Picture) <> '' AND lit.Len > 0 AND CLIP(lit.Text) <> ''
+      picTok = '@' & CLIP(f.Picture)
+      defTxt = DEFORMAT(CLIP(lit.Text), picTok)
+      picNum = defTxt
+      IF CLIP(defTxt) = '' OR (picNum = 0 AND NOT TpsExecHasDigit(CLIP(lit.Text)))
+        RETURN SELF.Range(colIdx, 'does not match picture ' & CLIP(picTok))
+      END
+    END
     SELF.Conv.Txt &= NEW STRING(CHOOSE(lit.Len = 0, 1, lit.Len))
     SELF.Conv.Txt = lit.Text
     SELF.Conv.TxtLen = lit.Len
@@ -973,6 +994,15 @@ n   LONG
 ! Base64Decode silently CYCLEs over any character it doesn't recognize instead of failing
 ! (confirmed against C:\Clarion12\accessory\libsrc\win\StringTheory.clw), so it would never by
 ! itself reject garbage input.
+! One digit anywhere is enough; see the picture check in Validate for why this exists.
+TpsExecHasDigit PROCEDURE(STRING s)
+i  LONG
+  CODE
+  LOOP i = 1 TO LEN(s)
+    IF s[i] >= '0' AND s[i] <= '9' THEN RETURN 1.
+  END
+  RETURN 0
+
 TpsExecValidBase64 PROCEDURE(STRING s)
 n    LONG
 i    LONG
