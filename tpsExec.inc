@@ -71,12 +71,13 @@ DoSelect    PROCEDURE(),LONG
 DoInsert    PROCEDURE(),LONG
 DoUpdate    PROCEDURE(),LONG
 DoDelete    PROCEDURE(),LONG
-Validate    PROCEDURE(LONG colIdx),LONG       ! converts Sql.Vals[i] into Conv[i], no buffer access. Stub: Task 8/9.
-Assign      PROCEDURE(LONG colIdx)            ! Sql.Cols[i] := Conv[i], after Validate succeeded. Stub: Task 8/9.
-Range       PROCEDURE(LONG colIdx, STRING why),LONG   ! sets VALUE_OUT_OF_RANGE, returns 3. Stub: Task 8/9.
-Mutate      PROCEDURE(BYTE isDelete),LONG     ! Stub: Task 8/9.
-Undo        PROCEDURE(),STRING               ! ROLLBACK; 'rolled_back' or 'unknown'. Stub: Task 8/9.
-RowIdText   PROCEDURE(),STRING               ! primary/unique key values of the current buffer, else position hex. Stub: Task 8/9.
+Validate    PROCEDURE(LONG colIdx),LONG       ! converts Sql.Vals[i] into Conv[i], no buffer access
+Assign      PROCEDURE(LONG colIdx)            ! Sql.Cols[i] := Conv[i], after Validate succeeded
+Range       PROCEDURE(LONG colIdx, STRING why),LONG   ! sets VALUE_OUT_OF_RANGE, returns 3
+Mutate      PROCEDURE(BYTE isDelete),LONG     ! two-pass UPDATE/DELETE, spec section 5; DoUpdate/DoDelete wrap it
+Undo        PROCEDURE(),STRING               ! ROLLBACK; 'rolled_back' or 'unknown'
+RowIdText   PROCEDURE(),STRING               ! primary/unique key values of the current buffer, else position hex
+IdKeyNbr    PROCEDURE(),LONG                 ! primary key, else the first unique key, else 0
 ErrOut      PROCEDURE(STRING op, STRING code, STRING msg, STRING outcome, LONG exitCode, <STRING errExtra>, <STRING topExtra>),LONG
           END
   _EndTpsExec_

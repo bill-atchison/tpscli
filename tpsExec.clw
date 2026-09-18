@@ -511,11 +511,9 @@ matched   BYTE
         kfound = SELF.Sch.Keys.Label; matched = 1; BREAK
       END
     END
-    IF NOT matched
-      LOOP k = 1 TO RECORDS(SELF.Sch.Keys)
-        GET(SELF.Sch.Keys, k)
-        IF NOT SELF.Sch.Keys.Dup THEN kfound = SELF.Sch.Keys.Label; BREAK.
-      END
+    IF NOT matched                               ! driver text named no key: fall back to the row identity key
+      k = SELF.IdKeyNbr()
+      IF k THEN GET(SELF.Sch.Keys, k); kfound = SELF.Sch.Keys.Label.
     END
     extra.SetValue('"key": ' & SELF.Out.JStr(CLIP(kfound)))
     RETURN SELF.ErrOut('insert', 'DUPLICATE_KEY', 'Duplicate value for key ' & CLIP(kfound), 'none', 3, extra.GetValue())
@@ -531,11 +529,11 @@ matched   BYTE
 
 tpsExec.DoUpdate PROCEDURE()
   CODE
-  RETURN SELF.ErrOut('update', 'UNSUPPORTED', 'Not implemented', 'none', 1)
+  RETURN SELF.Mutate(0)
 
 tpsExec.DoDelete PROCEDURE()
   CODE
-  RETURN SELF.ErrOut('delete', 'UNSUPPORTED', 'Not implemented', 'none', 1)
+  RETURN SELF.Mutate(1)
 
 ! Converts SELF.Sql.Vals[colIdx] into SELF.Conv[colIdx] (numbers into Conv.Num/IsNum=1, strings and
 ! decoded BLOB bytes into a NEW Conv.Txt/TxtLen) and touches no buffer. Structural checks that must
@@ -701,17 +699,213 @@ tpsExec.Range PROCEDURE(LONG colIdx, STRING why)
   SELF.ErrMsg = CLIP(SELF.Sql.Cols.Path) & ' ' & why
   RETURN 3
 
+! ---- UPDATE / DELETE (Task 9): the two-pass transactional protocol of spec section 5 ----
+
+! Pass 1 scans the file in record order with nothing locked and collects the position of every
+! matching row, together with a printable row identity (RowIdText) captured while the buffer still
+! holds that row - so a REGET that fails in pass 2 can still name the row it could not re-read.
+! Pass 2 runs inside LOGOUT/COMMIT and HOLDs + REGETs each candidate before touching it, so a row
+! another process changed between the passes is never overwritten blind. Any failure in pass 2
+! rolls the whole statement back: "affected" is all-or-nothing, never a partial count.
+! Every driver failure snapshots ERRORCODE/ERROR/FILEERRORCODE/FILEERROR into locals first, because
+! Undo() (ROLLBACK) and POPBIND both run before the message is built and would otherwise clear them.
 tpsExec.Mutate PROCEDURE(BYTE isDelete)
+cands    SortQ                      ! candidate rows from pass 1 (SortQ, not "PosQ" - see tpsExec.inc)
+rec      &GROUP
+opName   STRING(6)
+i        LONG
+j        LONG
+r        BYTE
+pk       STRING(255)
+e        LONG
+em       STRING(255)
+fe       STRING(255)
+fm       STRING(255)
+oc       STRING(12)
+affected LONG
+exitCode LONG
+extra    StringTheory
+top      StringTheory
+outLine  StringTheory
   CODE
+  opName = CHOOSE(isDelete, 'delete', 'update')
+  SELF.Warnings.Free()
+  FREE(SELF.Conv)                   ! Validate ADDs in column order and Assign GETs by column index
+  rec &= SELF.Sch.F{PROP:Record}
+  PUSHBIND
+  BIND(rec)
+
+  ! Every SET literal is converted before the scan, so a bad literal costs no I/O and leaves
+  ! outcome "none". (In practice tpsSql's SqlLitConvert already rejected it at parse time.)
+  IF NOT isDelete
+    LOOP j = 1 TO RECORDS(SELF.Sql.Cols)
+      IF SELF.Validate(j) <> 0
+        POPBIND
+        extra.SetValue('"column": ' & SELF.Out.JStr(CLIP(SELF.ErrCol)))
+        exitCode = CHOOSE(SELF.ErrCode = 'VALUE_OUT_OF_RANGE', 3, 1)
+        RETURN SELF.ErrOut(opName, SELF.ErrCode, SELF.ErrMsg, 'none', exitCode, extra.GetValue())
+      END
+    END
+  END
+
+  ! ---- pass 1: candidates in record order, nothing locked ----
+  SET(SELF.Sch.F)
+  LOOP
+    NEXT(SELF.Sch.F)
+    e = ERRORCODE()
+    IF e = 33 THEN BREAK.                       ! end of file
+    IF e
+      em = ERROR(); fe = FILEERRORCODE(); fm = FILEERROR(); POPBIND
+      RETURN SELF.ErrOut(opName, 'DRIVER', 'NEXT: ' & e & ' ' & CLIP(em) & ' / ' & CLIP(fe) & ' ' & CLIP(fm), 'none', 3)
+    END
+    r = SELF.Matches()
+    IF r = 2
+      POPBIND
+      RETURN SELF.ErrOut(opName, 'SYNTAX', 'Runtime rejected the filter expression: ' & CLIP(SELF.Sql.Where), 'none', 1)
+    END
+    IF r = 0 THEN CYCLE.
+    CLEAR(cands)
+    cands.Pos = POSITION(SELF.Sch.F)
+    cands.RowId = SELF.RowIdText()
+    ADD(cands)
+  END
+
+  ! ---- pass 2: one transaction over the candidates ----
+  IF RECORDS(cands) > 0
+    LOGOUT(2, SELF.Sch.F)
+    e = ERRORCODE()
+    IF e
+      em = ERROR(); fe = FILEERRORCODE(); fm = FILEERROR(); POPBIND
+      top.SetValue('"matched": ' & RECORDS(cands) & ', "affected": 0')
+      RETURN SELF.ErrOut(opName, 'DRIVER', 'LOGOUT failed: ' & e & ' ' & CLIP(em) & ' / ' & CLIP(fe) & ' ' & CLIP(fm), |
+                         'none', 3, '', top.GetValue())
+    END
+
+    LOOP i = 1 TO RECORDS(cands)
+      GET(cands, i)
+      HOLD(SELF.Sch.F, 1)                       ! spec: one second, no retries
+      REGET(SELF.Sch.F, cands.Pos)
+      e = ERRORCODE(); em = ERROR(); fe = FILEERRORCODE(); fm = FILEERROR()
+      IF e
+        ! 43 is IsHeldErr (Clarion's own ERRORS.CLW); nothing else counts as held, and every other
+        ! REGET failure - including 35, the row another process removed between the two passes -
+        ! fails the statement with a rollback, exactly as the spec requires.
+        pk = cands.RowId
+        IF e <> 43 THEN RELEASE(SELF.Sch.F).
+        oc = SELF.Undo(); POPBIND
+        extra.SetValue('"row": ' & SELF.Out.JStr(CLIP(pk)))
+        top.SetValue(CLIP('"matched": ' & RECORDS(cands) & CHOOSE(oc = 'rolled_back', ', "affected": 0', '')))
+        IF e = 43
+          RETURN SELF.ErrOut(opName, 'RECORD_HELD', 'Record held by another process (' & CLIP(pk) & '). Statement ' |
+                             & CHOOSE(oc = 'rolled_back', 'rolled back.', 'NOT confirmed rolled back.'), |
+                             oc, 3, extra.GetValue(), top.GetValue())
+        END
+        RETURN SELF.ErrOut(opName, 'DRIVER', 'REGET ' & CLIP(pk) & ': ' & e & ' ' & CLIP(em) & ' / ' & CLIP(fe) & ' ' & CLIP(fm), |
+                           oc, 3, extra.GetValue(), top.GetValue())
+      END
+
+      r = SELF.Matches()
+      IF r = 2
+        RELEASE(SELF.Sch.F); oc = SELF.Undo(); POPBIND
+        top.SetValue(CLIP('"matched": ' & RECORDS(cands) & CHOOSE(oc = 'rolled_back', ', "affected": 0', '')))
+        RETURN SELF.ErrOut(opName, 'SYNTAX', 'Runtime rejected the filter expression: ' & CLIP(SELF.Sql.Where), |
+                           oc, 1, '', top.GetValue())
+      END
+      IF r = 0 THEN RELEASE(SELF.Sch.F); CYCLE.  ! changed under us, no longer matches: counts in matched only
+
+      IF isDelete
+        DELETE(SELF.Sch.F)
+      ELSE
+        SELF.ErrCode = ''                        ! Assign signals a structural failure through it
+        LOOP j = 1 TO RECORDS(SELF.Sql.Cols)
+          SELF.Assign(j)
+          IF SELF.ErrCode <> '' THEN BREAK.
+        END
+        IF SELF.ErrCode <> ''
+          RELEASE(SELF.Sch.F); oc = SELF.Undo(); POPBIND
+          extra.SetValue('"column": ' & SELF.Out.JStr(CLIP(SELF.ErrCol)))
+          top.SetValue(CLIP('"matched": ' & RECORDS(cands) & CHOOSE(oc = 'rolled_back', ', "affected": 0', '')))
+          exitCode = CHOOSE(SELF.ErrCode = 'VALUE_OUT_OF_RANGE', 3, 1)
+          RETURN SELF.ErrOut(opName, SELF.ErrCode, SELF.ErrMsg, oc, exitCode, extra.GetValue(), top.GetValue())
+        END
+        PUT(SELF.Sch.F)
+      END
+      e = ERRORCODE(); em = ERROR(); fe = FILEERRORCODE(); fm = FILEERROR()
+      IF e
+        RELEASE(SELF.Sch.F); pk = cands.RowId; oc = SELF.Undo(); POPBIND
+        extra.SetValue('"row": ' & SELF.Out.JStr(CLIP(pk)))
+        top.SetValue(CLIP('"matched": ' & RECORDS(cands) & CHOOSE(oc = 'rolled_back', ', "affected": 0', '')))
+        RETURN SELF.ErrOut(opName, CHOOSE(e = 40, 'DUPLICATE_KEY', 'DRIVER'), |
+                           CLIP(CLIP(em) & ' at ' & CLIP(pk) & CHOOSE(e = 40, '', ' / ' & CLIP(fe) & ' ' & CLIP(fm))), |
+                           oc, 3, extra.GetValue(), top.GetValue())
+      END
+      affected += 1
+    END
+
+    COMMIT
+    e = ERRORCODE()
+    IF e
+      em = ERROR(); fe = FILEERRORCODE(); fm = FILEERROR()
+      oc = SELF.Undo(); POPBIND
+      top.SetValue(CLIP('"matched": ' & RECORDS(cands) & CHOOSE(oc = 'rolled_back', ', "affected": 0', '')))
+      RETURN SELF.ErrOut(opName, 'DRIVER', 'COMMIT failed: ' & e & ' ' & CLIP(em) & ' / ' & CLIP(fe) & ' ' & CLIP(fm), |
+                         oc, 3, '', top.GetValue())
+    END
+  END
+  POPBIND
+
+  outLine.SetValue('{{ "ok": true, "op": "' & CLIP(opName) & '", "matched": ' & RECORDS(cands) & ', "affected": ' & affected)
+  IF SELF.Warnings.Length() > 0 THEN outLine.Append(', "warnings": [' & SELF.Warnings.GetValue() & ']').
+  outLine.Append(', "complete": true }')
+  SELF.Out.Line(outLine.GetValue())
   RETURN 0
 
 tpsExec.Undo PROCEDURE()
   CODE
-  RETURN 'unknown'
+  ROLLBACK
+  IF ERRORCODE() THEN RETURN 'unknown'.
+  RETURN 'rolled_back'
 
+! Identity of the row currently in the buffer, for error messages only: the component values of the
+! primary (or first unique) key joined with '|', or - for a file with no unique key at all - the
+! driver's own POSITION bytes in hex, which is opaque but at least tells two rows apart.
 tpsExec.RowIdText PROCEDURE()
+k     LONG
+j     LONG
+n     LONG
+s     StringTheory
+v     ANY
+sv    STRING(255)
   CODE
-  RETURN ''
+  k = SELF.IdKeyNbr()
+  IF k = 0
+    s.SetValue(POSITION(SELF.Sch.F))
+    s.ToHex()
+    RETURN s.GetValue()
+  END
+  LOOP j = 1 TO RECORDS(SELF.Sch.Comps)
+    GET(SELF.Sch.Comps, j)
+    IF SELF.Sch.Comps.KeyNbr <> k THEN CYCLE.
+    v &= SELF.Sch.FieldRef(SELF.Sch.Comps.FieldNbr, 0)
+    IF v &= NULL THEN CYCLE.
+    sv = v                                       ! same numeric-to-text conversion Format() uses
+    n += 1
+    s.Append(CHOOSE(n = 1, '', '|') & CLIP(LEFT(sv)))
+  END
+  RETURN s.GetValue()
+
+! One lookup shared by DoInsert (naming the key in a DUPLICATE_KEY message when the driver's own
+! text names none) and RowIdText (choosing the components that identify a row).
+tpsExec.IdKeyNbr PROCEDURE()
+k     LONG
+uniq  LONG
+  CODE
+  LOOP k = 1 TO RECORDS(SELF.Sch.Keys)
+    GET(SELF.Sch.Keys, k)
+    IF SELF.Sch.Keys.Primary THEN RETURN k.
+    IF uniq = 0 AND NOT SELF.Sch.Keys.Dup THEN uniq = k.
+  END
+  RETURN uniq
 
 ! ---- error output: prints the failure line, returns the exit code; never HALTs (the
 ! caller controls when the process actually ends, so nothing is printed twice) ----
