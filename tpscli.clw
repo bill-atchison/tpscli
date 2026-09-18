@@ -7,6 +7,7 @@
   MAP
     ParseArgs()
     DumpDef()
+    WalkKey(tpsSchema sch, STRING keyName)
     Dispatch()
   END
 
@@ -14,6 +15,16 @@ TpsDrv     FILE,DRIVER('TOPSPEED'),NAME('tpsdrv.tps'),PRE(TD)
 Record       RECORD
 Dummy          BYTE
              END
+           END
+
+! One entry per component of the key --walk-key is walking; carries the previous row's value
+! so consecutive pairs can be compared without buffering the whole file.
+WalkCompQ  QUEUE,TYPE
+WcField      LONG                ! SchFieldQ.Nbr
+WcIsNum      BYTE
+WcDesc       BYTE                ! component declared descending
+WcNum        DECIMAL(31,15)      ! previous row's value, numeric components
+WcTxt        STRING(255)         ! previous row's value, string components
            END
 
 Out        tpsOut
@@ -25,6 +36,7 @@ LimitDefault LONG(1000)
 WantDumpDef  BYTE
 DumpDefPath  STRING(260)
 WantDumpSchema BYTE
+WalkKeyName  STRING(64)   ! --walk-key, '' = not asked for
 Sql          &STRING
            END
 TPSCLI_VERSION  EQUATE('0.1.0')
@@ -78,6 +90,10 @@ y     LONG
       Opt.WantDumpDef = 1
       seen = 1
     OF '--dump-schema'    ; Opt.WantDumpSchema = 1
+    OF '--walk-key'
+      n += 1
+      Opt.WalkKeyName = COMMAND(n)
+      IF Opt.WalkKeyName = '' THEN Out.Fail('SYNTAX', '--walk-key needs a key name', 1).
     ELSE
       IF SUB(a, 1, 2) = '--' THEN Out.Fail('SYNTAX', 'Unknown option ' & CLIP(a), 1).
       IF seen THEN Out.Fail('SYNTAX', 'Only one statement per invocation', 1).
@@ -179,6 +195,11 @@ errJs     StringTheory
       END
       HALT(2)
     END
+    IF Opt.WalkKeyName <> ''
+      WalkKey(Sc, Opt.WalkKeyName)
+      CLOSE(Sc.F)
+      HALT(0)
+    END
     Out.Line(Sc.DescribeJson(Out, RECORDS(Sc.F)))
     CLOSE(Sc.F)
     HALT(0)
@@ -215,3 +236,99 @@ errJs     StringTheory
   rc = Exec.Run()
   CLOSE(Sc.F)
   HALT(rc)
+
+! Hidden integrity hook for verify.ps1 (spec section 7): walks exactly one key with SET(key)/NEXT
+! and reports how many rows that key yielded and whether every consecutive pair was in the key's
+! declared order. Comparison is per component, in rank order, inverted for a DESCENDING component
+! and case-folded for a NOCASE key (a NOCASE key really does order 'baker' before 'Charlie', so a
+! case-sensitive compare would call a correct file out of order).
+WalkKey  PROCEDURE(tpsSchema sch, STRING keyName)
+wkNbr     LONG
+wkLabel   STRING(64)
+wkNoCase  BYTE
+wkKey     &KEY
+wkCmp     &WalkCompQ
+wkCount   LONG
+wkOrdered BYTE
+wkFirst   BYTE
+wkRel     LONG                 ! -1/0/1: this row against the previous one
+wkErr     LONG
+wkNum     DECIMAL(31,15)
+wkTxt     STRING(255)
+wkVal     ANY
+i         LONG
+  CODE
+  LOOP i = 1 TO RECORDS(sch.Keys)
+    GET(sch.Keys, i)
+    IF UPPER(CLIP(sch.Keys.Label)) = UPPER(CLIP(keyName))
+      wkNbr = i; wkLabel = sch.Keys.Label; wkNoCase = sch.Keys.NoCase
+      BREAK
+    END
+  END
+  IF wkNbr = 0 THEN Out.Fail('UNKNOWN_COLUMN', 'No key named ' & CLIP(keyName), 1).
+
+  wkCmp &= NEW WalkCompQ
+  LOOP i = 1 TO RECORDS(sch.Comps)
+    GET(sch.Comps, i)
+    IF sch.Comps.KeyNbr <> wkNbr THEN CYCLE.
+    CLEAR(wkCmp)
+    wkCmp.WcField = sch.Comps.FieldNbr
+    wkCmp.WcDesc = sch.Comps.Descending
+    GET(sch.Fields, sch.Comps.FieldNbr)
+    CASE UPPER(CLIP(sch.Fields.Type))
+    OF 'BYTE' OROF 'SHORT' OROF 'USHORT' OROF 'LONG' OROF 'ULONG' OROF 'SREAL' OROF 'REAL' OROF 'DECIMAL' OROF 'DATE' OROF 'TIME'
+      wkCmp.WcIsNum = 1
+    END
+    ADD(wkCmp)
+  END
+
+  wkKey &= sch.KeyRef(wkNbr)
+  wkOrdered = 1
+  wkFirst = 1
+  SET(wkKey)
+  LOOP
+    NEXT(sch.F)
+    wkErr = ERRORCODE()
+    IF wkErr
+      IF wkErr <> 33
+        DISPOSE(wkCmp)
+        Out.Fail('DRIVER', wkErr & ' ' & CLIP(ERROR()), 3)
+      END
+      BREAK
+    END
+    wkCount += 1
+    wkRel = 0
+    LOOP i = 1 TO RECORDS(wkCmp)
+      GET(wkCmp, i)
+      wkVal &= sch.FieldRef(wkCmp.WcField, 0)
+      IF wkCmp.WcIsNum
+        wkNum = wkVal; wkTxt = ''
+      ELSE
+        wkNum = 0; wkTxt = wkVal
+        IF wkNoCase THEN wkTxt = UPPER(wkTxt).
+      END
+      IF NOT wkFirst AND wkRel = 0
+        IF wkCmp.WcIsNum
+          IF wkNum > wkCmp.WcNum
+            wkRel = 1
+          ELSIF wkNum < wkCmp.WcNum
+            wkRel = -1
+          END
+        ELSE
+          IF wkTxt > wkCmp.WcTxt
+            wkRel = 1
+          ELSIF wkTxt < wkCmp.WcTxt
+            wkRel = -1
+          END
+        END
+        IF wkCmp.WcDesc THEN wkRel = -wkRel.
+      END
+      wkCmp.WcNum = wkNum; wkCmp.WcTxt = wkTxt
+      PUT(wkCmp)
+    END
+    IF NOT wkFirst AND wkRel < 0 THEN wkOrdered = 0.
+    wkFirst = 0
+  END
+  DISPOSE(wkCmp)
+  Out.Line('{{ "ok": true, "op": "walk-key", "key": ' & Out.JStr(CLIP(wkLabel)) & ', "count": ' & wkCount |
+           & ', "ordered": ' & CHOOSE(wkOrdered = 1, 'true', 'false') & ', "complete": true }')

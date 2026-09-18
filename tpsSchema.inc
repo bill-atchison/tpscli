@@ -14,7 +14,7 @@ Bytes        LONG        ! total bytes incl. all elements
 Elements     LONG        ! DIM, 1 = scalar
 Size         LONG        ! DynFile Size
 Places       LONG
-Digits       LONG
+Digits       LONG        ! DECIMAL: the packed STORAGE BYTE count from the definition, not a digit count; the decoded digit count is Size (= 2*Digits-1)
 Fields       LONG        ! GROUP member count (all nesting)
 Dim2         LONG        ! second extent for DIM(a,b), 0 otherwise
 IsPacked     BYTE        ! PDECIMAL, per Task 4 reconciliation
