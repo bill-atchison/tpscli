@@ -28,6 +28,7 @@ $holdExe = Join-Path $root 'tests\hold.exe'
 
 $timeoutMs = 60000
 $failures = 0
+$skips = 0
 $notes = New-Object System.Collections.ArrayList
 
 # testdata\SECRET.TPS is the corpus's encrypted file; its owner string is baked into
@@ -41,6 +42,15 @@ function Step-Pass([string]$name, [string]$detail) {
 function Step-Fail([string]$name, [string]$detail) {
     Write-Host ("FAIL  {0} - {1}" -f $name, $detail)
     $script:failures++
+}
+
+# A step that did not run is a SKIP, never a PASS. Spec section 7 makes this script the release
+# gate over the dtpos corpus, and a default run (no -Extra/-Expected/-TpsFixLog) exercises
+# neither the real files nor the dictionary parity nor the TPSFix report. Printing PASS for
+# those made a run that covers four of the six checks read as a full release qualification.
+function Step-Skip([string]$name, [string]$detail) {
+    Write-Host ("SKIP  {0}{1}" -f $name, $(if ($detail) { " - $detail" } else { '' }))
+    $script:skips++
 }
 
 function Note([string]$text) {
@@ -587,7 +597,7 @@ function Step4-Parity {
     $name = 'step 4 dictionary parity'
     if ($Expected -eq '') {
         if ($Extra -ne '') { Note 'no -Expected folder given, so dictionary parity was not checked' }
-        Step-Pass $name 'skipped (no -Expected folder)'
+        Step-Skip $name 'no -Expected folder given'
         return
     }
     $checked = 0
@@ -664,7 +674,7 @@ function Step5-Keys {
 
     $name = 'step 5 TPSFix log'
     if ($Extra -eq '') {
-        Step-Pass $name 'skipped (no -Extra folder)'
+        Step-Skip $name 'no -Extra folder given'
         return
     }
     if ($TpsFixLog -eq '') { Step-Fail $name '-Extra was given without -TpsFixLog'; return }
@@ -835,5 +845,9 @@ if ($failures -gt 0) {
     Write-Host "verify.ps1: $failures step(s) FAILED"
     exit 1
 }
-Write-Host 'verify.ps1: all steps PASS'
+if ($skips -gt 0) {
+    Write-Host "verify.ps1: all steps PASS ($skips skipped - not a release qualification)"
+} else {
+    Write-Host 'verify.ps1: all steps PASS'
+}
 exit 0

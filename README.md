@@ -70,7 +70,8 @@ The `WHERE` grammar, and what each piece becomes as a Clarion filter expression:
 Column names are resolved against the file's schema before anything runs. An unknown column is
 a parse-time error naming the column and listing the valid ones. Group members are addressed
 with dots, array elements with brackets, and each dimension is indexed at the component that
-owns it: `ADDR.CITY`, `QTY[3]`, `ADDR[2].CITY`, `GRID[2][3]`. Subscripts are 1-based. In a
+owns it: `ADDR.CITY`, `QTY[3]`, `ADDR[2].CITY`. Subscripts are 1-based, and one subscript per
+component: a `DIM(a,b)` field takes a single flat index, not `GRID[2][3]` (see Deviations). In a
 `SELECT` list, naming a group or a whole array expands to its scalar leaves in declaration
 order, and `*` uses the same expansion. Assignments in `INSERT` and `SET` must address
 individual leaves. Missing, extra or out-of-range subscripts are rejected before anything is
@@ -208,6 +209,21 @@ behaviour a caller can see, not an internal note.
   that writing `'rrr'` to it is refused.
 - **`DECIMAL` output trims trailing fraction zeros.** `10.00` in a `DECIMAL(7,2)` prints `"10"`,
   and zero prints `"0"`.
+- **An even-digit `DECIMAL` is reported one digit too wide, and cannot be otherwise.** The stored
+  definition records the packed storage-byte count, not the declared digit count, so the digit
+  count is recovered as `2*bytes-1`. That is exact for an odd width and one too many for an even
+  one: a `DECIMAL(6,2)` occupies the same four bytes as a `DECIMAL(7,2)` and the two are
+  indistinguishable in the file. `DESCRIBE` therefore reports `"size": 7` for a `DECIMAL(6,2)`,
+  which will show as a difference against a dictionary export, and literal validation accepts one
+  digit more than the owning application can read back. There is no fix available from the file
+  alone. The corpus has only odd-width DECIMAL fields, so the
+  `verify.ps1 -Extra -Expected` run against real dtpos files is where this first becomes visible.
+- **`DIM(a,b)` is flattened to a single extent.** A two-dimensional array is reported and
+  addressed as one dimension of `a*b`: `GROUPS.GRID`, declared `DIM(2,3)`, expands to `GRID[1]`
+  through `GRID[6]` and `DESCRIBE` reports `"dim": 6` where a dictionary export says 2,3. A
+  second subscript is rejected with `UNKNOWN_COLUMN` (`GRID does not have a second dimension`);
+  use the flat index instead. The parser never sets a second extent, so the two-subscript form
+  the WHERE and SELECT grammar can express is unreachable on every file.
 - **`INSERT`/`UPDATE` literal validation happens at parse time**, so a `VALUE_OUT_OF_RANGE` for a
   bad literal carries the parser's error shape (`position` and `token`) and `outcome: "none"`.
 - **Inside an open transaction every failure exits 3**, including a runtime rejection of the
@@ -267,3 +283,8 @@ and every verdict comes from its own comparisons rather than from the exe's exit
 `-Extra <dir>` points at a folder of real-world `.TPS` files, which are never committed; it
 requires `-TpsFixLog`. `-Expected <dir>` adds dictionary parity for those files against
 oracle-format JSON exports.
+
+Without those three options the dictionary-parity and TPSFix steps do not run. They print
+`SKIP`, not `PASS`, and the closing line says how many were skipped:
+`all steps PASS (2 skipped - not a release qualification)`. A run that qualifies a release is
+the one with all three options given against real files, where nothing is skipped.

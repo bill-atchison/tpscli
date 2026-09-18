@@ -84,7 +84,6 @@ Load         PROCEDURE(STRING path, STRING owner),LONG
 U8           PROCEDURE(LONG o),LONG
 U16          PROCEDURE(LONG o),LONG
 U32          PROCEDURE(LONG o),LONG          ! LE, may be negative
-BE32         PROCEDURE(LONG o),LONG
 ZStr         PROCEDURE(*LONG o),STRING       ! reads zero-terminated, advances o
 Decrypt      PROCEDURE(STRING owner)
 Decrypt64    PROCEDURE(LONG o)

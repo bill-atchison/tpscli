@@ -1,10 +1,8 @@
   MEMBER()
   INCLUDE('tpsSchema.inc'),ONCE
   MAP
-    SchFieldOffsetEnd(tpsSchema s, LONG i),LONG
-    SchFieldOffsetOf(tpsSchema s, LONG i),LONG
-    SchEmitFields(tpsSchema s, StringTheory js, LONG parentNbr, STRING dotted)
-    SchEmitOneField(tpsSchema s, StringTheory js, LONG idx, STRING dotted)
+    SchEmitFields(tpsSchema s, tpsOut o, StringTheory js, LONG parentNbr, STRING dotted)
+    SchEmitOneField(tpsSchema s, tpsOut o, StringTheory js, LONG idx, STRING dotted)
   END
 Kw    LONG,DIM(16)          ! decryption key schedule, module static (OVER is not allowed on class members)
 Kb    STRING(64),OVER(Kw)
@@ -52,13 +50,6 @@ s  STRING(4),OVER(v)
   CODE
   IF o < 0 OR o+4 > SELF.size THEN SELF.Overrun = 1; RETURN 0.
   s = SELF.buf[o+1 : o+4]
-  RETURN v
-
-tpsSchema.BE32 PROCEDURE(LONG o)
-v  LONG
-s  STRING(4),OVER(v)
-  CODE
-  s = SELF.buf[o+4] & SELF.buf[o+3] & SELF.buf[o+2] & SELF.buf[o+1]
   RETURN v
 
 tpsSchema.ZStr PROCEDURE(*LONG o)
@@ -304,16 +295,6 @@ merged   StringTheory
 
 ! ---- Task 4: definition parser and DESCRIBE parity ----
 
-SchFieldOffsetEnd PROCEDURE(tpsSchema s, LONG i)
-  CODE
-  GET(s.Fields, i)
-  RETURN s.Fields.Offset + s.Fields.Bytes
-
-SchFieldOffsetOf PROCEDURE(tpsSchema s, LONG i)
-  CODE
-  GET(s.Fields, i)
-  RETURN s.Fields.Offset
-
 tpsSchema.Parse PROCEDURE()
 o       LONG
 nF      LONG
@@ -548,7 +529,7 @@ first BYTE
     & ', "encrypted": ' & CHOOSE(SELF.Encrypted = 1, 'true', 'false'))
   IF records >= 0 THEN js.Append(', "records": ' & records).
   js.Append(', "columns": [')
-  SchEmitFields(SELF, js, 0, '')
+  SchEmitFields(SELF, o, js, 0, '')
   IF RECORDS(SELF.Fields) > 0 AND RECORDS(SELF.Memos) > 0 THEN js.Append(',').
   LOOP i = 1 TO RECORDS(SELF.Memos)
     GET(SELF.Memos, i)
@@ -581,7 +562,7 @@ first BYTE
   js.Append('], "complete": true }')
   RETURN js.GetValue()
 
-SchEmitFields PROCEDURE(tpsSchema s, StringTheory js, LONG parentNbr, STRING dotted)
+SchEmitFields PROCEDURE(tpsSchema s, tpsOut o, StringTheory js, LONG parentNbr, STRING dotted)
 i     LONG
 first BYTE
   CODE
@@ -591,17 +572,22 @@ first BYTE
     IF s.Fields.Parent <> parentNbr THEN CYCLE.
     IF NOT first THEN js.Append(',').
     first = 0
-    SchEmitOneField(s, js, i, dotted)
+    SchEmitOneField(s, o, js, i, dotted)
   END
 
-SchEmitOneField PROCEDURE(tpsSchema s, StringTheory js, LONG idx, STRING dotted)
-name STRING(80)
+! The dotted path is built in a StringTheory and escaped through o.JStr, like every other
+! file-derived name in the response. It was plain concatenation into a STRING(80): a label
+! carrying a quote, a backslash or a byte >= 127 - all of which the definition parser accepts,
+! since it reads bytes from an arbitrary file - produced invalid JSON, and a long nested path
+! was silently truncated (final-review I11).
+SchEmitOneField PROCEDURE(tpsSchema s, tpsOut o, StringTheory js, LONG idx, STRING dotted)
+name StringTheory
 nbr  LONG
   CODE
   GET(s.Fields, idx)
   nbr = s.Fields.Nbr
-  name = CHOOSE(dotted = '', CLIP(s.Fields.Label), CLIP(dotted) & '.' & CLIP(s.Fields.Label))
-  js.Append('{{"name":"' & CLIP(name) & '","type":"' & CLIP(s.Fields.Type) & '"')
+  name.SetValue(CHOOSE(dotted = '', CLIP(s.Fields.Label), CLIP(dotted) & '.' & CLIP(s.Fields.Label)))
+  js.Append('{{"name":' & o.JStr(name.GetValue()) & ',"type":' & o.JStr(CLIP(s.Fields.Type)))
   IF s.Fields.Elements > 1 THEN js.Append(',"dim":' & s.Fields.Elements).
   CASE s.Fields.Type
   OF 'DECIMAL'
@@ -610,7 +596,7 @@ nbr  LONG
     js.Append(',"size":' & s.Fields.Size)
   OF 'GROUP'
     js.Append(',"members":[')
-    SchEmitFields(s, js, nbr, name)
+    SchEmitFields(s, o, js, nbr, name.GetValue())
     js.Append(']')
   END
   js.Append('}')
