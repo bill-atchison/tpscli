@@ -791,6 +791,8 @@ outLine  StringTheory
         ! REGET failure - including 35, the row another process removed between the two passes -
         ! fails the statement with a rollback, exactly as the spec requires.
         pk = cands.RowId
+        ! 43 means our own HOLD never took, so there is nothing of ours to release; calling
+        ! RELEASE here would target the other process's hold on the same record.
         IF e <> 43 THEN RELEASE(SELF.Sch.F).
         oc = SELF.Undo(); POPBIND
         extra.SetValue('"row": ' & SELF.Out.JStr(CLIP(pk)))
@@ -808,8 +810,11 @@ outLine  StringTheory
       IF r = 2
         RELEASE(SELF.Sch.F); oc = SELF.Undo(); POPBIND
         top.SetValue(CLIP('"matched": ' & RECORDS(cands) & CHOOSE(oc = 'rolled_back', ', "affected": 0', '')))
+        ! Exit 3, not the 1 a SYNTAX failure carries before execution starts: spec section 8 defines
+        ! exit 1 as "No data was modified", and inside an open transaction only a confirmed
+        ! rolled_back could promise that - an outcome of "unknown" could not.
         RETURN SELF.ErrOut(opName, 'SYNTAX', 'Runtime rejected the filter expression: ' & CLIP(SELF.Sql.Where), |
-                           oc, 1, '', top.GetValue())
+                           oc, 3, '', top.GetValue())
       END
       IF r = 0 THEN RELEASE(SELF.Sch.F); CYCLE.  ! changed under us, no longer matches: counts in matched only
 
@@ -825,8 +830,10 @@ outLine  StringTheory
           RELEASE(SELF.Sch.F); oc = SELF.Undo(); POPBIND
           extra.SetValue('"column": ' & SELF.Out.JStr(CLIP(SELF.ErrCol)))
           top.SetValue(CLIP('"matched": ' & RECORDS(cands) & CHOOSE(oc = 'rolled_back', ', "affected": 0', '')))
-          exitCode = CHOOSE(SELF.ErrCode = 'VALUE_OUT_OF_RANGE', 3, 1)
-          RETURN SELF.ErrOut(opName, SELF.ErrCode, SELF.ErrMsg, oc, exitCode, extra.GetValue(), top.GetValue())
+          ! Always exit 3, even for the UNSUPPORTED that Assign raises on an unreachable BLOB: the
+          ! transaction is already open, so this is a runtime failure, not the pre-execution exit 1
+          ! that spec section 8 defines as "No data was modified".
+          RETURN SELF.ErrOut(opName, SELF.ErrCode, SELF.ErrMsg, oc, 3, extra.GetValue(), top.GetValue())
         END
         PUT(SELF.Sch.F)
       END
