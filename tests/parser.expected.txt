@@ -139,3 +139,15 @@ EXIT=1
 SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE GROUP = 1
 { "ok": false, "op": "select", "error": { "code": "UNKNOWN_COLUMN", "message": "Unknown column GROUP; valid columns: ID, B, S, US, UL, SR, R, D, DT, TM, STR, CSTR, PSTR, PIC, ARR", "position": 46, "token": "GROUP", "column": "GROUP" }, "outcome": "none", "complete": true }
 EXIT=1
+SELECT ID FROM [testdata\MEMOS.TPS] WHERE NOTES = 1
+{ "ok": false, "op": "select", "error": { "code": "VALUE_OUT_OF_RANGE", "message": "NOTES requires a string literal", "position": 51, "token": "1", "column": "NOTES" }, "outcome": "none", "complete": true }
+EXIT=3
+SELECT ID FROM [testdata\MEMOS.TPS] ORDER BY NOTES
+{ "ok": false, "op": "select", "error": { "code": "UNSUPPORTED", "message": "ORDER BY is not supported for a MEMO or BLOB column (NOTES)", "position": 46, "token": "NOTES" }, "outcome": "none", "complete": true }
+EXIT=1
+SELECT COUNT FROM [testdata\ALLTYPES.TPS]
+{ "ok": false, "op": "select", "error": { "code": "UNKNOWN_COLUMN", "message": "Unknown column COUNT; valid columns: ID, B, S, US, UL, SR, R, D, DT, TM, STR, CSTR, PSTR, PIC, ARR", "position": 8, "token": "COUNT", "column": "COUNT" }, "outcome": "none", "complete": true }
+EXIT=1
+SELECT MAX(ID) FROM [testdata\ALLTYPES.TPS]
+{ "ok": false, "op": "select", "error": { "code": "UNSUPPORTED", "message": "Aggregate functions are not supported (MAX)", "position": 8, "token": "MAX" }, "outcome": "none", "complete": true }
+EXIT=1

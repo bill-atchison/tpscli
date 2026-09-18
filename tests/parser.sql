@@ -128,3 +128,16 @@ SELECT ID FROM [testdata\ALLTYPES.TPS] GROUP BY ID
 
 -- a bare GROUP is resolved as a column reference (not a reserved word by itself)
 SELECT ID FROM [testdata\ALLTYPES.TPS] WHERE GROUP = 1
+
+-- a memo column's literal is typed from the memo, not from whatever field the last Fields scan
+-- left in the queue buffer (a memo has no Fields entry at all)
+SELECT ID FROM [testdata\MEMOS.TPS] WHERE NOTES = 1
+
+-- ORDER BY on a memo is refused, not silently ignored
+SELECT ID FROM [testdata\MEMOS.TPS] ORDER BY NOTES
+
+-- COUNT in a column position is a column name, not an aggregate: it reaches column resolution
+SELECT COUNT FROM [testdata\ALLTYPES.TPS]
+
+-- COUNT followed by '(' is still the aggregate
+SELECT MAX(ID) FROM [testdata\ALLTYPES.TPS]

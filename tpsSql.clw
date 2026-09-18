@@ -3,12 +3,14 @@
   MAP
     SqlAllDigits(STRING s),BYTE
     SqlEscapeStr(STRING s),STRING
-    SqlUnsupportedWord(STRING w, STRING nextTok),STRING
-    SqlLitConvert(tpsSql s, LONG fieldNbr, BYTE kind, STRING rawText, BYTE neg, StringTheory outp),LONG
+    SqlUnsupportedWord(STRING w, STRING nextTok, BYTE atColumnPos),STRING
+    SqlLitConvert(tpsSql s, LONG fieldNbr, LONG memoNbr, BYTE kind, STRING rawText, BYTE neg, StringTheory outp),LONG
     SqlCurPos(tpsSql s),LONG
     SqlPeekNext(tpsSql s),STRING
     SqlRequireLeaf(tpsSql s, ColQ c),LONG
-    SqlCaptureValue(tpsSql s, LONG fieldNbr),LONG
+    SqlCaptureValue(tpsSql s, LONG fieldNbr, LONG memoNbr),LONG
+    SqlTokAdd(tpsSql s, BYTE kind, STRING txt, LONG pos)
+    SqlTokFree(tpsSql s)
   END
 
 ! ---- construction ----
@@ -27,6 +29,7 @@ i  LONG
     GET(SELF.Vals, i)
     IF NOT SELF.Vals.Text &= NULL THEN DISPOSE(SELF.Vals.Text).
   END
+  SqlTokFree(SELF)
   DISPOSE(SELF.Toks); DISPOSE(SELF.Cols); DISPOSE(SELF.Vals); DISPOSE(SELF.Order)
 
 tpsSql.Fail PROCEDURE(STRING code, STRING msg)
@@ -42,12 +45,11 @@ i      LONG
 start  LONG
 c      BYTE
 c2     BYTE
-pathTxt STRING(1024)
 closeAt LONG
 lastWasPathKw BYTE
 str     StringTheory
   CODE
-  FREE(SELF.Toks)
+  SqlTokFree(SELF)
   n = LEN(sql)
   i = 1
   LOOP WHILE i <= n
@@ -62,8 +64,7 @@ str     StringTheory
         IF NOT ((c >= 65 AND c <= 90) OR (c >= 97 AND c <= 122) OR (c >= 48 AND c <= 57) OR c = 95) THEN BREAK.
         i += 1
       END
-      CLEAR(SELF.Toks); SELF.Toks.Kind = TK:Ident; SELF.Toks.Text = UPPER(sql[start : i-1]); SELF.Toks.Pos = start
-      ADD(SELF.Toks)
+      SqlTokAdd(SELF, TK:Ident, UPPER(sql[start : i-1]), start)
       CYCLE
     END
     IF c >= 48 AND c <= 57                    ! digit: [0-9]+(\.[0-9]+)?
@@ -72,8 +73,7 @@ str     StringTheory
         i += 1
         LOOP WHILE i <= n AND VAL(sql[i]) >= 48 AND VAL(sql[i]) <= 57; i += 1; END
       END
-      CLEAR(SELF.Toks); SELF.Toks.Kind = TK:Num; SELF.Toks.Text = sql[start : i-1]; SELF.Toks.Pos = start
-      ADD(SELF.Toks)
+      SqlTokAdd(SELF, TK:Num, sql[start : i-1], start)
       CYCLE
     END
     IF c = 39                                  ! ' - string literal, doubled '' escapes
@@ -93,8 +93,7 @@ str     StringTheory
         END
         str.Append(sql[i]); i += 1
       END
-      CLEAR(SELF.Toks); SELF.Toks.Kind = TK:Str; SELF.Toks.Text = str.GetValue(); SELF.Toks.Pos = start
-      ADD(SELF.Toks)
+      SqlTokAdd(SELF, TK:Str, str.GetValue(), start)
       CYCLE
     END
     IF c = 91                                  ! [ - bracket path or plain op
@@ -111,14 +110,11 @@ str     StringTheory
           SELF.ErrPos = start; SELF.ErrToken = '['
           RETURN SELF.Fail('SYNTAX', 'Unterminated bracket path')
         END
-        pathTxt = sql[i+1 : closeAt-1]
-        CLEAR(SELF.Toks); SELF.Toks.Kind = TK:Path; SELF.Toks.Text = pathTxt; SELF.Toks.Pos = start
-        ADD(SELF.Toks)
+        SqlTokAdd(SELF, TK:Path, sql[i+1 : closeAt-1], start)
         i = closeAt + 1
         CYCLE
       END
-      CLEAR(SELF.Toks); SELF.Toks.Kind = TK:Op; SELF.Toks.Text = '['; SELF.Toks.Pos = start
-      ADD(SELF.Toks)
+      SqlTokAdd(SELF, TK:Op, '[', start)
       i += 1
       CYCLE
     END
@@ -132,25 +128,21 @@ str     StringTheory
     ! two-char ops
     c2 = CHOOSE(i+1 <= n, VAL(sql[i+1]), 0)
     IF (c = 60 AND c2 = 62) OR (c = 33 AND c2 = 61) OR (c = 60 AND c2 = 61) OR (c = 62 AND c2 = 61)   ! <> != <= >=
-      CLEAR(SELF.Toks); SELF.Toks.Kind = TK:Op; SELF.Toks.Text = sql[i : i+1]; SELF.Toks.Pos = start
-      ADD(SELF.Toks)
+      SqlTokAdd(SELF, TK:Op, sql[i : i+1], start)
       i += 2; CYCLE
     END
     IF c = 61 OR c = 60 OR c = 62 OR c = 40 OR c = 41 OR c = 44 OR c = 46 OR c = 93 OR c = 42
-      CLEAR(SELF.Toks); SELF.Toks.Kind = TK:Op; SELF.Toks.Text = sql[i]; SELF.Toks.Pos = start
-      ADD(SELF.Toks)
+      SqlTokAdd(SELF, TK:Op, sql[i], start)
       i += 1; CYCLE
     END
     IF c = 43 OR c = 45 OR c = 47               ! + - /  (unary '-' handled by callers; these are always their own op)
-      CLEAR(SELF.Toks); SELF.Toks.Kind = TK:Op; SELF.Toks.Text = sql[i]; SELF.Toks.Pos = start
-      ADD(SELF.Toks)
+      SqlTokAdd(SELF, TK:Op, sql[i], start)
       i += 1; CYCLE
     END
     SELF.ErrPos = start; SELF.ErrToken = sql[i]
     RETURN SELF.Fail('SYNTAX', 'Unexpected character ' & sql[i] & ' at position ' & start)
   END
-  CLEAR(SELF.Toks); SELF.Toks.Kind = TK:Eof; SELF.Toks.Text = ''; SELF.Toks.Pos = n+1
-  ADD(SELF.Toks)
+  SqlTokAdd(SELF, TK:Eof, '', n+1)
   RETURN 0
 
 ! ---- token stream helpers ----
@@ -159,7 +151,8 @@ tpsSql.Peek PROCEDURE()
   CODE
   IF SELF.Cur > RECORDS(SELF.Toks) THEN RETURN ''.
   GET(SELF.Toks, SELF.Cur)
-  RETURN CLIP(SELF.Toks.Text)
+  IF SELF.Toks.Len = 0 THEN RETURN ''.
+  RETURN SELF.Toks.Text[1 : SELF.Toks.Len]
 
 tpsSql.PeekKind PROCEDURE()
   CODE
@@ -167,14 +160,16 @@ tpsSql.PeekKind PROCEDURE()
   GET(SELF.Toks, SELF.Cur)
   RETURN SELF.Toks.Kind
 
+! Returns the token's exact bytes - no CLIP. A string literal's trailing spaces are data for a
+! MEMO or BLOB column, and SqlTokAdd already stores every token at its true length, so there is
+! no padding here to strip (spec section 5: a literal is written as given, or refused).
 tpsSql.Take PROCEDURE()
-txt  STRING(1024)
   CODE
   IF SELF.Cur > RECORDS(SELF.Toks) THEN RETURN ''.
   GET(SELF.Toks, SELF.Cur)
-  txt = SELF.Toks.Text
   SELF.Cur += 1
-  RETURN CLIP(txt)
+  IF SELF.Toks.Len = 0 THEN RETURN ''.
+  RETURN SELF.Toks.Text[1 : SELF.Toks.Len]
 
 tpsSql.Expect PROCEDURE(STRING word)
 pos  LONG
@@ -463,10 +458,10 @@ tpsSql.FlatElem PROCEDURE(ColQ c, SchFieldQ f)
 
 ! ---- literal conversion ----
 
-tpsSql.Literal PROCEDURE(LONG fieldNbr)
+tpsSql.Literal PROCEDURE(LONG fieldNbr, LONG memoNbr)
 neg  BYTE
 kind BYTE
-raw  STRING(1024)
+raw  StringTheory
 pos  LONG
 conv StringTheory
   CODE
@@ -481,9 +476,9 @@ conv StringTheory
     RETURN ''
   END
   kind = SELF.PeekKind()
-  raw = SELF.Take()
-  IF SqlLitConvert(SELF, fieldNbr, kind, CLIP(raw), neg, conv) <> 0
-    SELF.ErrPos = pos; SELF.ErrToken = CHOOSE(neg, '-', '') & CLIP(raw)
+  raw.SetValue(SELF.Take())
+  IF SqlLitConvert(SELF, fieldNbr, memoNbr, kind, raw.GetValue(), neg, conv) <> 0
+    SELF.ErrPos = pos; SELF.ErrToken = CHOOSE(neg, '-', '') & raw.GetValue()
     RETURN ''
   END
   RETURN conv.GetValue()
@@ -584,12 +579,12 @@ rc         ColQ
 leftIsRef  BYTE
 rightIsRef BYTE
 leftKind   BYTE
-leftRaw    STRING(1024)
+leftRaw    StringTheory        ! never a fixed buffer: a WHERE literal past its width used to be
 leftNeg    BYTE
 leftPos    LONG
 rightNeg   BYTE
 rightKind  BYTE
-rightRaw   STRING(1024)
+rightRaw   StringTheory        ! silently cut, changing which rows matched (final-review C2)
 opTxt      STRING(4)
 pos        LONG
 inner      StringTheory
@@ -610,7 +605,7 @@ uw         STRING(64)
 
   leftPos = SqlCurPos(SELF)
   IF SELF.PeekKind() = TK:Ident
-    uw = SqlUnsupportedWord(SELF.Peek(), SqlPeekNext(SELF))
+    uw = SqlUnsupportedWord(SELF.Peek(), SqlPeekNext(SELF), 1)
     IF uw <> ''
       SELF.ErrPos = leftPos; SELF.ErrToken = SELF.Peek()
       SELF.Fail('UNSUPPORTED', uw)
@@ -634,7 +629,7 @@ uw         STRING(64)
       RETURN ''
     END
     leftKind = SELF.PeekKind()
-    leftRaw = SELF.Take()
+    leftRaw.SetValue(SELF.Take())
     leftIsRef = 0
   ELSE
     SELF.ErrPos = leftPos; SELF.ErrToken = CHOOSE(SELF.PeekKind() = TK:Eof, '<eof>', SELF.Peek())
@@ -678,7 +673,7 @@ uw         STRING(64)
     list.SetValue('')
     first = 1
     LOOP
-      inner.SetValue(SELF.Literal(lc.FieldNbr))
+      inner.SetValue(SELF.Literal(lc.FieldNbr, lc.MemoNbr))
       IF SELF.Err <> '' THEN RETURN ''.
       list.Append(CHOOSE(first, '', ',') & inner.GetValue())
       first = 0
@@ -711,7 +706,7 @@ uw         STRING(64)
 
   pos = SqlCurPos(SELF)
   IF SELF.PeekKind() = TK:Ident
-    uw = SqlUnsupportedWord(SELF.Peek(), SqlPeekNext(SELF))
+    uw = SqlUnsupportedWord(SELF.Peek(), SqlPeekNext(SELF), 1)
     IF uw <> ''
       SELF.ErrPos = pos; SELF.ErrToken = SELF.Peek()
       SELF.Fail('UNSUPPORTED', uw)
@@ -739,13 +734,13 @@ uw         STRING(64)
   END
 
   IF leftIsRef
-    inner.SetValue(SELF.Literal(lc.FieldNbr))
+    inner.SetValue(SELF.Literal(lc.FieldNbr, lc.MemoNbr))
     IF SELF.Err <> '' THEN RETURN ''.
     RETURN CLIP(lc.Expr) & ' ' & CLIP(opTxt) & ' ' & inner.GetValue()
   END
   IF rightIsRef
-    IF SqlLitConvert(SELF, rc.FieldNbr, leftKind, CLIP(leftRaw), leftNeg, convL) <> 0
-      SELF.ErrPos = leftPos; SELF.ErrToken = CHOOSE(leftNeg, '-', '') & CLIP(leftRaw)
+    IF SqlLitConvert(SELF, rc.FieldNbr, rc.MemoNbr, leftKind, leftRaw.GetValue(), leftNeg, convL) <> 0
+      SELF.ErrPos = leftPos; SELF.ErrToken = CHOOSE(leftNeg, '-', '') & leftRaw.GetValue()
       RETURN ''
     END
     RETURN convL.GetValue() & ' ' & CLIP(opTxt) & ' ' & CLIP(rc.Expr)
@@ -757,16 +752,16 @@ uw         STRING(64)
     rightNeg = 1; SELF.Take()
   END
   rightKind = SELF.PeekKind()
-  rightRaw = SELF.Take()
+  rightRaw.SetValue(SELF.Take())
   IF rightKind <> leftKind
-    SELF.ErrPos = pos; SELF.ErrToken = CLIP(rightRaw)
+    SELF.ErrPos = pos; SELF.ErrToken = rightRaw.GetValue()
     SELF.Fail('SYNTAX', 'Comparing two literals requires matching kinds')
     RETURN ''
   END
   IF leftKind = TK:Num
-    RETURN CHOOSE(leftNeg, '-', '') & CLIP(leftRaw) & ' ' & CLIP(opTxt) & ' ' & CHOOSE(rightNeg, '-', '') & CLIP(rightRaw)
+    RETURN CHOOSE(leftNeg, '-', '') & leftRaw.GetValue() & ' ' & CLIP(opTxt) & ' ' & CHOOSE(rightNeg, '-', '') & rightRaw.GetValue()
   END
-  RETURN '''' & SqlEscapeStr(CLIP(leftRaw)) & '''' & ' ' & CLIP(opTxt) & ' ' & '''' & SqlEscapeStr(CLIP(rightRaw)) & ''''
+  RETURN '''' & SqlEscapeStr(leftRaw.GetValue()) & '''' & ' ' & CLIP(opTxt) & ' ' & '''' & SqlEscapeStr(rightRaw.GetValue()) & ''''
 
 ! ---- statement body: SELECT / INSERT / UPDATE / DELETE, after Sch is loaded ----
 
@@ -777,6 +772,7 @@ j      LONG
 w      STRING(24)
 uw     STRING(64)
 fnbr   LONG
+mnbr   LONG
 colPos LONG
   CODE
   SELF.Err = ''; SELF.ErrMsg = ''; SELF.ErrPos = 0; SELF.ErrToken = ''; SELF.ErrColumn = ''
@@ -792,7 +788,7 @@ colPos LONG
       SELF.Take(); SELF.Star = 1
     ELSE
       LOOP
-        uw = SqlUnsupportedWord(SELF.Peek(), SqlPeekNext(SELF))
+        uw = SqlUnsupportedWord(SELF.Peek(), SqlPeekNext(SELF), 1)
         IF SELF.PeekKind() = TK:Ident AND uw <> ''
           SELF.ErrPos = SqlCurPos(SELF); SELF.ErrToken = SELF.Peek()
           RETURN SELF.Fail('UNSUPPORTED', uw)
@@ -838,8 +834,8 @@ colPos LONG
         SELF.ErrPos = SqlCurPos(SELF); SELF.ErrToken = CHOOSE(SELF.PeekKind() = TK:Eof, '<eof>', SELF.Peek())
         RETURN SELF.Fail('SYNTAX', 'INSERT has more values than columns')
       END
-      GET(SELF.Cols, i); fnbr = SELF.Cols.FieldNbr
-      IF SqlCaptureValue(SELF, fnbr) <> 0 THEN RETURN 1.
+      GET(SELF.Cols, i); fnbr = SELF.Cols.FieldNbr; mnbr = SELF.Cols.MemoNbr
+      IF SqlCaptureValue(SELF, fnbr, mnbr) <> 0 THEN RETURN 1.
       IF SELF.Peek() = ',' THEN SELF.Take(); CYCLE.
       BREAK
     END
@@ -865,7 +861,7 @@ colPos LONG
       END
       IF SELF.Expect('=') <> 0 THEN RETURN 1.
       SELF.Cols = c; ADD(SELF.Cols)
-      IF SqlCaptureValue(SELF, c.FieldNbr) <> 0 THEN RETURN 1.
+      IF SqlCaptureValue(SELF, c.FieldNbr, c.MemoNbr) <> 0 THEN RETURN 1.
       IF SELF.Peek() = ',' THEN SELF.Take(); CYCLE.
       BREAK
     END
@@ -916,6 +912,12 @@ OrderByRoutine ROUTINE
         SELF.ErrPos = colPos; SELF.ErrToken = c.Path
         RETURN SELF.Fail('UNSUPPORTED', 'ORDER BY is not supported for a leaf inside a DIM''d GROUP (' & CLIP(c.Path) & ')')
       END
+      ! A memo/BLOB column has FieldNbr 0 and no record-buffer field to sort on, so it used to be
+      ! accepted and then silently ignored - rows came back ok: true in file order (I3).
+      IF c.MemoNbr > 0 OR c.FieldNbr < 1
+        SELF.ErrColumn = c.Path; SELF.ErrPos = colPos; SELF.ErrToken = c.Path
+        RETURN SELF.Fail('UNSUPPORTED', 'ORDER BY is not supported for a MEMO or BLOB column (' & CLIP(c.Path) & ')')
+      END
       CLEAR(SELF.Order)
       SELF.Order.FieldNbr = c.FieldNbr
       GET(SELF.Sch.Fields, c.FieldNbr)
@@ -951,7 +953,7 @@ LimitOffsetRoutine ROUTINE
   END
 
 TrailingRoutine ROUTINE
-  uw = SqlUnsupportedWord(SELF.Peek(), SqlPeekNext(SELF))
+  uw = SqlUnsupportedWord(SELF.Peek(), SqlPeekNext(SELF), 0)
   IF SELF.PeekKind() = TK:Ident AND uw <> ''
     SELF.ErrPos = SqlCurPos(SELF); SELF.ErrToken = SELF.Peek()
     RETURN SELF.Fail('UNSUPPORTED', uw)
@@ -962,6 +964,31 @@ TrailingRoutine ROUTINE
   END
 
 ! ---- private helpers (module-local, not on the class) ----
+
+! Appends one token, storing its text in a &STRING of exactly the token's length. The old
+! STRING(1024) field silently cut every literal longer than that: a MEMO was written short and a
+! BLOB's base64 was written as a different value, with no warning and exit 0 (final-review C2).
+! Len carries the true length because a zero-length token still needs a one-byte allocation.
+SqlTokAdd PROCEDURE(tpsSql s, BYTE kind, STRING txt, LONG pos)
+n  LONG
+  CODE
+  n = LEN(txt)
+  CLEAR(s.Toks)
+  s.Toks.Kind = kind
+  s.Toks.Len = n
+  s.Toks.Text &= NEW STRING(CHOOSE(n = 0, 1, n))
+  IF n > 0 THEN s.Toks.Text = txt.
+  s.Toks.Pos = pos
+  ADD(s.Toks)
+
+SqlTokFree PROCEDURE(tpsSql s)
+i  LONG
+  CODE
+  LOOP i = 1 TO RECORDS(s.Toks)
+    GET(s.Toks, i)
+    IF NOT s.Toks.Text &= NULL THEN DISPOSE(s.Toks.Text).
+  END
+  FREE(s.Toks)
 
 SqlCurPos PROCEDURE(tpsSql s)
   CODE
@@ -977,7 +1004,8 @@ SqlPeekNext PROCEDURE(tpsSql s)
   CODE
   IF s.Cur + 1 > RECORDS(s.Toks) THEN RETURN ''.
   GET(s.Toks, s.Cur + 1)
-  RETURN CLIP(s.Toks.Text)
+  IF s.Toks.Len = 0 THEN RETURN ''.
+  RETURN s.Toks.Text[1 : s.Toks.Len]
 
 SqlAllDigits PROCEDURE(STRING s)
 i LONG
@@ -999,10 +1027,23 @@ st StringTheory
   st.Replace('{{', '<123>')
   RETURN st.GetValue()
 
-SqlUnsupportedWord PROCEDURE(STRING w, STRING nextTok)
+! A reserved word is only reserved where it is syntactically a keyword. atColumnPos = 1 marks the
+! three places a bare identifier is a COLUMN NAME (the SELECT list and either side of a WHERE
+! comparison); there, JOIN/HAVING/DISTINCT/UNION/GROUP fall through to ordinary column
+! resolution, and an aggregate name is only an aggregate when '(' follows it - the same
+! one-token lookahead GROUP BY already used. Without this a TPS file with a column called COUNT
+! or MAX, which is not rare in a POS schema, could not be selected at all and there is no
+! quoted-identifier escape hatch (final-review I6).
+SqlUnsupportedWord PROCEDURE(STRING w, STRING nextTok, BYTE atColumnPos)
 u STRING(24)
   CODE
   u = UPPER(CLIP(w))
+  CASE u
+  OF 'COUNT' OROF 'SUM' OROF 'MIN' OROF 'MAX' OROF 'AVG'
+    IF CLIP(nextTok) <> '(' THEN RETURN ''.
+    RETURN 'Aggregate functions are not supported (' & CLIP(u) & ')'
+  END
+  IF atColumnPos THEN RETURN ''.
   CASE u
   OF 'JOIN'     ; RETURN 'JOIN is not supported'
   OF 'GROUP'
@@ -1011,11 +1052,6 @@ u STRING(24)
   OF 'HAVING'   ; RETURN 'HAVING is not supported'
   OF 'DISTINCT' ; RETURN 'DISTINCT is not supported'
   OF 'UNION'    ; RETURN 'UNION is not supported'
-  OF 'COUNT'    ; RETURN 'Aggregate functions are not supported (COUNT)'
-  OF 'SUM'      ; RETURN 'Aggregate functions are not supported (SUM)'
-  OF 'MIN'      ; RETURN 'Aggregate functions are not supported (MIN)'
-  OF 'MAX'      ; RETURN 'Aggregate functions are not supported (MAX)'
-  OF 'AVG'      ; RETURN 'Aggregate functions are not supported (AVG)'
   END
   RETURN ''
 
@@ -1033,13 +1069,14 @@ SqlRequireLeaf PROCEDURE(tpsSql s, ColQ c)
   END
   RETURN 0
 
-SqlCaptureValue PROCEDURE(tpsSql s, LONG fieldNbr)
+SqlCaptureValue PROCEDURE(tpsSql s, LONG fieldNbr, LONG memoNbr)
 neg  BYTE
 kind BYTE
-raw  STRING(1024)
+raw  StringTheory
 pos  LONG
 conv StringTheory
-full STRING(1024)
+full StringTheory
+n    LONG
   CODE
   pos = SqlCurPos(s)
   neg = 0
@@ -1051,24 +1088,27 @@ full STRING(1024)
     RETURN s.Fail('SYNTAX', 'Expected a literal value')
   END
   kind = s.PeekKind()
-  raw = s.Take()
-  IF SqlLitConvert(s, fieldNbr, kind, CLIP(raw), neg, conv) <> 0
-    s.ErrPos = pos; s.ErrToken = CHOOSE(neg, '-', '') & CLIP(raw)
+  raw.SetValue(s.Take())
+  IF SqlLitConvert(s, fieldNbr, memoNbr, kind, raw.GetValue(), neg, conv) <> 0
+    s.ErrPos = pos; s.ErrToken = CHOOSE(neg, '-', '') & raw.GetValue()
     RETURN 1
   END
-  full = CHOOSE(neg, '-', '') & CLIP(raw)
+  ! Length from the StringTheory, never LEN(CLIP(...)): a MEMO or BLOB literal's trailing spaces
+  ! are data, and clipping them here wrote a shorter value than the caller asked for.
+  full.SetValue(CHOOSE(neg, '-', '') & raw.GetValue())
+  n = full.Length()
   CLEAR(s.Vals)
   s.Vals.Kind = kind
-  s.Vals.Text &= NEW STRING(CHOOSE(LEN(CLIP(full)) = 0, 1, LEN(CLIP(full))))
-  s.Vals.Text = full
-  s.Vals.Len = LEN(CLIP(full))
+  s.Vals.Text &= NEW STRING(CHOOSE(n = 0, 1, n))
+  IF n > 0 THEN s.Vals.Text = full.GetValue().
+  s.Vals.Len = n
   ADD(s.Vals)
   RETURN 0
 
 ! typed literal -> Clarion expression text. rawText/neg are the already-tokenized literal
 ! (never re-reads the token stream), so it serves both Literal() (WHERE) and SqlCaptureValue
 ! (INSERT/UPDATE values), and the literal-first branch of ExprCmp ('1 = 1', 'literal op ref').
-SqlLitConvert PROCEDURE(tpsSql s, LONG fieldNbr, BYTE kind, STRING rawText, BYTE neg, StringTheory outp)
+SqlLitConvert PROCEDURE(tpsSql s, LONG fieldNbr, LONG memoNbr, BYTE kind, STRING rawText, BYTE neg, StringTheory outp)
 typ    STRING(12)
 label  STRING(64)
 places LONG
@@ -1087,6 +1127,20 @@ minV   REAL
 maxV   REAL
 usedDigits LONG
   CODE
+  ! A memo or BLOB column has no entry in Sch.Fields at all - ColQ.FieldNbr is 0 for one - so
+  ! GET(Fields, 0) used to fail and leave the queue buffer holding whatever the last scan put
+  ! there (the file's LAST field), typing the literal from an unrelated column and naming that
+  ! column in the error (final-review I3). The label lives in Sch.Memos instead.
+  IF fieldNbr < 1
+    GET(s.Sch.Memos, memoNbr)
+    label = s.Sch.Memos.Label
+    IF kind <> TK:Str
+      s.ErrColumn = label
+      RETURN s.Fail('VALUE_OUT_OF_RANGE', CLIP(label) & ' requires a string literal')
+    END
+    outp.SetValue('''' & SqlEscapeStr(rawText) & '''')
+    RETURN 0
+  END
   GET(s.Sch.Fields, fieldNbr)
   typ = s.Sch.Fields.Type; label = s.Sch.Fields.Label
   ! SchFieldQ.Size (not .Digits!) holds the true total digit count for a DECIMAL field - Build()

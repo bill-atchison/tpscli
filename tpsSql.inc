@@ -18,7 +18,8 @@ OP:Delete   EQUATE(5)
 
 TokQ      QUEUE,TYPE
 Kind        BYTE
-Text        STRING(1024)
+Text        &STRING                ! exact-length token text, NEW'd by SqlTokAdd, disposed in SqlTokFree
+Len         LONG                   ! true length of Text; 0 means the empty token, Text is then a 1-byte placeholder
 Pos         LONG
           END
 ColQ      QUEUE,TYPE               ! a resolved column reference
@@ -78,7 +79,7 @@ Expr        PROCEDURE(),STRING                ! OR level
 ExprAnd     PROCEDURE(),STRING
 ExprNot     PROCEDURE(),STRING
 ExprCmp     PROCEDURE(),STRING
-Literal     PROCEDURE(LONG fieldNbr),STRING   ! typed literal to Clarion expression text
+Literal     PROCEDURE(LONG fieldNbr, LONG memoNbr),STRING   ! typed literal to Clarion expression text
 ValidDate   PROCEDURE(STRING s, *LONG clarionDate),BYTE   ! strict YYYY-MM-DD, year 1801..2999, round-trips Y/M/D
 ValidTime   PROCEDURE(STRING s, *LONG clarionTime),BYTE   ! HH:MM[:SS[.hh]], all digits, in range
 FlatElem    PROCEDURE(ColQ c, SchFieldQ f),LONG       ! single WHAT element index from GrpElem/Elem/Elem2
