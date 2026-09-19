@@ -186,14 +186,14 @@
             <tr><td><code>tps_version</code></td><td>none</td><td><code>tpscli.exe --version</code>. Returns <code>{ server: "&lt;package version&gt;", exe: &lt;the exe's version object&gt; }</code>.</td></tr>
             <tr><td><code>tps_list_files</code></td><td><code>pattern?</code> (glob on the file name, default <code>*.TPS</code>, case-insensitive)</td><td>No exe. Lists matching files directly inside each <code>--root</code> folder (no recursion): <code>{ files: [{ name, path, size, modified }] }</code>, sorted by path. <code>NO_ROOT</code> when the server has no roots.</td></tr>
             <tr><td><code>tps_describe</code></td><td><code>file</code>, <code>owner?</code></td><td><code>DESCRIBE [file]</code></td></tr>
-            <tr><td><code>tps_select</code></td><td><code>file</code>, <code>columns?</code> (string[]; default all), <code>where?</code>, <code>order_by?</code>, <code>limit?</code>, <code>offset?</code>, <code>format?</code>, <code>owner?</code></td><td>Built <code>SELECT</code>. <code>limit</code> omitted means the CLI's default cap of 1000; <code>limit: 0</code> means no cap, as in the CLI.</td></tr>
+            <tr><td><code>tps_select</code></td><td><code>file</code>, <code>columns?</code> (string[]; default all), <code>where?</code>, <code>order_by?</code>, <code>limit?</code>, <code>offset?</code>, <code>format?</code>, <code>owner?</code></td><td>Built <code>SELECT</code>. <code>limit</code> omitted means the CLI's default cap of 1000; <code>limit: 0</code> means no cap, as in the CLI. <code>offset</code> requires <code>limit</code> (the dialect has <code>OFFSET</code> only inside <code>LIMIT</code>); the schema rejects it alone and the message says to pass <code>limit: 0</code> for no cap.</td></tr>
             <tr><td><code>tps_insert</code></td><td><code>file</code>, <code>values</code> (object, column &rarr; value, at least one), <code>owner?</code></td><td>Built <code>INSERT</code></td></tr>
             <tr><td><code>tps_update</code></td><td><code>file</code>, <code>set</code> (object, at least one), <code>where</code> (required), <code>owner?</code></td><td>Built <code>UPDATE</code></td></tr>
             <tr><td><code>tps_delete</code></td><td><code>file</code>, <code>where</code> (required), <code>owner?</code></td><td>Built <code>DELETE</code></td></tr>
             <tr><td><code>tps_query</code></td><td><code>sql</code>, <code>owner?</code>, <code>limit_default?</code>, <code>parse_only?</code>, <code>format?</code></td><td>The statement verbatim, with <code>--limit-default N</code>, <code>--parse-only</code> and <code>--table</code> added as given. No path resolution.</td></tr>
           </tbody>
         </table>
-        <p><code>format</code> is <code>"json"</code> (default) or <code>"table"</code>. <code>where</code> and <code>order_by</code> are raw fragments in the CLI's dialect (<code>ORDER BY</code> takes <code>col [ASC|DESC], ...</code>); the WHERE grammar is small enough that a JSON expression tree would add a second grammar without removing the first. Every tool description carries the three dialect facts the model needs without the README: paths go in square brackets, string literals use single quotes with <code>''</code> for an embedded quote, and <code>LIMIT 0</code> means no cap.</p>
+        <p><code>format</code> is <code>"json"</code> (default) or <code>"table"</code>. On <code>tps_query</code>, <code>"table"</code> with a statement that <code>classify()</code> reports as <code>INSERT</code>, <code>UPDATE</code> or <code>DELETE</code> is <code>INVALID_ARGUMENT</code>: the grid drops <code>outcome</code>, and a write's outcome is never dropped. <code>where</code> and <code>order_by</code> are raw fragments in the CLI's dialect (<code>ORDER BY</code> takes <code>col [ASC|DESC], ...</code>); the WHERE grammar is small enough that a JSON expression tree would add a second grammar without removing the first. Every tool description carries the three dialect facts the model needs without the README: paths go in square brackets, string literals use single quotes with <code>''</code> for an embedded quote, and <code>LIMIT 0</code> means no cap.</p>
 
         <h3>The file argument</h3>
         <p>A <code>file</code> that is absolute (drive letter or UNC) is used as given. Any other value is tried against each <code>--root</code> in order, and the first path that exists is used; with no roots, or no hit, the tool returns <code>FILE_NOT_FOUND</code> from the server before the exe runs, listing the folders tried. A resolved path that lies outside every root after normalisation (<code>..</code> segments) is refused with <code>FILE_NOT_FOUND</code> too: roots are a convenience for bare names, not a second way to spell an absolute path. The resolved path is what goes inside the brackets. Absolute paths are not sandboxed; that is a deliberate non-goal (section 10).</p>
@@ -206,12 +206,12 @@
           <thead><tr><th>Input</th><th>Rendered as</th></tr></thead>
           <tbody>
             <tr><td>file path</td><td><code>[C:\pos\data\ITEMS.TPS]</code>; always bracketed. A <code>]</code> in the path is rejected (<code>INVALID_ARGUMENT</code>) because the dialect has no escape for it.</td></tr>
-            <tr><td>column name</td><td>As given, after checking it matches <code>[A-Za-z_][A-Za-z0-9_:]*</code> (the CLI's identifier shape, colon for group members); anything else is <code>INVALID_ARGUMENT</code>. Unknown names are left to the exe's <code>UNKNOWN_COLUMN</code>, which lists the valid ones.</td></tr>
+            <tr><td>column name</td><td>As given, after checking it is a dotted path of identifiers, each with an optional integer subscript: <code>ID</code>, <code>ADDR.CITY</code>, <code>QTY[3]</code>, <code>ADDR[2].CITY</code> (regex <code>^[A-Za-z_]\w*(\[\d+\])?(\.[A-Za-z_]\w*(\[\d+\])?)*$</code>); anything else is <code>INVALID_ARGUMENT</code>. Subscript range, group expansion and write restrictions stay with the exe. Unknown names are left to the exe's <code>UNKNOWN_COLUMN</code>, which lists the valid ones.</td></tr>
             <tr><td>JSON string</td><td><code>'text'</code> with every <code>'</code> doubled.</td></tr>
-            <tr><td>JSON number</td><td>As JavaScript renders it. Non-finite is <code>INVALID_ARGUMENT</code>. Range and fraction errors are the exe's <code>VALUE_OUT_OF_RANGE</code>.</td></tr>
+            <tr><td>JSON number</td><td>Plain decimal notation, exactly as JSON spells it without an exponent: <code>12.5</code>, <code>-4</code>. A value whose JavaScript rendering contains <code>e</code>, a non-finite value, or an integer outside <code>Number.isSafeInteger</code> is <code>INVALID_ARGUMENT</code> (the dialect has no exponent form and the server will not round silently). Range and fraction errors for the column are the exe's <code>VALUE_OUT_OF_RANGE</code>.</td></tr>
             <tr><td>JSON boolean</td><td><code>1</code> / <code>0</code> (the dialect has no boolean literal; BYTE flags are numbers).</td></tr>
             <tr><td>JSON null</td><td><code>INVALID_ARGUMENT</code>: the dialect has no <code>NULL</code> (TopSpeed has no nulls). The message says to omit the column instead.</td></tr>
-            <tr><td>object / array value</td><td><code>INVALID_ARGUMENT</code>. Dates, times, decimals and blobs are strings in the CLI's own formats (<code>YYYY-MM-DD</code>, <code>HH:MM:SS.hh</code>, exact decimal, base64), so the model passes strings.</td></tr>
+            <tr><td>object / array value</td><td><code>INVALID_ARGUMENT</code>. Dates, times and blobs are strings in the CLI's own formats (<code>YYYY-MM-DD</code>, <code>HH:MM:SS.hh</code>, base64); <code>DECIMAL</code> columns take a JSON number, because the exe requires a numeric literal for them (a quoted <code>'12.50'</code> is <code>VALUE_OUT_OF_RANGE</code>).</td></tr>
             <tr><td><code>where</code>, <code>order_by</code></td><td>Verbatim after trimming; empty string treated as absent. For <code>tps_update</code> and <code>tps_delete</code> an absent or empty <code>where</code> is <code>INVALID_ARGUMENT</code> before the exe would say <code>WHERE_REQUIRED</code>, so the message can point at the argument.</td></tr>
             <tr><td><code>limit</code>, <code>offset</code>, <code>limit_default</code></td><td>Non-negative integers up to 2,147,483,647 (zod), matching the CLI's range.</td></tr>
           </tbody>
@@ -238,8 +238,10 @@ RunResult = { exitCode: number | null, stdout: string, stderr: string,
               json: object | null, timedOut: boolean, durationMs: number }</code></pre>
         <ul>
           <li><code>child_process.spawn(exe, args, { windowsHide: true, shell: false })</code>. The SQL is one argv element; there is no shell and therefore no quoting layer. stdin is closed immediately so the exe never waits for it.</li>
-          <li>stdout and stderr are collected as UTF-8. <code>json</code> is the parse of the last non-empty stdout line that begins with <code>{</code> (the <code>--table</code> grid has no such line, so <code>json</code> is <code>null</code> there by design). Anything that fails to parse leaves <code>json</code> null.</li>
-          <li>On timeout the process tree is killed with <code>taskkill /PID &lt;pid&gt; /T /F</code>. A Clarion exe that crashes sits behind a modal dialog; a plain <code>child.kill()</code> leaves that dialog on screen and the handle open.</li>
+          <li>stdout and stderr are collected as UTF-8, up to a fixed ceiling of 64 MiB combined. Past the ceiling the process tree is killed and the result is <code>INCOMPLETE</code> ("output exceeded 64 MiB; add a LIMIT"), never a truncated success.</li>
+          <li><code>json</code> is the parse of the whole trimmed stdout as one JSON object (the exe writes exactly one object; the parse does not assume it is one line). It counts as a response only when it is an object with <code>complete === true</code> and <code>ok === (exitCode === 0)</code>; anything else, including <code>{}</code>, a partial object, or an <code>ok</code> that disagrees with the exit code, leaves <code>json</code> null and becomes <code>INCOMPLETE</code>. In table mode no parse is attempted and <code>json</code> is null.</li>
+          <li>On timeout the process tree is killed with <code>taskkill /PID &lt;pid&gt; /T /F</code>. A Clarion exe that crashes sits behind a modal dialog; a plain <code>child.kill()</code> leaves that dialog on screen and the handle open. The promise settles exactly once (on the child's <code>exit</code> or on a spawn <code>error</code>), and the timer is cleared when it does.</li>
+          <li>A spawn failure (<code>error</code> event, <code>exitCode</code> null) is an <code>INCOMPLETE</code> whose message is the system error. A <code>taskkill</code> that fails or does not return within 5 s is an <code>INCOMPLETE</code> whose message names the pid and says the process may still be running.</li>
           <li>The owner string, when present in <code>args</code>, is never logged. The runner has no logging of its own; the server logs one line per call to stderr (tool name, duration, exit code) and nothing from argv.</li>
         </ul>
 
@@ -247,13 +249,13 @@ RunResult = { exitCode: number | null, stdout: string, stderr: string,
         <table>
           <thead><tr><th>Case</th><th>Tool result</th></tr></thead>
           <tbody>
-            <tr><td>exit 0, <code>json</code> present</td><td><code>structuredContent</code> = the object; <code>content</code> = the same object pretty-printed. <code>isError</code> false.</td></tr>
-            <tr><td>exit 0, <code>format: "table"</code></td><td><code>content</code> = stdout verbatim (the grid plus its summary line); no <code>structuredContent</code>.</td></tr>
-            <tr><td>exit 1, 2 or 3, <code>json</code> present</td><td>Same shape as success; <code>isError</code> true. The exe's <code>error.code</code> and <code>error.message</code> are the explanation, and <code>outcome</code> is passed through for writes. With <code>format: "table"</code> the text is the exe's <code>ERROR CODE: message</code> line.</td></tr>
-            <tr><td>timeout, crash, exit &ge; 4, or no parseable object</td><td><code>isError</code> true with a server-made object <code>{ ok:false, complete:false, error:{ code:"INCOMPLETE", message }, exit_code, timed_out, stderr }</code>. The message repeats the README's rule: the response is incomplete, a write's outcome is unknown, do not retry without checking.</td></tr>
+            <tr><td>exit 0, <code>json</code> present</td><td><code>structuredContent</code> = the object; <code>content</code> = <code>[{ type:"text", text: &lt;the object pretty-printed&gt; }]</code>. <code>isError</code> false.</td></tr>
+            <tr><td>exit 1, 2 or 3, <code>json</code> present</td><td>Same shape as success; <code>isError</code> true. The exe's <code>error.code</code> and <code>error.message</code> are the explanation, and <code>outcome</code> is passed through for writes.</td></tr>
+            <tr><td><code>format: "table"</code>, exit 0 to 3</td><td><code>content</code> = <code>[{ type:"text", text: stdout verbatim }]</code>: the grid plus its summary line, or on failure the exe's single <code>CODE: message</code> line. <code>isError</code> = exit &ne; 0. No <code>structuredContent</code>. Table mode is read-only by construction (section 3), so no <code>outcome</code> is lost.</td></tr>
+            <tr><td>timeout, spawn failure, output ceiling, exit &ge; 4, or no valid object</td><td><code>isError</code> true with a server-made object <code>{ ok:false, complete:false, op, error:{ code:"INCOMPLETE", message }, exit_code, timed_out, stderr }</code>, plus <code>outcome:"unknown"</code> when the statement was a write. The message repeats the README's rule: the response is incomplete, a write's outcome is unknown, do not retry without checking.</td></tr>
           </tbody>
         </table>
-        <p><code>isError</code> follows the exe: any non-zero exit is an error result, so a client that renders errors differently does the right thing, and the model still receives the full object.</p>
+        <p><code>isError</code> follows the exe: any non-zero exit is an error result, so a client that renders errors differently does the right thing, and the model still receives the full object. No tool declares an <code>outputSchema</code>: the SDK would then require <code>structuredContent</code> on every success, and table results have none.</p>
       </section>
 
       <section>
@@ -267,7 +269,8 @@ RunResult = { exitCode: number | null, stdout: string, stderr: string,
             <tr><td>Timeout</td><td>All exe-running tools</td><td>Server-wide value; not overridable per call.</td></tr>
           </tbody>
         </table>
-        <p>Server-made errors (<code>WRITES_DISABLED</code>, <code>NO_ROOT</code>, <code>FILE_NOT_FOUND</code> from resolution, <code>INVALID_ARGUMENT</code>, <code>INCOMPLETE</code>) use the exe's error shape, <code>{ ok:false, complete:true, op, error:{ code, message } }</code>, so the model sees one error format. <code>complete</code> is true for all of them except <code>INCOMPLETE</code>: nothing ran, so nothing is unknown.</p>
+        <p>Server-made errors (<code>WRITES_DISABLED</code>, <code>NO_ROOT</code>, <code>FILE_NOT_FOUND</code> from resolution, <code>INVALID_ARGUMENT</code>, <code>INCOMPLETE</code>) use the exe's error shape, <code>{ ok:false, complete:true, op, error:{ code, message } }</code>, so the model sees one error format. <code>op</code> is the statement's operation when the tool implies one (<code>describe</code>, <code>select</code>, <code>insert</code>, <code>update</code>, <code>delete</code>; for <code>tps_query</code> the lower-cased <code>classify()</code> result when it is one of those five) and <code>null</code> otherwise. A write refused before launch carries <code>outcome:"none"</code>, as the exe's own pre-write refusals do. <code>complete</code> is true for all of them except <code>INCOMPLETE</code>: nothing ran, so nothing is unknown.</p>
+        <p>Argument-shape failures are the SDK's: <code>registerTool</code> validates the zod schema before the handler runs and answers with its own <code>isError</code> text result. The envelope above applies to everything the handler itself refuses (empty <code>set</code>, a bad column name, a null value, <code>offset</code> without <code>limit</code> is a zod refinement and therefore the SDK's).</p>
       </section>
 
       <section>
@@ -292,19 +295,23 @@ client   renders the result</code></pre>
   package.json        name tpscli-mcp, version 0.1.0, type module, bin: dist/server.js
                       deps: @modelcontextprotocol/sdk, zod   dev: typescript, @types/node
   tsconfig.json       target ES2022, module NodeNext, strict, rootDir src, outDir dist
-  src/server.ts       argv parsing, exe discovery, policy, tool registration, StdioServerTransport
+  src/server.ts       createServer(config, run) registers the tools; main() parses argv,
+                      discovers the exe, and connects StdioServerTransport
   src/sql.ts          bracket(), quote(), buildDescribe/Select/Insert/Update/Delete(), classify()
-  src/runner.ts       run()
-  test/sql.test.ts    table-driven cases for every builder rule in section 4
-  test/runner.test.ts against test/fake-tpscli.js
+  src/runner.ts       run(file, args, opts): file is what is spawned, args its argv
+  test/sql.test.js    table-driven cases for every builder rule in section 4 (imports dist/)
+  test/runner.test.js run(process.execPath, ['test/fake-tpscli.js', mode, ...]) so the fake
+                      needs no shell and no .cmd wrapper
   test/fake-tpscli.js a Node script: prints a canned object and exits with a chosen code,
-                      prints garbage, prints nothing, or sleeps past the timeout, chosen by argv
-  test/e2e.test.ts    starts dist/server.js over stdio with the SDK's Client, runs against
+                      prints garbage, prints nothing, floods stdout, or sleeps past the timeout
+  test/server.test.js createServer() with a stub run() and the SDK's InMemoryTransport:
+                      tool list, WRITES_DISABLED, NO_ROOT, root resolution, envelopes
+  test/e2e.test.js    starts dist/server.js over stdio with the SDK's Client, runs against
                       ..\cli\testdata\*.TPS copied into a temp folder; skips itself with a
                       message when the exe or the fixtures are absent
   README.md           install, client config snippet, flags, tool reference, error codes</code></pre>
         <ul>
-          <li>Scripts: <code>build</code> = <code>tsc</code>; <code>test</code> = <code>tsc &amp;&amp; node --test test/</code>. Node's own test runner; no test framework dependency.</li>
+          <li>Scripts: <code>build</code> = <code>tsc</code>; <code>test</code> = <code>tsc &amp;&amp; node --test test/sql.test.js test/runner.test.js test/server.test.js test/e2e.test.js</code>. Tests are plain ESM JavaScript importing the built <code>dist/</code> modules, because Node 20 neither runs <code>.ts</code> nor globs test directories; <code>tsconfig</code> compiles <code>src/</code> only.</li>
           <li><code>dist/</code> and <code>node_modules/</code> are gitignored. <code>package-lock.json</code> is committed.</li>
           <li>Client configuration is one entry: <code>{ "command": "node", "args": ["C:\\...\\mcp\\dist\\server.js", "--root", "C:\\pos\\data"] }</code>, with <code>"--allow-writes"</code> appended when writes are wanted and the owner in <code>env: { "TPSCLI_OWNER": "..." }</code>.</li>
           <li>Line endings: <code>.ts</code>, <code>.js</code>, <code>.json</code> and <code>.md</code> under <code>mcp/</code> follow the repository rule (CRLF, lone-LF 0).</li>
@@ -316,8 +323,8 @@ client   renders the result</code></pre>
         <h3>Unit (no Clarion needed)</h3>
         <ul>
           <li><code>sql.test.ts</code>: every row of the section 4 table has at least one passing and one rejecting case; the three examples in section 4 are asserted byte for byte; <code>classify()</code> on leading whitespace, <code>--</code> comments, lower case, and an empty string.</li>
-          <li><code>runner.test.ts</code> with the fake: exit 0 with JSON; exit 3 with JSON; exit 0 with the <code>--table</code> grid (json null, stdout intact); garbage stdout (json null); empty stdout; a hang that trips a 500 ms timeout and leaves no child process behind (checked with <code>tasklist</code>).</li>
-          <li>Server unit surface: tool registration lists exactly the eight tools; <code>WRITES_DISABLED</code> and <code>NO_ROOT</code> paths, using the fake exe via <code>--exe</code>.</li>
+          <li><code>runner.test.js</code> with the fake: exit 0 with JSON; exit 3 with JSON; <code>ok:true</code> with exit 1 (json null); <code>complete:false</code> (json null); table mode (json null, stdout intact); garbage stdout; empty stdout; a spawn of a path that does not exist; stdout past the ceiling (killed, INCOMPLETE); a hang that trips a 500 ms timeout and leaves no child process behind (checked with <code>tasklist</code>).</li>
+          <li><code>server.test.js</code> with a stub <code>run()</code>: the tool list is exactly the eight tools; <code>WRITES_DISABLED</code> with <code>outcome:"none"</code>; <code>parse_only</code> passing the gate; <code>NO_ROOT</code>; bare name resolved against two roots in order; a <code>..</code> escape refused; <code>format:"table"</code> on a raw write refused; the argv handed to <code>run()</code> for each tool, owner as its own element.</li>
         </ul>
         <h3>End to end (real exe, real fixtures)</h3>
         <ul>
@@ -328,7 +335,7 @@ client   renders the result</code></pre>
         </ul>
         <h3>Manual gate, recorded in the implementation notes</h3>
         <ul>
-          <li>Register the server in Claude Code's MCP config on this machine, call each of the eight tools once from a conversation, and paste the results into <code>docs/mySuperpower/implementation-notes/</code> for the MCP.</li>
+          <li>Register the server in Claude Code's MCP config on this machine with <code>--root</code> pointing at a temp folder holding copies of the six fixtures, call each of the eight tools once from a conversation (the writes and the raw query against those copies only), and paste the results into <code>docs/mySuperpower/implementation-notes/</code> for the MCP.</li>
           <li>Docs: <code>mcp/README.md</code> written; the root <code>README.md</code> row for <code>mcp/</code> loses "not started yet".</li>
         </ul>
       </section>
@@ -359,9 +366,11 @@ client   renders the result</code></pre>
         <h2><span class="num">11 &middot; Self-review</span>Checked before hand-off</h2>
         <ul class="check">
           <li>No placeholders: every flag has a default, every tool has its argv mapping, every error has a code and a shape.</li>
-          <li>Consistency: <code>format: "table"</code> yields <code>json: null</code> in the runner and no <code>structuredContent</code> in section 5; <code>parse_only</code> bypasses the write gate in sections 3, 6 and 9; roots apply to structured tools only in sections 3 and 6.</li>
+          <li>Consistency: <code>format: "table"</code> yields <code>json: null</code> in the runner, no <code>structuredContent</code> in section 5, and is refused for raw writes in section 3; <code>parse_only</code> bypasses the write gate in sections 3, 6 and 9; roots apply to structured tools only in sections 3 and 6; every server-made write refusal carries <code>outcome:"none"</code> and every <code>INCOMPLETE</code> write <code>outcome:"unknown"</code>.</li>
+          <li>Checked against the exe on 2026-09-19: a quoted decimal is refused (<code>VALUE_OUT_OF_RANGE</code>), <code>1e-7</code> is not a literal, <code>OFFSET</code> without <code>LIMIT</code> is <code>SYNTAX</code>, table-mode failures print one <code>CODE: message</code> line. Section 4 follows those facts.</li>
           <li>Scope: one implementation plan. The three modules and the three test files are the whole deliverable; the manual gate is one sitting.</li>
-          <li>Ambiguity resolved: bare-name resolution is first-existing-hit in root order; <code>limit</code> omitted vs. <code>0</code> mirrors the CLI; boolean renders as <code>1</code>/<code>0</code>; null is rejected rather than guessed.</li>
+          <li>Ambiguity resolved: bare-name resolution is first-existing-hit in root order; <code>limit</code> omitted vs. <code>0</code> mirrors the CLI and <code>offset</code> needs <code>limit</code>; boolean renders as <code>1</code>/<code>0</code>; null is rejected rather than guessed; numbers are plain decimal or refused.</li>
+          <li>Reviewed by Codex (round 1, 13 findings): all accepted; three were checked against the running exe first.</li>
         </ul>
       </section>
     </main>
