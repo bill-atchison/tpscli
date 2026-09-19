@@ -1,18 +1,19 @@
-# Automates docs\Testing\Tpscli-Unit-Test-Cases.html: runs every "Run" step of every case, checks
+# Automates ..\docs\Testing\Tpscli-Unit-Test-Cases.html (docs live at the repository root): runs every "Run" step of every case, checks
 # the concrete values each case's expected text names, and writes a results JSON whose shape
 # mirrors the instrument's per-case state (steps ticks, verdict, notes, evidence) so the run can
 # be loaded into the page through its own engine functions.
 #
-# Usage (repository root):  powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-instrument.ps1
+# Usage (from cli\):  powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-instrument.ps1
 # Exit 0 when no case is FAIL (BLOCKED for the dev-input case TC-28 is expected), 1 otherwise.
 param(
-    [string]$OutFile = 'docs\Testing\Tpscli-Unit-Test-Results.json',
+    [string]$OutFile = 'docs\Testing\Tpscli-Unit-Test-Results.json',   # relative to the repository root
     [string[]]$Only = @()      # e.g. -Only TC-17,TC-18 (setup cases are not implied)
 )
 $ErrorActionPreference = 'Stop'
-$root = Split-Path -Parent $PSScriptRoot
+$root = Split-Path -Parent $PSScriptRoot          # cli\
+$repo = Split-Path -Parent $root                  # repository root, where docs\ lives
 $exe = Join-Path $root 'tpscli.exe'
-$instrument = Join-Path $root 'docs\Testing\Tpscli-Unit-Test-Cases.html'
+$instrument = Join-Path $repo 'docs\Testing\Tpscli-Unit-Test-Cases.html'
 . (Join-Path $PSScriptRoot 'TestHelpers.ps1')
 $powershell = Join-Path $PSHOME 'powershell.exe'
 if (-not (Test-Path $powershell)) { $powershell = 'powershell.exe' }
@@ -403,7 +404,7 @@ $doc = [ordered]@{
     started = $started.ToString('s'); finished = (Get-Date).ToString('s'); tally = $tally; cases = $results
 }
 $json = ($doc | ConvertTo-Json -Depth 6) -replace "(?<!`r)`n", "`r`n"
-[IO.File]::WriteAllText((Join-Path $root $OutFile), $json + "`r`n", (New-Object System.Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText((Join-Path $repo $OutFile), $json + "`r`n", (New-Object System.Text.UTF8Encoding($false)))
 Write-Host ''
 Write-Host "run-instrument.ps1: PASS $($tally.PASS) FAIL $($tally.FAIL) BLOCKED $($tally.BLOCKED) -> $OutFile"
 if ($tally.FAIL -gt 0) { exit 1 } else { exit 0 }

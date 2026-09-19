@@ -3,18 +3,19 @@
 // tally, and prints the engine-built report to PDF. Headless Chrome is driven over the DevTools
 // protocol so nothing has to be installed beyond Chrome and Node.
 //
-// Usage (repository root):
+// Usage (from cli\; the docs live at the repository root, one level up):
 //   node --experimental-websocket tests\record-instrument.js [results.json] [report.pdf]
 // The run state stays in the headless profile under %TEMP%\tpscli-uts-profile.
 'use strict';
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawn } = require('child_process');
 
-const root = path.resolve(__dirname, '..');
+const root = path.resolve(__dirname, '..');        // cli\
+const repo = path.resolve(root, '..');             // repository root, where docs\ lives
 function localDate() { const d = new Date(), p = n => (n < 10 ? '0' : '') + n; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
-const resultsFile = path.resolve(root, process.argv[2] || 'docs\\Testing\\Tpscli-Unit-Test-Results.json');
-const pdfFile = path.resolve(root, process.argv[3] || `docs\\Testing\\Tpscli-Unit-Test-Report-${localDate()}.pdf`);
-const page = path.resolve(root, 'docs\\Testing\\Tpscli-Unit-Test-Cases.html');
+const resultsFile = path.resolve(repo, process.argv[2] || 'docs\\Testing\\Tpscli-Unit-Test-Results.json');
+const pdfFile = path.resolve(repo, process.argv[3] || `docs\\Testing\\Tpscli-Unit-Test-Report-${localDate()}.pdf`);
+const page = path.resolve(repo, 'docs\\Testing\\Tpscli-Unit-Test-Cases.html');
 const chrome = ['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
                 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
                 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'].find(fs.existsSync);
@@ -75,12 +76,22 @@ async function main() {
     return r.result.result.value;
   };
 
+  // The target reports the file: URL before the document has replaced the initial empty one, and
+  // localStorage on that document throws SecurityError; wait until the page's own engine is there.
+  const waitForEngine = async () => {
+    for (let i = 0; i < 100; i++) {
+      try { if (await evaluate('document.readyState === "complete" && typeof CASES !== "undefined" && CASES.length > 0 && !window.__recorderStale')) return; } catch (e) {}
+      await new Promise(r => setTimeout(r, 100));
+    }
+    throw new Error('instrument page did not finish loading within 10 s');
+  };
+
   await send('Page.enable');
+  await waitForEngine();
   // Fresh run in this profile, then reload so the engine starts from freshState().
-  await evaluate('localStorage.removeItem(STORAGE_KEY); "cleared"');
-  await send('Page.reload');
-  await new Promise(r => setTimeout(r, 1500));
-  await evaluate('typeof CASES !== "undefined" && CASES.length');
+  await evaluate('localStorage.removeItem(STORAGE_KEY); window.__recorderStale = true; "cleared"');
+  await send('Page.reload');   // the marker vanishes with the old document, so waitForEngine sees only the new one
+  await waitForEngine();
 
   const summary = await evaluate(`(function(){
     var header = ${JSON.stringify(header)}, cases = ${JSON.stringify(cases)};
@@ -114,8 +125,15 @@ async function main() {
   if (!pdf.result || !pdf.result.data) throw new Error('printToPDF failed: ' + JSON.stringify(pdf));
   fs.writeFileSync(pdfFile, Buffer.from(pdf.result.data, 'base64'));
   console.log(`report: ${path.relative(root, pdfFile)} (${fs.statSync(pdfFile).size} bytes)`);
-  console.log(`state saved under ${results.storage_key} in profile ${profile}`);
+  // Chrome commits localStorage to the profile asynchronously; killing it here loses the saved
+  // run. Ask it to close and wait for the process to exit so the state really is on disk.
+  const exited = new Promise(r => proc.once('exit', r));
+  await send('Browser.close');
   ws.close();
+  if (await Promise.race([exited.then(() => true), new Promise(r => setTimeout(() => r(false), 10000))]) === false) {
+    throw new Error('chrome did not exit within 10 s after Browser.close');
+  }
+  console.log(`state saved under ${results.storage_key} in profile ${profile}`);
 }
-main().then(() => { proc.kill(); process.exit(0); },
+main().then(() => { process.exit(0); },
             err => { console.error(err.stack || err); proc.kill(); process.exit(1); });

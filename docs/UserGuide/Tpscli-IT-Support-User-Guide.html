@@ -7,7 +7,7 @@
   in place of the Dollar Tree brand blocks, at the owner's request. No <link>,
   @font-face, script or CDN fetch: the file renders from file:// with no network.
 
-  Sources: README.md, docs/mySuperpower/specs/2026-09-15-tpscli-design.html,
+  Sources: cli/README.md, docs/mySuperpower/specs/2026-09-15-tpscli-design.html,
   docs/mySuperpower/implementation-notes/2026-09-16-tpscli.html, tpscli.clw,
   verify.ps1, tests/run-instrument.ps1. Every command and message below was run
   against tpscli.exe 0.1.0 (6b35bc9) and copied from its output.
@@ -250,7 +250,7 @@ ID  NAME     CODE
   <ol class="steps">
     <li>Read standard output only. Errors are JSON too, on the same stream, so a script parses one object per run. Standard error carries nothing a script needs.</li>
     <li>Check the exit code before trusting the object: <span class="exit ok">0</span> ran, <span class="exit bad">1</span> was rejected before anything changed, <span class="exit amber">2</span> could not open the file, <span class="exit bad">3</span> failed while running (see the table below).</li>
-    <li>Run each call under a timeout. If a Clarion executable crashes it can stop behind a modal dialog instead of exiting, and a script with no timeout waits forever. The project's own test helper, <code>tests\TestHelpers.ps1</code> (<code>Invoke-Tpscli_Bounded</code>), shows one way to do this from PowerShell.</li>
+    <li>Run each call under a timeout. If a Clarion executable crashes it can stop behind a modal dialog instead of exiting, and a script with no timeout waits forever. The project's own test helper, <code>cli\tests\TestHelpers.ps1</code> (<code>Invoke-Tpscli_Bounded</code>), shows one way to do this from PowerShell.</li>
     <li>Treat a response with no <code>"complete": true</code> as unknown, and never retry a write on that basis alone.</li>
   </ol>
 
@@ -305,10 +305,10 @@ ID  NAME     CODE
 
   <h2 id="reference">Reference</h2>
   <ul>
-    <li><a href="../../README.md">README.md</a> &mdash; full option, dialect, response-contract, error-code and deviations reference, plus build and verify instructions.</li>
+    <li><a href="../../cli/README.md">cli/README.md</a> &mdash; full option, dialect, response-contract, error-code and deviations reference, plus build and verify instructions.</li>
     <li><a href="../Testing/Tpscli-Unit-Test-Cases.html">docs/Testing/Tpscli-Unit-Test-Cases.html</a> &mdash; the interactive unit-test instrument (32 cases). It opens showing the recorded 2026-09-18 run: 31 PASS, 0 FAIL, 1 BLOCKED (TC-28, which needs production files that are not in the repository).</li>
     <li><a href="../Testing/Tpscli-Unit-Test-Report-2026-09-18.pdf">docs/Testing/Tpscli-Unit-Test-Report-2026-09-18.pdf</a> and <a href="../Testing/Tpscli-Unit-Test-Results.json">Tpscli-Unit-Test-Results.json</a> &mdash; the printed report and the raw command output for that run.</li>
-    <li><code>tests\run-instrument.ps1</code> and <code>tests\record-instrument.js</code> &mdash; rerun every case and record the result into the instrument; <code>verify.ps1</code> &mdash; the release gate.</li>
+    <li><code>cli\tests\run-instrument.ps1</code> and <code>cli\tests\record-instrument.js</code> &mdash; rerun every case and record the result into the instrument; <code>cli\verify.ps1</code> &mdash; the release gate.</li>
     <li><a href="../mySuperpower/specs/2026-09-15-tpscli-design.html">Design spec</a>, <a href="../mySuperpower/plans/2026-09-15-tpscli.html">implementation plan</a> and <a href="../mySuperpower/implementation-notes/2026-09-16-tpscli.html">implementation notes</a>.</li>
   </ul>
 
