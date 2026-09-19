@@ -1,4 +1,5 @@
-# Shared by select.ps1/parser.ps1/describe.ps1. Runs an exe with a hard wall-clock timeout so a
+# Shared by every tests\*.ps1 suite, verify.ps1 and tests\run-instrument.ps1. Runs an exe with a
+# hard wall-clock timeout so a
 # crashed process sitting behind the Clarion runtime's modal crash dialog (confirmed to happen -
 # see task-7-report.md) never blocks a test run for hours instead of seconds. On timeout the
 # process is killed and the caller gets TimedOut=$true instead of hanging forever.
@@ -22,27 +23,45 @@ function Invoke-Tpscli_Bounded {
         [Parameter(Mandatory)] [string]$WorkingDirectory,
         [int]$TimeoutMs = 20000
     )
-    $outFile = [System.IO.Path]::GetTempFileName()
-    $errFile = [System.IO.Path]::GetTempFileName()
+    # System.Diagnostics.Process is used instead of Start-Process -PassThru: with output
+    # redirection, Windows PowerShell 5.1's Start-Process launches the child natively and returns
+    # a Process object that does not own the handle, so a child that exits before the caller
+    # touches .Handle (tpscli.exe finishes in milliseconds) reports ExitCode $null - reproduced
+    # at roughly 1 in 300 runs by tests\helpers.ps1. Process.Start owns the handle from creation.
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $FilePath
+    $psi.Arguments = ConvertTo-Tpscli_CommandLine -ArgumentList $ArgumentList
+    $psi.WorkingDirectory = $WorkingDirectory
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.RedirectStandardInput = $true     # closed right after start: the child sees EOF, as with < $null
+    $proc = New-Object System.Diagnostics.Process
+    $proc.StartInfo = $psi
     try {
-        # An exe that takes no arguments (testdata\gen\mkcorpus.exe) passes @(); Start-Process
-        # rejects an empty -ArgumentList, so the parameter is omitted entirely in that case.
-        $cmdLine = ConvertTo-Tpscli_CommandLine -ArgumentList $ArgumentList
-        $common = @{
-            FilePath = $FilePath; WorkingDirectory = $WorkingDirectory
-            RedirectStandardOutput = $outFile; RedirectStandardError = $errFile
-            PassThru = $true; NoNewWindow = $true
-        }
-        if ($cmdLine -ne '') { $common['ArgumentList'] = $cmdLine }
-        # ElapsedMs below times the child process only (launch to exit), not this function's
-        # temp-file and Get-Content plumbing, so verify.ps1's performance step measures what
-        # the spec asks for: process start plus the statement.
+        # ElapsedMs times the child process only (launch to exit), not this function's stream
+        # plumbing, so verify.ps1's performance step measures what the spec asks for: process
+        # start plus the statement.
         $clock = [System.Diagnostics.Stopwatch]::StartNew()
-        $proc = Start-Process @common
-        # Start-Process -PassThru does not populate ExitCode reliably (a documented Windows
-        # PowerShell quirk) unless .Handle is touched before the process exits - confirmed by a
-        # failing probe run (ExitCode came back blank) before this line was added.
-        $null = $proc.Handle
+        # .NET Framework builds the child's stdin writer from [Console]::InputEncoding, and when
+        # the console is UTF-8 that encoding carries a preamble, so closing the writer sends a
+        # byte-order mark (EF BB BF) that tpscli reads as a one-character statement. The known
+        # workaround is a preamble-free console input encoding while the process starts.
+        $savedInput = $null
+        try {
+            if ([Console]::InputEncoding.GetPreamble().Length -gt 0) {
+                $savedInput = [Console]::InputEncoding
+                [Console]::InputEncoding = New-Object System.Text.UTF8Encoding($false)
+            }
+        } catch { $savedInput = $null }
+        try { $null = $proc.Start() }
+        finally { if ($savedInput) { try { [Console]::InputEncoding = $savedInput } catch {} } }
+        $proc.StandardInput.Close()
+        # Both pipes are drained asynchronously so a child that fills one pipe while the caller
+        # waits on the other can never deadlock.
+        $outTask = $proc.StandardOutput.ReadToEndAsync()
+        $errTask = $proc.StandardError.ReadToEndAsync()
 
         if (-not $proc.WaitForExit($TimeoutMs)) {
             try { $proc.Kill() } catch {}
@@ -55,16 +74,17 @@ function Invoke-Tpscli_Bounded {
                 ElapsedMs = $clock.Elapsed.TotalMilliseconds
             }
         }
-
         $clock.Stop()
+        $proc.WaitForExit()   # the parameterless overload flushes the redirected streams
+
         return [pscustomobject]@{
             TimedOut  = $false
             ExitCode  = $proc.ExitCode
-            StdOut    = (Get-Content -Path $outFile -Raw -ErrorAction SilentlyContinue)
-            StdErr    = (Get-Content -Path $errFile -Raw -ErrorAction SilentlyContinue)
+            StdOut    = $outTask.Result
+            StdErr    = $errTask.Result
             ElapsedMs = $clock.Elapsed.TotalMilliseconds
         }
     } finally {
-        Remove-Item $outFile, $errFile -ErrorAction SilentlyContinue
+        $proc.Dispose()
     }
 }
