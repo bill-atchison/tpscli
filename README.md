@@ -31,9 +31,10 @@ argument, empty SQL, or more than one statement are rejected with `SYNTAX` befor
 opened. `LIMIT`, `OFFSET` and `--limit-default` must be non-negative integers up to
 2,147,483,647.
 
-Three further options exist for the test suite and are not part of the supported surface:
+Four further options exist for the test suite and are not part of the supported surface:
 `--dump-def <path>` (hex dump of the raw definition record), `--dump-schema` (the oracle-format
-schema dump `tests\describe.ps1` diffs against) and `--walk-key <name>` (see Deviations).
+schema dump `tests\describe.ps1` diffs against), `--walk-key <name>` (see Deviations) and
+`--selftest` (prints three integer wrap-around checks).
 
 ### Table names are file paths
 
@@ -288,3 +289,36 @@ Without those three options the dictionary-parity and TPSFix steps do not run. T
 `SKIP`, not `PASS`, and the closing line says how many were skipped:
 `all steps PASS (2 skipped - not a release qualification)`. A run that qualifies a release is
 the one with all three options given against real files, where nothing is skipped.
+
+`tests\helpers.ps1` is a regression check for the shared `Invoke-Tpscli_Bounded` helper in
+`tests\TestHelpers.ps1` (300 timed runs of `--version` plus one empty-argument run); it is not
+part of `verify.ps1`.
+
+### Unit-test instrument
+
+`docs\Testing\Tpscli-Unit-Test-Cases.html` is a self-contained, offline test document: 32 cases
+in six sections, ticked and recorded in the browser, with a dashboard, resumable state and a
+printable completion report. It opens showing the most recent recorded run. Two scripts automate it:
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-instrument.ps1
+node --experimental-websocket tests\record-instrument.js
+```
+
+`run-instrument.ps1` reads the case list out of the instrument itself, runs every case's steps
+under the same timeout helper as the other suites, asserts the values each case's expected text
+names, and writes `docs\Testing\Tpscli-Unit-Test-Results.json`. `record-instrument.js` drives a
+headless Chrome or Edge over the DevTools protocol, records that JSON into the page through the
+page's own engine functions, checks the dashboard tally, and prints the report to
+`docs\Testing\Tpscli-Unit-Test-Report-<date>.pdf`. TC-28 (release qualification against real
+dtpos files) is always `BLOCKED` in this repository because its inputs are not committed.
+
+## Documentation
+
+- `docs\UserGuide\Tpscli-IT-Support-User-Guide.html`: install, operate and troubleshoot the exe,
+  for support staff and script authors.
+- `docs\Testing\`: the unit-test instrument, the latest results JSON and the PDF report.
+- `docs\mySuperpower\specs\2026-09-15-tpscli-design.html`: the design spec;
+  `docs\mySuperpower\plans\2026-09-15-tpscli.html`: the task-by-task plan;
+  `docs\mySuperpower\implementation-notes\2026-09-16-tpscli.html`: decisions and findings from
+  the build.

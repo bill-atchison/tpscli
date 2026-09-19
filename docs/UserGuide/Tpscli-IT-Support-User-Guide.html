@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<!--
+  tpscli IT Support User Guide (house branding, self-contained, offline).
+
+  Produced from the creating-feature-docs IT-support template with the house
+  warm-paper style (the same tokens as docs/Testing/Tpscli-Unit-Test-Cases.html)
+  in place of the Dollar Tree brand blocks, at the owner's request. No <link>,
+  @font-face, script or CDN fetch: the file renders from file:// with no network.
+
+  Sources: README.md, docs/mySuperpower/specs/2026-09-15-tpscli-design.html,
+  docs/mySuperpower/implementation-notes/2026-09-16-tpscli.html, tpscli.clw,
+  verify.ps1, tests/run-instrument.ps1. Every command and message below was run
+  against tpscli.exe 0.1.0 (6b35bc9) and copied from its output.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tpscli &mdash; IT Support User Guide</title>
+<style>
+/* House warm-paper style: tokens mirror the unit-test instrument's screen. */
+:root{
+  --paper:#f4efe1; --ink:#221f18; --maroon:#8a2b27; --meta-bg:#e9e1cd;
+  --label:#6d5f4e; --value:#2b2820; --amber:#a8762b; --rule:#d8cdb2; --soft:#efe7d3;
+  --ok:#3f6f3a; --bad:#8a2b27; --field:#fbf7ec;
+  --serif:Georgia,'Times New Roman',serif;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);line-height:1.6;}
+
+header.house{border-bottom:3px solid var(--maroon);padding:2rem 1.5rem 1.4rem;background:var(--meta-bg);}
+header.house .wrap{max-width:900px;margin:0 auto;}
+header.house .wordmark{display:inline-block;font-family:var(--mono);font-size:.72rem;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--maroon);border:1px solid var(--maroon);
+  border-radius:999px;padding:.15rem .7rem;margin-bottom:.8rem;}
+header.house h1{font-size:2rem;margin:0 0 .3rem;font-weight:700;}
+header.house .sub{font-style:italic;color:var(--label);margin:0 0 .8rem;max-width:62ch;}
+header.house .meta{font-family:var(--mono);font-size:.78rem;color:var(--label);margin:0;}
+header.house .meta b{color:var(--ink);}
+
+main{max-width:900px;margin:0 auto;padding:1.5rem;}
+h2{font-size:1.3rem;border-bottom:2px solid var(--maroon);padding-bottom:.3rem;margin:2rem 0 .6rem;}
+h3{font-size:1.05rem;margin:1.4rem 0 .4rem;color:var(--value);}
+p{margin:.55rem 0;}
+ul,ol{margin:.5rem 0 .5rem .2rem;padding-left:1.4rem;}
+li{margin:.25rem 0;}
+a{color:var(--maroon);text-decoration:none;border-bottom:1px solid var(--rule);}
+a:hover{border-bottom-color:var(--maroon);}
+.lead{font-size:1.08rem;color:var(--value);}
+
+code{font-family:var(--mono);font-size:.86em;background:var(--field);border:1px solid var(--rule);
+  border-radius:4px;padding:.02rem .3rem;}
+pre{font-family:var(--mono);font-size:.82rem;line-height:1.45;background:var(--field);
+  border:1px solid var(--rule);border-radius:8px;padding:.7rem .9rem;overflow:auto;white-space:pre;}
+pre code{background:none;border:0;padding:0;font-size:inherit;}
+
+table{border-collapse:collapse;width:100%;margin:.7rem 0;font-size:.92rem;}
+th,td{border:1px solid var(--rule);padding:.45rem .6rem;text-align:left;vertical-align:top;}
+th{background:var(--soft);font-family:var(--mono);font-size:.72rem;text-transform:uppercase;
+  letter-spacing:.04em;color:var(--label);}
+td code{white-space:nowrap;}
+
+.crumbs{font-family:var(--mono);font-size:.74rem;color:var(--label);margin:0 0 .8rem;}
+.crumbs .sep{margin:0 .4rem;color:var(--rule);}
+.crumbs b{color:var(--ink);}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.8rem;margin:.8rem 0;}
+.card{background:var(--meta-bg);border-left:5px solid var(--maroon);border-radius:10px;padding:.8rem 1rem;}
+.card h5{margin:0 0 .3rem;font-family:var(--mono);font-size:.72rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--label);}
+.card p{margin:0;font-size:.92rem;}
+
+.chip{display:inline-block;font-family:var(--mono);font-size:.68rem;font-weight:700;
+  border:1px solid currentColor;border-radius:999px;padding:.08rem .55rem;margin:0 .35rem .35rem 0;color:var(--label);}
+.chip.maroon{color:var(--maroon);}
+
+.toc{background:var(--soft);border:1px solid var(--rule);border-radius:10px;padding:.7rem 1rem;margin:1rem 0;}
+.toc h2{border:0;margin:0 0 .3rem;padding:0;font-family:var(--mono);font-size:.72rem;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--label);}
+.toc ul{margin:0;padding-left:1.2rem;columns:2;}
+.toc a{border:0;}
+
+.callout{border:1px solid var(--rule);border-left-width:5px;border-radius:8px;padding:.6rem .9rem;
+  margin:.8rem 0;font-size:.94rem;background:var(--soft);}
+.callout b{display:block;font-family:var(--mono);font-size:.72rem;text-transform:uppercase;
+  letter-spacing:.06em;margin-bottom:.15rem;}
+.note{border-left-color:var(--label);}
+.tip{border-left-color:var(--ok);}  .tip b{color:var(--ok);}
+.warn{border-left-color:var(--amber);background:#f6e7c8;} .warn b{color:var(--amber);}
+.danger{border-left-color:var(--maroon);background:#f1dcd8;} .danger b{color:var(--maroon);}
+
+ol.steps{list-style:none;counter-reset:s;margin:.6rem 0;padding:0;}
+ol.steps li{counter-increment:s;position:relative;padding:.1rem 0 .8rem 2.4rem;}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:.1rem;width:1.6rem;height:1.6rem;
+  border-radius:50%;background:var(--maroon);color:#fff;font-family:var(--mono);font-size:.78rem;
+  font-weight:700;display:flex;align-items:center;justify-content:center;}
+ol.steps li:not(:last-child)::after{content:"";position:absolute;left:.75rem;top:1.85rem;bottom:.1rem;
+  width:2px;background:var(--rule);}
+
+.exit{font-family:var(--mono);font-weight:700;}
+.exit.ok{color:var(--ok);} .exit.bad{color:var(--bad);} .exit.amber{color:var(--amber);}
+
+footer{max-width:900px;margin:2.5rem auto 0;padding:1rem 1.5rem 2rem;border-top:1px solid var(--rule);
+  font-family:var(--mono);font-size:.74rem;color:var(--label);}
+.top{font-family:var(--mono);font-size:.78rem;}
+
+@media print{
+  body{background:#fff;}
+  header.house{background:#fff;}
+  main{padding:0;}
+  h2,h3{page-break-after:avoid;}
+  pre,table,.callout,.card{page-break-inside:avoid;}
+  .top{display:none;}
+}
+</style>
+</head>
+<body>
+<header class="house">
+  <div class="wrap">
+    <span class="wordmark">tpscli</span>
+    <h1>tpscli &mdash; IT Support User Guide</h1>
+    <p class="sub">One command-line executable that runs DESCRIBE, SELECT, INSERT, UPDATE and DELETE against any TopSpeed <code>.TPS</code> file, reading the table layout from the file itself.</p>
+    <p class="meta">Applies to: <b>tpscli 0.1.0</b> &middot; Windows, any Clarion TopSpeed data file &middot; build <b>6b35bc9</b></p>
+  </div>
+</header>
+<main id="top">
+  <div class="crumbs">tpscli 0.1.0<span class="sep">&rsaquo;</span>User Guides<span class="sep">&rsaquo;</span><b>IT Support</b></div>
+
+  <h2>At a glance</h2>
+  <div class="cards">
+    <div class="card">
+      <h5>Purpose</h5>
+      <p>Look inside a TopSpeed data file, pull rows out of it, and correct rows in place from a shell or a script, without a Clarion dictionary, an ODBC driver or a rebuild when the file's layout changes.</p>
+    </div>
+    <div class="card">
+      <h5>Audience</h5>
+      <p>IT and field support staff who inspect or repair <code>.TPS</code> files on a register, back office or file server, and anyone scripting against those files.</p>
+    </div>
+    <div class="card">
+      <h5>Prerequisites</h5>
+      <p>A Windows machine, <code>tpscli.exe</code> copied onto it, read (or read/write) access to the <code>.TPS</code> file, and the owner string when the file is encrypted.</p>
+    </div>
+  </div>
+
+  <p>
+    <span class="chip maroon">Feature: tpscli</span>
+    <span class="chip">Version: 0.1.0</span>
+    <span class="chip">Branch: feature/tpscli-impl</span>
+    <span class="chip">Single exe, no DLLs</span>
+  </p>
+
+  <div class="toc">
+    <h2>On this page</h2>
+    <ul>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#config">Options</a></li>
+      <li><a href="#procedures">Procedures</a></li>
+      <li><a href="#responses">Reading the response</a></li>
+      <li><a href="#troubleshooting">Troubleshooting</a></li>
+      <li><a href="#reference">Reference</a></li>
+    </ul>
+  </div>
+
+  <h2 id="overview">Overview</h2>
+  <p class="lead">tpscli takes one SQL statement, opens the <code>.TPS</code> file the statement names, does what the statement says, and prints one JSON object (or, with <code>--table</code>, a text grid) before exiting. Writes go through the real TopSpeed driver, so every key in the file is maintained exactly as the owning application maintains it. Each run is one process and one statement; there is no server, session or configuration file.</p>
+  <div class="callout note"><b>Scope</b>Row-level work only. tpscli cannot create, alter, drop, pack or rebuild a file, join two files, aggregate, or run more than one statement per invocation. For any of those, use the owning application or the Clarion tools.</div>
+
+  <h3>What you type</h3>
+<pre><code>tpscli.exe [--owner &lt;string&gt;] [--table] [--limit-default N] [--parse-only] "&lt;sql&gt;"
+tpscli.exe [options] &lt; statement.sql
+tpscli.exe --version</code></pre>
+  <p>The statement is the first argument that does not start with <code>--</code>. Wrap it in double quotes so the shell passes it whole. If no statement argument is given, tpscli reads the statement from standard input, which is how a script feeds it a file. The table name inside the SQL is the <em>path</em> to the <code>.TPS</code> file, written in square brackets: <code>[C:\pos\data\ITEMS.TPS]</code>. Brackets are required when the path has a drive letter, backslashes or spaces.</p>
+
+  <h3>The five statements</h3>
+<pre><code>DESCRIBE [file]
+SELECT &lt;cols | *&gt; FROM [file] [WHERE &lt;expr&gt;] [ORDER BY &lt;col&gt; [ASC|DESC], ...] [LIMIT n [OFFSET m]]
+INSERT INTO [file] (&lt;cols&gt;) VALUES (&lt;values&gt;)
+UPDATE [file] SET &lt;col&gt; = &lt;value&gt;, ... WHERE &lt;expr&gt;
+DELETE FROM [file] WHERE &lt;expr&gt;</code></pre>
+  <p><code>WHERE</code> accepts <code>=</code>, <code>&lt;&gt;</code>, <code>!=</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>, <code>AND</code>, <code>OR</code>, <code>NOT</code>, parentheses, <code>LIKE</code> (with <code>%</code> and <code>_</code>), <code>IN (...)</code> and <code>NOT IN (...)</code>. Text literals go in single quotes; a quote inside a literal is doubled. Dates are written <code>'2026-09-15'</code> and times <code>'13:45:00'</code>. Group members use a dot (<code>ADDR.CITY</code>) and array elements a 1-based subscript (<code>QTY[3]</code>). <code>UPDATE</code> and <code>DELETE</code> without a <code>WHERE</code> are refused.</p>
+
+  <h2 id="config">Options</h2>
+  <p>tpscli has no configuration file, registry keys or environment variables. Everything is set per invocation on the command line.</p>
+  <table>
+    <thead>
+      <tr><th>Option</th><th>Value</th><th>Where</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>--owner &lt;string&gt;</code></td><td>The file's owner (encryption) string</td><td>Command line, before the SQL</td><td>Required for an encrypted file. Never echoed in output or error messages. Wrong or missing string gives <code>OWNER_WRONG</code> / <code>OWNER_REQUIRED</code>, exit 2.</td></tr>
+      <tr><td><code>--table</code></td><td>flag</td><td>Command line</td><td>Prints an aligned text grid instead of JSON. Exit codes and behaviour are otherwise identical; the last line is <code>(n rows)</code> or <code>CODE: message</code>.</td></tr>
+      <tr><td><code>--limit-default N</code></td><td>0 to 2147483647</td><td>Command line</td><td>Caps a <code>SELECT</code> that has no <code>LIMIT</code>. Default 1000. <code>0</code> means no cap.</td></tr>
+      <tr><td><code>--parse-only</code></td><td>flag</td><td>Command line</td><td>Checks the statement's syntax and column names against the file, then stops. Opens the file to read the layout; never touches a record. Use it before every write.</td></tr>
+      <tr><td><code>--version</code></td><td>flag</td><td>Command line</td><td>Prints <code>{ "ok": true, "op": null, "version": "0.1.0", "complete": true }</code> and exits 0. The quickest way to confirm the copy on a machine runs.</td></tr>
+    </tbody>
+  </table>
+  <p>Four further options (<code>--dump-def</code>, <code>--dump-schema</code>, <code>--walk-key</code>, <code>--selftest</code>) exist for the test suite and are not part of the supported surface.</p>
+  <div class="callout warn"><b>Caution</b>The owner string is the one input that, if wrong, stops everything on an encrypted file, and tpscli deliberately never prints it back. Keep it where the site keeps its other secrets, and when a colleague reports <code>OWNER_WRONG</code>, compare the string they used against the source of truth rather than the exe's output.</div>
+
+  <h2 id="procedures">Procedures</h2>
+
+  <h3>Install tpscli on a machine</h3>
+  <ol class="steps">
+    <li>Copy <code>tpscli.exe</code> (about 1.7 MB) into a folder on the machine, for example <code>C:\Tools\tpscli\</code>. It is statically linked: no DLLs, no Clarion runtime, no installer and no registry entries are needed.</li>
+    <li>Open a Command Prompt or PowerShell window in that folder.</li>
+    <li>Run <code>tpscli.exe --version</code>. You should see <code>{ "ok": true, "op": null, "version": "0.1.0", "complete": true }</code>.</li>
+    <li>Optionally add the folder to the machine's <code>PATH</code> so the exe can be run from any directory. Relative file paths in a statement resolve against the current directory, not the exe's folder.</li>
+  </ol>
+  <div class="callout tip"><b>Tip</b>tpscli opens the data file in shared mode, so it can be run while the owning application has the file open. A row that application is holding at that moment is reported as <code>RECORD_HELD</code>; rerun after the hold clears.</div>
+
+  <h3>Inspect a file's layout</h3>
+  <ol class="steps">
+    <li>Run <code>tpscli.exe "DESCRIBE [C:\pos\data\ITEMS.TPS]"</code>, substituting the real path.</li>
+    <li>Read the JSON: <code>records</code> is the row count, <code>columns</code> lists every field with its type (and <code>size</code>, <code>places</code>, <code>dim</code> or nested <code>members</code> where they apply), and <code>keys</code> lists every key with its components and whether it is <code>primary</code> or <code>unique</code>.</li>
+    <li>If the reply is <code>OWNER_REQUIRED</code>, the file is encrypted: repeat with <code>--owner &lt;string&gt;</code> in front of the statement.</li>
+  </ol>
+
+  <h3>Look at rows</h3>
+  <ol class="steps">
+    <li>Add <code>--table</code> for a human-readable grid: <code>tpscli.exe --table "SELECT ID, NAME, CODE FROM [C:\pos\data\ITEMS.TPS] ORDER BY ID LIMIT 3"</code>.</li>
+    <li>Narrow with <code>WHERE</code>, for example <code>WHERE NAME LIKE 'b%'</code> or <code>WHERE CODE IN ('A','E')</code>. Column names must match the <code>DESCRIBE</code> output; an unknown name is refused and the message lists the valid ones.</li>
+    <li>Check the last line. <code>(3 rows, truncated by LIMIT)</code> means more rows matched than were printed; raise <code>LIMIT</code> or use <code>OFFSET</code> to page. Without a <code>LIMIT</code>, a <code>SELECT</code> stops at 1000 rows unless <code>--limit-default</code> says otherwise.</li>
+  </ol>
+<pre><code>&gt; tpscli.exe --table "SELECT ID, NAME, CODE FROM [testdata\KEYS.TPS] ORDER BY ID LIMIT 3"
+ID  NAME     CODE
+--  -------  ----
+ 1  Able     A
+ 2  baker
+ 3  Charlie  C
+(3 rows, truncated by LIMIT)</code></pre>
+
+  <h3>Change data safely</h3>
+  <ol class="steps">
+    <li>Copy the <code>.TPS</code> file somewhere safe first (<code>copy ITEMS.TPS ITEMS.TPS.bak</code>). tpscli has no undo; a multi-row write that fails part-way is rolled back, but a write that succeeds is permanent.</li>
+    <li>Write the <code>UPDATE</code>, <code>INSERT</code> or <code>DELETE</code> with a <code>WHERE</code> that names the exact rows. Run a <code>SELECT</code> with the same <code>WHERE</code> and confirm the row count is what you expect.</li>
+    <li>Dry-run it: <code>tpscli.exe --parse-only "UPDATE [C:\pos\data\ITEMS.TPS] SET RECALLED = 0 WHERE SKU = '000379493'"</code>. Success looks like <code>{ "ok": true, "op": "update", "parse_only": true, "complete": true }</code>. Anything else is a syntax or column problem to fix before going on.</li>
+    <li>Run the same statement without <code>--parse-only</code>. A successful <code>UPDATE</code> or <code>DELETE</code> replies with <code>matched</code> and <code>affected</code>; a successful <code>INSERT</code> replies with <code>affected: 1</code>.</li>
+    <li>Confirm with the <code>SELECT</code> from step 2, then check the exit code: <code>echo %ERRORLEVEL%</code> in cmd, <code>$LASTEXITCODE</code> in PowerShell. <span class="exit ok">0</span> is the only success.</li>
+  </ol>
+  <div class="callout danger"><b>Critical</b><code>DELETE FROM [file] WHERE 1 = 1</code> deletes every row in the file, and tpscli will do it: the refusal only covers a <code>DELETE</code> or <code>UPDATE</code> with no <code>WHERE</code> at all. Never run that form on a live file without the backup from step 1. Also: if the output ends without the closing <code>"complete": true</code> (the window closed, the process was killed, the machine lost power), the outcome of that write is <em>unknown</em>. Do not assume nothing happened and do not simply rerun it; <code>SELECT</code> the rows first and decide from what is actually there.</div>
+
+  <h3>Work with an encrypted file</h3>
+  <ol class="steps">
+    <li>Put <code>--owner &lt;string&gt;</code> before the statement on every call: <code>tpscli.exe --owner &lt;string&gt; "DESCRIBE [C:\pos\data\SECRET.TPS]"</code>. The option is per invocation; nothing is remembered between runs.</li>
+    <li>On a shared machine prefer feeding the statement through a file (<code>tpscli.exe --owner &lt;string&gt; &lt; statement.sql</code>) or a script so the string does not sit in a shell history you cannot clear.</li>
+    <li>Do not expect the string in any output, log or error text. If you need to prove which string was used, look at your script, not at tpscli.</li>
+  </ol>
+
+  <h3>Call tpscli from a script</h3>
+  <ol class="steps">
+    <li>Read standard output only. Errors are JSON too, on the same stream, so a script parses one object per run. Standard error carries nothing a script needs.</li>
+    <li>Check the exit code before trusting the object: <span class="exit ok">0</span> ran, <span class="exit bad">1</span> was rejected before anything changed, <span class="exit amber">2</span> could not open the file, <span class="exit bad">3</span> failed while running (see the table below).</li>
+    <li>Run each call under a timeout. If a Clarion executable crashes it can stop behind a modal dialog instead of exiting, and a script with no timeout waits forever. The project's own test helper, <code>tests\TestHelpers.ps1</code> (<code>Invoke-Tpscli_Bounded</code>), shows one way to do this from PowerShell.</li>
+    <li>Treat a response with no <code>"complete": true</code> as unknown, and never retry a write on that basis alone.</li>
+  </ol>
+
+  <h2 id="responses">Reading the response</h2>
+  <p>Every reply carries <code>ok</code>, <code>op</code> and, as its last member, <code>complete</code>. What sits between them depends on the statement.</p>
+  <table>
+    <thead><tr><th>Statement</th><th>Success members</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td><code>DESCRIBE</code></td><td><code>file</code>, <code>encrypted</code>, <code>records</code>, <code>columns</code>, <code>keys</code></td><td><code>{ "ok": true, "op": "describe", "file": "...", "encrypted": false, "records": 5, "columns": [...], "keys": [...], "complete": true }</code></td></tr>
+      <tr><td><code>SELECT</code></td><td><code>columns</code>, <code>rows</code>, <code>row_count</code>, <code>truncated</code></td><td><code>{ "ok": true, "op": "select", "columns": [{"name":"ID","type":"LONG"},{"name":"NAME","type":"STRING"}], "rows": [[2,"baker"]], "row_count": 1, "truncated": false, "complete": true }</code></td></tr>
+      <tr><td><code>INSERT</code></td><td><code>affected</code></td><td><code>{ "ok": true, "op": "insert", "affected": 1, "complete": true }</code></td></tr>
+      <tr><td><code>UPDATE</code> / <code>DELETE</code></td><td><code>matched</code>, <code>affected</code></td><td><code>{ "ok": true, "op": "update", "matched": 1, "affected": 1, "complete": true }</code></td></tr>
+      <tr><td>any, with <code>--parse-only</code></td><td><code>parse_only: true</code></td><td><code>{ "ok": true, "op": "update", "parse_only": true, "complete": true }</code></td></tr>
+      <tr><td>failure</td><td><code>error.code</code>, <code>error.message</code>, and for writes <code>outcome</code></td><td><code>{ "ok": false, "op": "delete", "error": { "code": "WHERE_REQUIRED", "message": "DELETE without WHERE is refused. Use WHERE 1 = 1 to delete every row.", "position": 32, "token": "&lt;eof&gt;" }, "outcome": "none", "complete": true }</code></td></tr>
+    </tbody>
+  </table>
+  <p>Values print as: dates <code>YYYY-MM-DD</code>, times <code>HH:MM:SS.hh</code>, decimals as exact strings with trailing fraction zeros trimmed (<code>"10"</code> for 10.00), BLOBs as base64. A string literal longer than its column is stored truncated and the reply adds a <code>warnings</code> array with <code>STRING_TRUNCATED</code>; that is not an error.</p>
+
+  <h3>Exit codes</h3>
+  <table>
+    <thead><tr><th>Exit</th><th>Meaning</th><th>Data changed?</th></tr></thead>
+    <tbody>
+      <tr><td><span class="exit ok">0</span></td><td>The statement ran; <code>ok</code> is true.</td><td>Yes for a write, as reported by <code>affected</code>.</td></tr>
+      <tr><td><span class="exit bad">1</span></td><td>Syntax or validation error: <code>SYNTAX</code>, <code>UNKNOWN_COLUMN</code>, <code>WHERE_REQUIRED</code>, <code>UNSUPPORTED</code>, unknown option.</td><td>No. The file may have been opened to read its layout.</td></tr>
+      <tr><td><span class="exit amber">2</span></td><td>File error: <code>FILE_NOT_FOUND</code>, <code>OWNER_REQUIRED</code>, <code>OWNER_WRONG</code>, <code>DEFINITION_UNREADABLE</code>, <code>DEFINITION_MISMATCH</code>, <code>UNSUPPORTED_FIELD_TYPE</code>.</td><td>No.</td></tr>
+      <tr><td><span class="exit bad">3</span></td><td>Runtime error while executing: <code>DUPLICATE_KEY</code>, <code>RECORD_HELD</code>, <code>VALUE_OUT_OF_RANGE</code>, <code>DRIVER</code>.</td><td>Read <code>outcome</code>: <code>"none"</code> nothing changed; <code>"rolled_back"</code> a multi-row write was undone; <code>"unknown"</code> the rollback itself failed and the file must be inspected.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="troubleshooting">Troubleshooting</h2>
+  <table>
+    <thead>
+      <tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>"code": "FILE_NOT_FOUND", "message": "File not found: ..."</code>, exit 2</td><td>The path in the brackets is wrong, or it is relative and the current directory is not where you think.</td><td>Use the full path with a drive letter inside <code>[...]</code>. Check the message: it echoes the path exactly as tpscli tried it.</td></tr>
+      <tr><td><code>"code": "OWNER_REQUIRED", "message": "Not a plain TopSpeed file; if it is encrypted pass --owner"</code>, exit 2</td><td>The file is encrypted, or it is not a TopSpeed file at all.</td><td>Rerun with <code>--owner &lt;string&gt;</code>. If it still fails with <code>OWNER_WRONG</code>, confirm the file really is a <code>.TPS</code> from this application and that the string is the one that application uses.</td></tr>
+      <tr><td><code>"code": "OWNER_WRONG", "message": "Owner string does not decrypt this file"</code>, exit 2</td><td>The owner string does not match the file.</td><td>Check the string against its source of truth. tpscli will not print the one you supplied.</td></tr>
+      <tr><td><code>"code": "SYNTAX", "message": "Expected DESCRIBE, SELECT, INSERT, UPDATE, or DELETE", "position": 1, "token": "SELEC"</code>, exit 1</td><td>A typo, a statement outside the five supported, or the shell split the statement because it was not quoted.</td><td>Fix the token the message names at the given character position. Wrap the whole statement in double quotes.</td></tr>
+      <tr><td><code>"code": "SYNTAX", "message": "Unknown option --bogus"</code>, exit 1</td><td>A misspelt option, or an option placed after the statement where it was taken as a second positional argument.</td><td>Use only the options in the table above, all before the SQL.</td></tr>
+      <tr><td><code>"code": "UNKNOWN_COLUMN", "message": "Unknown column NOPE; valid columns: ID, NAME, CODE, AMOUNT"</code>, exit 1</td><td>The column name is not in this file's layout.</td><td>Pick one from the list in the message, or run <code>DESCRIBE</code>. Group members need the dot form (<code>ADDR.CITY</code>).</td></tr>
+      <tr><td><code>"code": "WHERE_REQUIRED"</code>, exit 1</td><td><code>UPDATE</code> or <code>DELETE</code> with no <code>WHERE</code>.</td><td>Add a <code>WHERE</code> that names the rows. Only use <code>WHERE 1 = 1</code> when you truly mean every row and have a backup.</td></tr>
+      <tr><td><code>"code": "UNSUPPORTED"</code>, exit 1</td><td>Valid SQL outside the subset: <code>JOIN</code>, <code>GROUP BY</code>, <code>COUNT(*)</code>, <code>IS NULL</code>, arithmetic in a <code>WHERE</code>, <code>LIMIT</code> on a write, a fifth <code>ORDER BY</code> column.</td><td>Rewrite within the five statements. There is no NULL in a TopSpeed file: compare to <code>''</code> or <code>0</code> instead.</td></tr>
+      <tr><td><code>"code": "DUPLICATE_KEY"</code>, exit 3</td><td>The insert or update would create a second row with the same value in a unique key; the message names the key.</td><td><code>SELECT</code> for the existing row and decide whether to update it instead.</td></tr>
+      <tr><td><code>"code": "RECORD_HELD"</code>, exit 3, <code>"outcome": "rolled_back"</code></td><td>Another process (usually the owning application) holds one of the matching rows. Nothing was changed.</td><td>Wait for the hold to clear, or run when the application is idle, then rerun. tpscli does not retry on its own.</td></tr>
+      <tr><td><code>"code": "VALUE_OUT_OF_RANGE"</code>, exit 3</td><td>A literal cannot be stored in its column: a fraction in an integer, an invalid date such as <code>'2026-02-30'</code>, too many digits for a decimal, invalid base64, or text a picture column cannot read.</td><td>Check the column's type and size in <code>DESCRIBE</code> and correct the literal. The message names the column.</td></tr>
+      <tr><td>Output ends with no <code>"complete": true</code>, or the exe never returns</td><td>The process was interrupted, or a runtime fault left it behind a modal dialog.</td><td>Look at the machine for a dialog and close it. Treat the write's outcome as unknown: <code>SELECT</code> the rows before doing anything else. Always run scripted calls under a timeout.</td></tr>
+      <tr><td><code>DESCRIBE</code> reports a decimal one digit wider than the dictionary, or a two-dimensional array as one flat dimension</td><td>Known limits of what the file stores: an even-width <code>DECIMAL</code> is indistinguishable from the next odd width, and <code>DIM(a,b)</code> is stored as a single extent.</td><td>Not a fault. Address the array with one flat subscript (<code>GRID[5]</code> rather than <code>GRID[2][2]</code>). See the README's Deviations section.</td></tr>
+      <tr><td>A key or index shows zero rows, or <code>ORDER BY</code> on it is ignored</td><td>An <code>INDEX</code> is only populated when the owning application builds it; tpscli never does, and never orders by one.</td><td>Order by a real key or accept the in-memory sort. Not a data-loss condition.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="reference">Reference</h2>
+  <ul>
+    <li><a href="../../README.md">README.md</a> &mdash; full option, dialect, response-contract, error-code and deviations reference, plus build and verify instructions.</li>
+    <li><a href="../Testing/Tpscli-Unit-Test-Cases.html">docs/Testing/Tpscli-Unit-Test-Cases.html</a> &mdash; the interactive unit-test instrument (32 cases). It opens showing the recorded 2026-09-18 run: 31 PASS, 0 FAIL, 1 BLOCKED (TC-28, which needs production files that are not in the repository).</li>
+    <li><a href="../Testing/Tpscli-Unit-Test-Report-2026-09-18.pdf">docs/Testing/Tpscli-Unit-Test-Report-2026-09-18.pdf</a> and <a href="../Testing/Tpscli-Unit-Test-Results.json">Tpscli-Unit-Test-Results.json</a> &mdash; the printed report and the raw command output for that run.</li>
+    <li><code>tests\run-instrument.ps1</code> and <code>tests\record-instrument.js</code> &mdash; rerun every case and record the result into the instrument; <code>verify.ps1</code> &mdash; the release gate.</li>
+    <li><a href="../mySuperpower/specs/2026-09-15-tpscli-design.html">Design spec</a>, <a href="../mySuperpower/plans/2026-09-15-tpscli.html">implementation plan</a> and <a href="../mySuperpower/implementation-notes/2026-09-16-tpscli.html">implementation notes</a>.</li>
+  </ul>
+
+  <p class="top"><a href="#top">Back to top</a></p>
+</main>
+<footer>tpscli documentation &middot; IT Support User Guide &middot; tpscli 0.1.0 &middot; generated from the creating-feature-docs skill, house branding</footer>
+</body>
+</html>
