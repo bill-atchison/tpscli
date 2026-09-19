@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<!--
+  TEST-EXECUTION INSTRUMENT TEMPLATE (self-contained, offline, no network).
+  Proven engine extracted from a real suite. To adapt it you edit ONLY the marked
+  CUSTOMIZE blocks: SUITE_ID / SUITE_TITLE / SECTIONS / CASES / HEADER_FIELDS +
+  matching freshState.header keys / SIGN_ROLES + matching freshState.signoff keys /
+  renderPreamble text / the <title>, <h1>, <p class="sub">. Everything else is the
+  generic engine — leave it alone. Keep the file fully inline (no <link>/CDN/fonts).
+-->
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tpscli 0.1.0 — Test Cases</title>
+<style>
+  :root{
+    --paper:#f4efe1; --ink:#221f18; --maroon:#8a2b27; --meta-bg:#e9e1cd;
+    --label:#6d5f4e; --value:#2b2820; --amber:#a8762b; --rule:#d8cdb2; --soft:#efe7d3;
+    --ok:#3f6f3a; --bad:#8a2b27;   /* warnings reuse --amber */
+    --serif:Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);padding:1.5rem;}
+  .wrap{max-width:1100px;margin:0 auto;}
+  h1{font-family:var(--serif);font-size:2rem;margin:0 0 .3rem;}
+  .sub{font-style:italic;color:var(--label);margin:0 0 1.2rem;}
+.case{background:var(--meta-bg);border-left:5px solid var(--maroon);border-radius:10px;
+      padding:1rem 1.25rem;margin:1rem 0;}
+.case h3{margin:0 0 .3rem;font-size:1.15rem;}
+.case .pill{font-family:var(--mono);font-size:.66rem;font-weight:700;text-transform:uppercase;
+      border:1px solid currentColor;border-radius:999px;padding:.08rem .5rem;margin-left:.5rem;}
+.pill.CORE{color:var(--maroon);} .pill.HIGH{color:var(--amber);} .pill.MED{color:var(--label);}
+.chip{font-family:var(--mono);font-size:.66rem;font-weight:700;border:1px solid currentColor;
+      border-radius:999px;padding:.08rem .5rem;margin-left:.5rem;color:var(--label);}
+.chip.PASS{color:var(--ok);} .chip.FAIL{color:var(--bad);} .chip.BLOCKED{color:var(--amber);} .chip.NA{color:var(--label);}
+.case .ro{font-size:.92rem;margin:.35rem 0;}
+.case .ro b{font-family:var(--mono);font-size:.72rem;text-transform:uppercase;color:var(--label);}
+.steplist{list-style:none;padding-left:0;margin:.4rem 0;}
+.steplist li{margin:.2rem 0;font-size:.95rem;}
+.verdict label{margin-right:1rem;font-family:var(--mono);font-size:.85rem;}
+.case textarea{width:100%;font-family:var(--mono);font-size:.82rem;margin-top:.3rem;
+      border:1px solid var(--rule);border-radius:6px;padding:.4rem;background:#fbf7ec;}
+.flag{display:inline-block;font-family:var(--mono);font-size:.72rem;color:var(--amber);
+      border:1px solid var(--amber);border-radius:5px;padding:.05rem .4rem;margin-left:.5rem;}
+.escaped{white-space:pre-wrap;}
+.stepcount{font-family:var(--mono);font-size:.72rem;color:var(--label);margin-left:.5rem;}
+.stepcount.full{color:var(--ok);}
+.runhdr{background:var(--soft);border:1px solid var(--rule);border-radius:10px;padding:1rem;margin:1rem 0;}
+.hgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.6rem;}
+.hf{display:flex;flex-direction:column;font-family:var(--mono);font-size:.72rem;color:var(--label);}
+.hf input{font-size:.9rem;padding:.3rem;border:1px solid var(--rule);border-radius:5px;background:#fbf7ec;}
+.hstatus{margin-top:.6rem;font-family:var(--mono);font-size:.8rem;}
+#saveStatus.ok{color:var(--ok);} #saveStatus.warn-text{color:var(--bad);font-weight:700;}
+.resume{color:var(--amber);margin-right:1rem;}
+.signtbl input{width:100%;font-family:var(--mono);font-size:.85rem;padding:.25rem;border:1px solid var(--rule);border-radius:5px;}
+h2.sec{font-size:1.3rem;border-bottom:2px solid var(--maroon);padding-bottom:.3rem;margin:1.5rem 0 .5rem;}
+details.pre{background:var(--soft);border:1px solid var(--rule);border-radius:10px;
+      padding:.6rem 1rem;margin:1rem 0;}
+details.pre summary{cursor:pointer;font-weight:700;}
+.notice{background:#f6e7c8;border:1px solid var(--amber);border-radius:8px;padding:.7rem 1rem;
+      margin:.8rem 0;font-family:var(--mono);font-size:.85rem;}
+.notice button{margin-left:.6rem;font-family:var(--mono);cursor:pointer;}
+.dash{position:sticky;top:0;z-index:5;background:var(--paper);border-bottom:2px solid var(--maroon);
+      padding:.6rem 0;margin-bottom:1rem;}
+#counts{font-family:var(--mono);font-size:.85rem;}
+.bar{height:8px;background:var(--rule);border-radius:4px;margin:.4rem 0;overflow:hidden;}
+#barFill{height:100%;background:var(--amber);width:0;transition:width .2s;}
+.dashctl{font-family:var(--mono);font-size:.82rem;}
+.dashctl select,.dashctl button{font-family:var(--mono);font-size:.8rem;margin-left:.4rem;
+      padding:.25rem .6rem;border:1px solid var(--maroon);border-radius:6px;background:var(--meta-bg);cursor:pointer;}
+/* BRAND-REPORT-CSS:BEGIN — refreshed from skills/dollar-tree-branding/brand-report.css */
+/* Canonical DT report stylesheet — every rule #report-scoped so it can never
+   restyle instrument house screens. Token values MUST mirror brand.css
+   (parity-guarded). Repo + payload file; refreshed into instruments via
+   marked blocks per the dollar-tree-branding skill. */
+
+#report{
+  --brand-green:#009639;
+  --brand-green-dark:#007a2f;
+  --brand-green-light:#6CC24A;
+  --brand-green-link:#12823b;
+  --brand-green-header:#00953a;
+  --brand-blue:#0033a1;
+  --brand-blue-soft:#e8eefb;
+  --brand-blue-line:#c3d2f0;
+  --brand-orange:#ED8B00;
+  --brand-red:#DA291C;
+  --brand-gray-d:#4C4C4D;
+  --brand-gray-l:#DDDDDD;
+  --brand-text:#333333;
+  --brand-bg:#faf8f2;
+  --brand-soft:#f3efe6;
+  --brand-green-soft:#e6f4ea;
+  --brand-line:#dcdedd;
+  --brand-muted:#5a6b62;
+  --brand-black:#231F20;
+  --warn-soft:#fdf0d9;
+  --warn-line:#f3d39a;
+  --danger-soft:#fbe6e4;
+  --danger-line:#f1c2bd;
+}
+
+/* --- Base --- */
+#report .rpt{font-family:Futura,'Century Gothic','Calibri','Segoe UI',Arial,sans-serif;color:var(--brand-text);}
+
+/* --- Masthead --- */
+#report .rpt-hd{background:var(--brand-green);color:#fff;text-align:center;padding:22px 16px;border-bottom:4px solid var(--brand-green-light);}
+#report .rpt-wm{display:inline-block;border:2px solid rgba(255,255,255,.85);border-radius:6px;padding:6px 15px;font-weight:700;letter-spacing:.06em;font-size:16px;} /* zero-asset text-wordmark fallback — keep */
+#report .rpt-logo img{max-height:44px;width:auto;}
+#report .rpt-hd h1{font-size:24px;margin:11px 0 4px;font-weight:600;letter-spacing:0;}
+#report .rpt-sub{color:#d6efdd;font-size:13px;margin:0;}
+
+/* --- Meta table --- */
+#report .rpt-meta{width:100%;border-collapse:collapse;margin:14px 0;font-size:12px;}
+#report .rpt-meta td{border:1px solid var(--brand-line);padding:5px 9px;}
+#report .rpt-meta td:first-child{background:var(--brand-soft);font-weight:600;width:28%;color:var(--brand-gray-d);}
+
+/* --- Verdict banner --- */
+#report .rpt-verdict{border-radius:8px;padding:11px 16px;margin:14px 0;border:1px solid;border-left-width:5px;}
+#report .rpt-verdict.pass{background:var(--brand-green-soft);border-color:var(--brand-green);}
+#report .rpt-verdict.fail{background:var(--danger-soft);border-color:var(--brand-red);}
+#report .rpt-vtitle{font-weight:700;font-size:15px;}
+#report .rpt-verdict.pass .rpt-vtitle{color:var(--brand-green-dark);}
+#report .rpt-verdict.fail .rpt-vtitle{color:#a5160b;}
+#report .rpt-verdict p{margin:.3rem 0 0;font-size:12px;}
+
+/* --- Stat tiles --- */
+#report .rpt-tiles{display:flex;gap:8px;margin:14px 0;}
+#report .rpt-tiles .tile{flex:1;text-align:center;border:1px solid var(--brand-line);border-radius:8px;padding:8px 4px;background:#f7f9f7;}
+#report .rpt-tiles .tile b{display:block;font-size:23px;line-height:1;}
+#report .rpt-tiles .tile span{font-size:9px;letter-spacing:.08em;color:var(--brand-muted);}
+#report .rpt-tiles .tile.pass b{color:var(--brand-green);}
+#report .rpt-tiles .tile.fail b{color:var(--brand-red);}
+#report .rpt-tiles .tile.blk b{color:var(--brand-orange);}
+#report .rpt-tiles .tile.na b{color:var(--brand-gray-d);}
+#report .rpt-tiles .tile.nr b{color:#8a8f8b;}
+
+/* --- Section heading --- */
+#report .rpt-h2{font-size:16px;color:var(--brand-green);border-bottom:2px solid var(--brand-green-light);padding-bottom:3px;margin:20px 0 4px;font-weight:600;}
+
+/* --- Version / note lines (release-info vocabulary) --- */
+#report .rpt-ver{font-family:Consolas,monospace;font-size:12.5px;font-weight:700;color:var(--brand-green-dark);margin:10px 0 4px;}
+#report .rpt-note{font-style:italic;color:var(--brand-gray-d);font-size:12.5px;margin:6px 0;}
+
+/* --- Prose lists inside .rpt --- */
+#report .rpt ul{margin:5px 0 8px 0;padding-left:22px;}
+#report .rpt li{margin:3px 0;font-size:12.5px;line-height:1.45;}
+#report .rpt .tk{font-weight:700;color:var(--brand-green-dark);}
+#report .rpt .sub-ul{border-left:3px solid var(--brand-green-soft);padding-left:14px;margin-left:6px;}
+#report .rpt .prose{font-size:12.5px;line-height:1.5;white-space:pre-wrap;margin:6px 0;}
+#report .rpt .empty{color:#8a8f8b;font-style:italic;font-size:12px;}
+
+/* --- Affected modules table (release-info vocabulary) --- */
+#report .rpt-aff{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px;}
+#report .rpt-aff td{border:1px solid var(--brand-line);padding:5px 9px;vertical-align:top;}
+#report .rpt-aff td:first-child{width:34%;font-weight:700;color:var(--brand-green-dark);font-family:Consolas,monospace;}
+#report .rpt-aff .m{white-space:pre-wrap;font-family:Consolas,monospace;}
+
+/* --- Results table (unit-test vocabulary; sign-off is table.rpt-sign below) --- */
+#report .rpt-tbl{width:100%;border-collapse:collapse;font-size:10.5px;}
+#report .rpt-tbl th,#report .rpt-tbl td{border:1px solid var(--brand-line);padding:3px 6px;text-align:left;vertical-align:top;}
+#report .rpt-tbl th{background:var(--brand-green-soft);color:var(--brand-green-dark);}
+
+/* --- Footer --- */
+#report .rpt-foot{font-size:9px;color:var(--brand-muted);margin-top:18px;border-top:1px solid var(--brand-line);padding-top:8px;}
+
+/* --- New vocabulary for redesigned report builders --- */
+#report .rpt-badge{display:inline-block;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;letter-spacing:.02em;}
+#report .rpt-badge.pass{background:var(--brand-green-soft);color:var(--brand-green-dark);border:1px solid #bfe0c9;}
+#report .rpt-badge.fail{background:var(--danger-soft);color:#8a1c12;border:1px solid var(--danger-line);}
+#report .rpt-badge.blk{background:var(--warn-soft);color:#7a5200;border:1px solid var(--warn-line);}
+#report .rpt-badge.na{background:var(--brand-soft);color:var(--brand-gray-d);border:1px solid var(--brand-line);}
+#report .rpt-badge.info{background:var(--brand-blue-soft);color:var(--brand-blue);border:1px solid var(--brand-blue-line);}
+#report ul.rpt-timeline{margin:10px 0;padding:0 0 0 18px;border-left:2px solid var(--brand-green-light);list-style:none;}
+#report ul.rpt-timeline li{position:relative;padding:0 0 10px 12px;font-size:12.5px;}
+#report ul.rpt-timeline li::before{content:"";position:absolute;left:-23px;top:3px;width:9px;height:9px;border-radius:50%;background:var(--brand-green);box-shadow:0 0 0 2px var(--brand-green);border:2px solid #fff;}
+#report ul.rpt-timeline .when{font-size:10.5px;color:var(--brand-muted);text-transform:uppercase;letter-spacing:.05em;display:block;}
+#report table.rpt-sign{width:100%;border-collapse:collapse;margin:14px 0;font-size:12px;}
+#report table.rpt-sign td{border:1px solid var(--brand-line);padding:8px 9px;}
+#report table.rpt-sign td:first-child{background:var(--brand-soft);font-weight:600;width:32%;color:var(--brand-gray-d);}
+
+/* --- Print --- */
+@media print{
+  #report .rpt-hd,#report .rpt-h2,#report .rpt-tbl th,#report table.rpt-sign td:first-child,#report .rpt-meta td:first-child,#report .rpt-tiles .tile,#report .rpt-verdict,#report .rpt-badge{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  #report .rpt-tbl tr,#report .rpt-sign tr{page-break-inside:avoid;}
+  #report .rpt ul,#report .rpt li{page-break-inside:avoid;}
+}
+/* BRAND-REPORT-CSS:END */
+#report{display:none;}
+@media print{
+  body{padding:0;background:#fff;}
+  #loadNotice,#preamble,#runHeader,#dashboard,#cases,#signoff{display:none !important;}
+  #report{display:block !important;}
+  .rpt-hd,.rpt-h2,.rpt-tbl th,.rpt-sign th,.rpt-meta td:first-child,.rpt-tiles .tile,.rpt-verdict{
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .rpt-tbl tr,.rpt-sign tr{page-break-inside:avoid;}
+}
+</style></head><body><div class="wrap">
+  <!-- >>> CUSTOMIZE: title + one-line subtitle <<< -->
+  <h1>tpscli 0.1.0 — Test Cases</h1>
+  <p class="sub">SQL over TopSpeed files · tick steps, record verdicts, print a PDF report.</p>
+  <div id="loadNotice"></div>
+  <div id="preamble"></div>
+  <div id="runHeader"></div>
+  <div id="dashboard"></div>
+  <div id="cases"></div>
+  <div id="report"></div>
+  <div id="signoff"></div>
+</div>
+<script>
+"use strict";
+
+/* ============================ CUSTOMIZE START ============================ */
+var SCHEMA_VERSION = "v1";          // bump ONLY on a breaking change to the CASES shape
+var SUITE_ID = "tpscli-0-1-0";      // stable lowercase slug — keys localStorage
+var STORAGE_KEY = "uts:" + SUITE_ID + ":" + SCHEMA_VERSION;
+var SUITE_TITLE = "tpscli 0.1.0 — SQL over TopSpeed files";   // heading on the printed report
+
+// Sections drive the filter dropdown. One key per logical group of cases.
+var SECTIONS = [
+  {key:"setup",    label:"Build, corpus and CLI contract"},
+  {key:"describe", label:"DESCRIBE"},
+  {key:"select",   label:"SELECT"},
+  {key:"insert",   label:"INSERT"},
+  {key:"mutate",   label:"UPDATE and DELETE (transactional)"},
+  {key:"gate",     label:"Release gate (verify.ps1)"}
+];
+
+// One object per test case. RULE: one source-numbered action = one steps[] entry = one checkbox.
+// priority is "CORE" | "HIGH" | "MED". section must match a SECTIONS key.
+var CASES = [
+  { id:"TC-01", section:"setup", priority:"CORE",
+    title:"Build tpscli.exe as a console executable",
+    pre:"Clarion 12.0.14000 installed at C:\\Clarion12. Repository checked out at branch feature/tpscli-impl (or tag v0.1.0). PowerShell open at the repository root (CP-1).",
+    steps:[
+      "Run: powershell -NoProfile -ExecutionPolicy Bypass -File tools\\build.ps1",
+      "Read the last lines of the output.",
+      "Run: (Get-Item tpscli.exe).LastWriteTime and compare it with the current time."
+    ],
+    expected:"The output contains no line containing the word error (warnings about PEEK and 'Calling function as procedure' are expected) and ends with subsystem=3 (console). The exe timestamp is within the last minute. If any error line appears, record FAIL and paste it into Notes." },
+
+  { id:"TC-02", section:"setup", priority:"CORE",
+    title:"Generate the test corpus with the oracle dumps",
+    pre:"TC-01 passed.",
+    steps:[
+      "Run: powershell -NoProfile -ExecutionPolicy Bypass -File tools\\build.ps1 -Proj testdata\\gen\\mkcorpus.cwproj",
+      "Run from the repository root (CP-2): testdata\\gen\\mkcorpus.exe",
+      "Run: Get-ChildItem testdata\\*.TPS, testdata\\expected\\*.json"
+    ],
+    expected:"Six files exist under testdata: ALLTYPES.TPS, GROUPS.TPS, KEYS.TPS, MEMOS.TPS, NOKEY.TPS, SECRET.TPS, each with a matching .json under testdata\\expected. mkcorpus prints nothing on stderr. If it prints a line such as 'CREATE ALLTYPES: 47 ...', record FAIL and paste it." },
+
+  { id:"TC-03", section:"setup", priority:"HIGH",
+    title:"--version prints the version object and exits 0",
+    pre:"TC-01 passed.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe --version",
+      "Run: $LASTEXITCODE"
+    ],
+    expected:"One line of the form { \"ok\": true, \"op\": null, \"version\": \"0.1.0\", \"complete\": true }; ok, op null and complete true must be present. Exit code 0." },
+
+  { id:"TC-04", section:"setup", priority:"HIGH",
+    title:"No statement given is a SYNTAX error with exit 1",
+    pre:"TC-01 passed.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe < $null   (if it waits on stdin instead, press Ctrl+Z then Enter)",
+      "Run: $LASTEXITCODE"
+    ],
+    expected:"A JSON line with \"ok\": false and \"code\": \"SYNTAX\" whose message says no SQL statement was given, ending with \"complete\": true. Exit code 1." },
+
+  { id:"TC-05", section:"setup", priority:"HIGH",
+    title:"A missing file is FILE_NOT_FOUND with exit 2",
+    pre:"TC-01 passed.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"SELECT * FROM [testdata\\NOPE.TPS]\"",
+      "Run: $LASTEXITCODE"
+    ],
+    expected:"JSON with \"ok\": false, \"code\": \"FILE_NOT_FOUND\", ending with \"complete\": true. Exit code 2. Nothing is printed on stderr." },
+
+  { id:"TC-06", section:"setup", priority:"MED",
+    title:"--parse-only validates without touching data",
+    pre:"TC-02 passed.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe --parse-only \"INSERT INTO [testdata\\ALLTYPES.TPS] (ID, B) VALUES (12, 300)\"",
+      "Run (CP-2): .\\tpscli.exe \"DESCRIBE [testdata\\ALLTYPES.TPS]\""
+    ],
+    expected:"Step 1 returns \"ok\": false with \"code\": \"VALUE_OUT_OF_RANGE\", \"column\": \"B\" and a position and token, exit 3. Step 2 still reports \"records\": 3, proving nothing was written." },
+
+  { id:"TC-07", section:"describe", priority:"CORE",
+    title:"DESCRIBE reports fields, keys and the record count",
+    pre:"TC-02 passed.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"DESCRIBE [testdata\\KEYS.TPS]\"",
+      "Locate \"records\" in the output.",
+      "Locate the keys array and count its entries."
+    ],
+    expected:"\"ok\": true, \"op\": \"describe\", fields ID, NAME, CODE, AMOUNT listed with their types, \"records\": 5, five keys including PKEY marked primary, and \"complete\": true. Exit code 0." },
+
+  { id:"TC-08", section:"describe", priority:"CORE",
+    title:"Encrypted file requires --owner and never echoes it",
+    pre:"TC-02 passed. The corpus owner string for SECRET.TPS is s3cret.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"DESCRIBE [testdata\\SECRET.TPS]\"",
+      "Run: $LASTEXITCODE",
+      "Run (CP-2): .\\tpscli.exe --owner s3cret \"DESCRIBE [testdata\\SECRET.TPS]\"",
+      "Search both outputs for the text s3cret."
+    ],
+    expected:"Step 1: \"code\": \"OWNER_REQUIRED\" (or OWNER_WRONG), exit 2. Step 3: \"ok\": true with \"records\": 2. The string s3cret appears in neither output. If it appears anywhere, record FAIL." },
+
+  { id:"TC-09", section:"describe", priority:"HIGH",
+    title:"DESCRIBE output matches the DynFile oracle dump",
+    pre:"TC-02 passed.",
+    steps:[
+      "Run: powershell -NoProfile -ExecutionPolicy Bypass -File tests\\describe.ps1",
+      "Run: $LASTEXITCODE"
+    ],
+    expected:"The script prints no MISMATCH lines and exits 0. It compares --dump-schema for all six corpus files against testdata\\expected\\*.json field by field." },
+
+  { id:"TC-10", section:"select", priority:"CORE",
+    title:"SELECT a column list with WHERE on the primary key",
+    pre:"TC-02 passed.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID, STR, D, DT, TM, ARR[2] FROM [testdata\\ALLTYPES.TPS] WHERE ID = 1\""
+    ],
+    expected:"columns ID LONG, STR STRING, D DECIMAL, DT DATE, TM TIME, ARR[2] SHORT; rows [[1,\"alpha\",\"12345.67\",\"2026-09-15\",\"13:45:30.00\",20]]; \"row_count\": 1, \"truncated\": false, \"complete\": true. Exit 0. DECIMAL is a quoted string, DATE is YYYY-MM-DD, TIME is HH:MM:SS.hh." },
+
+  { id:"TC-11", section:"select", priority:"CORE",
+    title:"Nested GROUP paths and DIM'd group leaves are readable",
+    pre:"TC-02 passed.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"SELECT ADDR.CITY FROM [testdata\\GROUPS.TPS] WHERE ID = 1\"",
+      "Run (CP-2): .\\tpscli.exe \"SELECT PHONES[2].EXT[2] FROM [testdata\\GROUPS.TPS] WHERE ID = 1\"",
+      "Run (CP-2): .\\tpscli.exe \"SELECT * FROM [testdata\\GROUPS.TPS] ORDER BY ID LIMIT 1\""
+    ],
+    expected:"Step 1 rows [[\"Springfield\"]]. Step 2 rows [[\"b2\"]]. Step 3 expands * to 21 columns including PHONES[1].KIND through PHONES[2].EXT[2] and GRID[1] through GRID[6], returns one row with \"truncated\": true." },
+
+  { id:"TC-12", section:"select", priority:"HIGH",
+    title:"WHERE and ORDER BY on a leaf inside a DIM'd GROUP are refused",
+    pre:"TC-02 passed.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID FROM [testdata\\GROUPS.TPS] WHERE PHONES[2].KIND = 'M' ORDER BY ID\"",
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID FROM [testdata\\GROUPS.TPS] ORDER BY PHONES[2].KIND\"",
+      "Run: $LASTEXITCODE"
+    ],
+    expected:"Both return \"ok\": false, \"code\": \"UNSUPPORTED\" with \"token\": \"PHONES[2].KIND\" and \"outcome\": \"none\". Exit 1. Plain array subscripts such as ARR[2] remain allowed (TC-10)." },
+
+  { id:"TC-13", section:"select", priority:"CORE",
+    title:"ORDER BY, LIMIT and OFFSET with the truncated flag",
+    pre:"TC-02 passed. KEYS.TPS holds IDs 1 to 5.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID FROM [testdata\\KEYS.TPS] ORDER BY ID LIMIT 2 OFFSET 1\"",
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID FROM [testdata\\KEYS.TPS] LIMIT 5\"",
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID FROM [testdata\\KEYS.TPS] WHERE ID > 999\""
+    ],
+    expected:"Step 1 rows [[2],[3]] with \"truncated\": true. Step 2 returns five rows with \"truncated\": false (the limit exactly exhausts the rows). Step 3 returns \"rows\": [] with \"row_count\": 0 and \"ok\": true, exit 0." },
+
+  { id:"TC-14", section:"select", priority:"HIGH",
+    title:"LIKE, IN and a DESC sort served by a matching key",
+    pre:"TC-02 passed.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID FROM [testdata\\KEYS.TPS] WHERE NAME LIKE '%a%' ORDER BY AMOUNT DESC, ID\"",
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID, NAME FROM [testdata\\KEYS.TPS] WHERE CODE IN ('A','E') ORDER BY NAME\"",
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID, CODE FROM [testdata\\KEYS.TPS] ORDER BY CODE\""
+    ],
+    expected:"Step 1 returns the rows whose NAME contains a lowercase a, ordered by AMOUNT descending then ID. Step 2 returns IDs 1 and 5 ordered by NAME. Step 3 returns all five rows ordered by CODE with the blank codes first (in-memory sort, because the OPT key on CODE is never used)." },
+
+  { id:"TC-15", section:"select", priority:"HIGH",
+    title:"MEMO, BINARY MEMO and BLOB columns are returned as valid JSON",
+    pre:"TC-02 passed.",
+    steps:[
+      "Run (CP-2): $line = .\\tpscli.exe \"SELECT ID, NOTES, BIN, PIC FROM [testdata\\MEMOS.TPS] WHERE ID = 1\"",
+      "Run: $line | ConvertFrom-Json"
+    ],
+    expected:"NOTES is returned as text; in BIN every control byte below 32 and every byte of 128 or more is escaped as \\u00xx (the fixture holds CHR(0) and CHR(255), so \\u0000 and \\u00ff appear); PIC is a base64 string. Step 2 parses without error. If ConvertFrom-Json throws, record FAIL and paste the error." },
+
+  { id:"TC-16", section:"select", priority:"MED",
+    title:"--table renders an aligned grid with a summary line",
+    pre:"TC-02 passed.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID, NAME, CODE, AMOUNT FROM [testdata\\KEYS.TPS] ORDER BY ID\" --table",
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID FROM [testdata\\NOPE.TPS]\" --table"
+    ],
+    expected:"Step 1 prints a header row, a dashed rule, five data rows with numeric columns right-aligned and text left-aligned, and a final line (5 rows). Step 2 prints one line FILE_NOT_FOUND: followed by the message, exit 2." },
+
+  { id:"TC-17", section:"insert", priority:"CORE",
+    title:"INSERT typed literals and read the row back",
+    pre:"Fresh work copy of ALLTYPES (CP-3).",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, STR, D, DT, TM, ARR[3]) VALUES (9, 'nine', 9.995, '2026-01-31', '23:59:59', 7)\"",
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID, STR, D, DT, TM, ARR[3] FROM [testdata\\work\\ALLTYPES.TPS] WHERE ID = 9\"",
+      "Run (CP-2): .\\tpscli.exe \"DESCRIBE [testdata\\work\\ALLTYPES.TPS]\""
+    ],
+    expected:"Step 1: { \"ok\": true, \"op\": \"insert\", \"affected\": 1, \"complete\": true }, exit 0. Step 2 rows [[9,\"nine\",\"10\",\"2026-01-31\",\"23:59:59.00\",7]] (9.995 rounds half away from zero into DECIMAL(7,2); trailing fraction zeros are trimmed). Step 3 \"records\": 4." },
+
+  { id:"TC-18", section:"insert", priority:"CORE",
+    title:"Duplicate primary key is DUPLICATE_KEY with outcome none",
+    pre:"TC-17 completed on the same work copy.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID) VALUES (9)\"",
+      "Run: $LASTEXITCODE",
+      "Run (CP-2): .\\tpscli.exe \"DESCRIBE [testdata\\work\\ALLTYPES.TPS]\""
+    ],
+    expected:"Step 1: \"ok\": false, \"code\": \"DUPLICATE_KEY\", \"key\": \"IDKEY\", \"outcome\": \"none\". Step 2: exit 3. Step 3 still shows \"records\": 4." },
+
+  { id:"TC-19", section:"insert", priority:"HIGH",
+    title:"String overflow truncates with a warning; bad values are VALUE_OUT_OF_RANGE",
+    pre:"TC-18 completed on the same work copy.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, STR) VALUES (10, 'this string is far longer than twenty characters')\"",
+      "Run (CP-2): .\\tpscli.exe \"INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, DT) VALUES (11, '2026-02-30')\"",
+      "Run (CP-2): .\\tpscli.exe \"INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, B) VALUES (12, 300)\"",
+      "Run (CP-2): .\\tpscli.exe \"INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, S) VALUES (13, 1.5)\"",
+      "Run (CP-2): .\\tpscli.exe \"INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, D) VALUES (14, 123456.78)\"",
+      "Run (CP-2): .\\tpscli.exe \"DESCRIBE [testdata\\work\\ALLTYPES.TPS]\""
+    ],
+    expected:"Step 1 succeeds with \"affected\": 1 and a warnings array containing \"code\": \"STRING_TRUNCATED\", \"column\": \"STR\". Steps 2 to 5 each return \"ok\": false, \"code\": \"VALUE_OUT_OF_RANGE\" naming the column (DT, B, S, D), \"outcome\": \"none\", exit 3. Step 6 shows \"records\": 5 (only step 1 wrote a row)." },
+
+  { id:"TC-20", section:"insert", priority:"HIGH",
+    title:"A STRING with a picture refuses a literal the picture cannot read",
+    pre:"Fresh work copy of ALLTYPES (CP-3). The PIC column is STRING(@N9.2).",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, PIC) VALUES (20, 'rrr')\"",
+      "Run (CP-2): .\\tpscli.exe \"INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, PIC) VALUES (21, '7')\"",
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID, PIC FROM [testdata\\work\\ALLTYPES.TPS] WHERE ID > 19\""
+    ],
+    expected:"Step 1: \"code\": \"VALUE_OUT_OF_RANGE\" with the message PIC does not match picture @N9.2, exit 3. Step 2: \"affected\": 1. Step 3 rows [[21,\"00007.00\"]] only." },
+
+  { id:"TC-21", section:"insert", priority:"HIGH",
+    title:"BLOB round trip, including a value over 4 KB of base64",
+    pre:"Fresh work copy of MEMOS (CP-3).",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"INSERT INTO [testdata\\work\\MEMOS.TPS] (ID, TITLE, PIC) VALUES (3, 'blobtest', 'UE5HPw==')\"",
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID, TITLE, PIC FROM [testdata\\work\\MEMOS.TPS] WHERE ID = 3\"",
+      "Run: $b = [Convert]::ToBase64String([byte[]](1..3150 | ForEach-Object { $_ % 256 }))",
+      "Run (CP-2): .\\tpscli.exe \"INSERT INTO [testdata\\work\\MEMOS.TPS] (ID, TITLE, PIC) VALUES (4, 'bigblob', '$b')\"",
+      "Run (CP-2): $out = .\\tpscli.exe \"SELECT PIC FROM [testdata\\work\\MEMOS.TPS] WHERE ID = 4\"; ($out | ConvertFrom-Json).rows[0][0] -eq $b"
+    ],
+    expected:"Step 2 rows [[3,\"blobtest\",\"UE5HPw==\"]]. Step 4 \"affected\": 1. Step 5 prints True: the 4200-character base64 value comes back identical and the response parsed as JSON. If it prints False or ConvertFrom-Json throws, record FAIL." },
+
+  { id:"TC-22", section:"mutate", priority:"CORE",
+    title:"UPDATE that creates a duplicate on a unique key rolls back every row",
+    pre:"Fresh work copy of KEYS (CP-3). IDs 1 to 5; IDs 2 and 4 have a blank CODE; OPTKEY on CODE is unique.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"UPDATE [testdata\\work\\KEYS.TPS] SET CODE = 'Z' WHERE CODE = ''\"",
+      "Run: $LASTEXITCODE",
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID, CODE FROM [testdata\\work\\KEYS.TPS] WHERE ID IN (2,4) ORDER BY ID\""
+    ],
+    expected:"Step 1: \"code\": \"DUPLICATE_KEY\", \"row\": \"4\", \"outcome\": \"rolled_back\", \"matched\": 2, \"affected\": 0. Step 2: exit 3. Step 3 rows [[2,\"\"],[4,\"\"]]: the first row's write was undone by the rollback." },
+
+  { id:"TC-23", section:"mutate", priority:"CORE",
+    title:"Multi-row UPDATE, key-component UPDATE and DELETE report matched and affected",
+    pre:"TC-22 completed on the same work copy.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"UPDATE [testdata\\work\\KEYS.TPS] SET NAME = 'zulu' WHERE CODE = ''\"",
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID FROM [testdata\\work\\KEYS.TPS] WHERE NAME = 'zulu' ORDER BY ID\"",
+      "Run (CP-2): .\\tpscli.exe \"UPDATE [testdata\\work\\KEYS.TPS] SET AMOUNT = 100 WHERE ID = 1\"",
+      "Run (CP-2): .\\tpscli.exe \"UPDATE [testdata\\work\\KEYS.TPS] SET ID = 2 WHERE ID = 3\"",
+      "Run (CP-2): .\\tpscli.exe \"DELETE FROM [testdata\\work\\KEYS.TPS] WHERE AMOUNT < 3\"",
+      "Run (CP-2): .\\tpscli.exe \"DESCRIBE [testdata\\work\\KEYS.TPS]\"",
+      "Run (CP-2): .\\tpscli.exe \"DELETE FROM [testdata\\work\\KEYS.TPS] WHERE 1 = 1\"",
+      "Run (CP-2): .\\tpscli.exe \"DESCRIBE [testdata\\work\\KEYS.TPS]\""
+    ],
+    expected:"Step 1 \"matched\": 2, \"affected\": 2. Step 2 rows [[2],[4]]. Step 3 matched 1, affected 1. Step 4 DUPLICATE_KEY, rolled_back, matched 1, affected 0, exit 3. Step 5 matched 2, affected 2. Step 6 \"records\": 3. Step 7 matched 3, affected 3. Step 8 \"records\": 0." },
+
+  { id:"TC-24", section:"mutate", priority:"HIGH",
+    title:"UPDATE and DELETE refuse a missing WHERE, LIMIT and non-literal values",
+    pre:"Fresh work copy of KEYS (CP-3).",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"DELETE FROM [testdata\\work\\KEYS.TPS]\"",
+      "Run (CP-2): .\\tpscli.exe \"UPDATE [testdata\\work\\KEYS.TPS] SET NAME = 'x' WHERE ID > 0 LIMIT 1\"",
+      "Run (CP-2): .\\tpscli.exe \"UPDATE [testdata\\work\\KEYS.TPS] SET NAME = NAME WHERE ID = 1\"",
+      "Run (CP-2): .\\tpscli.exe \"DESCRIBE [testdata\\work\\KEYS.TPS]\""
+    ],
+    expected:"Step 1 \"code\": \"WHERE_REQUIRED\", exit 1. Step 2 \"code\": \"UNSUPPORTED\" (LIMIT on a write), exit 1. Step 3 \"code\": \"SYNTAX\" (a literal is required), exit 1. Every one has \"outcome\": \"none\". Step 4 still shows \"records\": 5." },
+
+  { id:"TC-25", section:"mutate", priority:"CORE",
+    title:"A record held by another process makes DELETE roll back with RECORD_HELD",
+    pre:"Fresh work copy of KEYS (CP-3). tests\\hold.exe built (CP-4).",
+    steps:[
+      "Start the holder (CP-4): Start-Process tests\\hold.exe -WorkingDirectory (Get-Location) -NoNewWindow",
+      "Wait until the file testdata\\work\\held.flag exists (poll with Test-Path; it appears within a second and the hold lasts eight seconds).",
+      "Run (CP-2) immediately: .\\tpscli.exe \"DELETE FROM [testdata\\work\\KEYS.TPS] WHERE ID > 0\"",
+      "Run: $LASTEXITCODE",
+      "Wait until testdata\\work\\held.flag no longer exists, then run (CP-2): .\\tpscli.exe \"DESCRIBE [testdata\\work\\KEYS.TPS]\""
+    ],
+    expected:"Step 3: \"code\": \"RECORD_HELD\", \"row\": \"2\", message Record held by another process (2). Statement rolled back., \"outcome\": \"rolled_back\", \"matched\": 5, \"affected\": 0. Step 4 exit 3. Step 5 \"records\": 5: row 1, deleted inside the transaction before row 2 was found held, is back. If the DELETE instead succeeds with \"affected\": 5, the holder was not running in time: retry once from step 1 before recording FAIL." },
+
+  { id:"TC-26", section:"gate", priority:"CORE",
+    title:"The five test suites pass",
+    pre:"TC-01 and TC-02 passed; tests\\hold.exe built (CP-4).",
+    steps:[
+      "Run: powershell -NoProfile -ExecutionPolicy Bypass -File tests\\describe.ps1; $LASTEXITCODE",
+      "Run: powershell -NoProfile -ExecutionPolicy Bypass -File tests\\parser.ps1; $LASTEXITCODE",
+      "Run: powershell -NoProfile -ExecutionPolicy Bypass -File tests\\select.ps1; $LASTEXITCODE",
+      "Run: powershell -NoProfile -ExecutionPolicy Bypass -File tests\\insert.ps1; $LASTEXITCODE",
+      "Run: powershell -NoProfile -ExecutionPolicy Bypass -File tests\\update.ps1; $LASTEXITCODE"
+    ],
+    expected:"Each script prints its OK line (parser.ps1: OK (N source lines), select.ps1: OK (17 cases), insert.ps1: OK, update.ps1: OK; describe.ps1 is silent on success) and exits 0. Any MISMATCH line is a FAIL: paste it into Notes." },
+
+  { id:"TC-27", section:"gate", priority:"CORE",
+    title:"verify.ps1 passes on the corpus and declares the skipped steps",
+    pre:"Repository root in PowerShell (CP-1). No -Extra folder is available in this repository.",
+    steps:[
+      "Run: powershell -NoProfile -ExecutionPolicy Bypass -File verify.ps1",
+      "Run: $LASTEXITCODE",
+      "Count the PASS, SKIP and FAIL lines."
+    ],
+    expected:"Every step line reads PASS except two SKIP lines (step 4 dictionary parity, step 5 TPSFix log). The closing line is verify.ps1: all steps PASS (2 skipped - not a release qualification). Exit 0. The step 7 median is under 250 ms; if it fails while the machine is under heavy load, note the median and re-run once with the machine idle before recording FAIL." },
+
+  { id:"TC-28", section:"gate", priority:"HIGH",
+    title:"Release qualification against real dtpos files (dev-supplied input)",
+    pre:"A folder of copied dtpos .TPS files, the matching oracle JSON folder produced from the dictionary, and a TPSFix log from the same day, all supplied by development. Never point -Extra at live store data.",
+    steps:[
+      "Run: powershell -NoProfile -ExecutionPolicy Bypass -File verify.ps1 -Extra FOLDER -Expected FOLDER -TpsFixLog FILE (substitute the three paths development supplied)",
+      "Run: $LASTEXITCODE",
+      "Record every FAIL line and every note mentioning UNSUPPORTED_FIELD_TYPE or DEFINITION_UNREADABLE in Notes."
+    ],
+    expected:"Every step reads PASS with no SKIP lines and exit 0. A file that fails with UNSUPPORTED_FIELD_TYPE or DEFINITION_UNREADABLE is a FAIL to be reported with the file name and the type code; do not loosen the gate. If development cannot supply the inputs, record BLOCKED." },
+
+  { id:"TC-29", section:"select", priority:"HIGH",
+    title:"A two-column ORDER BY served by a key walked in reverse",
+    pre:"TC-02 passed. KEYS.TPS has DESCKEY on (-AMOUNT, +ID).",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID FROM [testdata\\KEYS.TPS] ORDER BY AMOUNT ASC, ID DESC\""
+    ],
+    expected:"rows [[5],[4],[3],[2],[1]] (AMOUNT 1 to 5 ascending), \"truncated\": false, exit 0. The key is walked backwards rather than sorted in memory; the result is identical either way, so any other order is a FAIL." },
+
+  { id:"TC-30", section:"insert", priority:"HIGH",
+    title:"A DECIMAL literal that needs the field's full declared width is accepted",
+    pre:"Fresh work copy of ALLTYPES (CP-3). D is DECIMAL(7,2).",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, D) VALUES (50, 54321.99)\"",
+      "Run (CP-2): .\\tpscli.exe \"SELECT ID, D FROM [testdata\\work\\ALLTYPES.TPS] WHERE ID = 50\""
+    ],
+    expected:"Step 1 \"affected\": 1, exit 0. Step 2 rows [[50,\"54321.99\"]]. If step 1 instead reports VALUE_OUT_OF_RANGE with a message such as overflows DECIMAL(4,2), record FAIL: the definition width is being read from the wrong byte." },
+
+  { id:"TC-31", section:"mutate", priority:"MED",
+    title:"UPDATE with no matching row reports matched 0 and opens no transaction",
+    pre:"Fresh work copy of KEYS (CP-3).",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe \"UPDATE [testdata\\work\\KEYS.TPS] SET NAME = 'nobody' WHERE ID = 999\"",
+      "Run: $LASTEXITCODE"
+    ],
+    expected:"{ \"ok\": true, \"op\": \"update\", \"matched\": 0, \"affected\": 0, \"complete\": true }, exit 0. No outcome field is present because nothing was written." },
+
+  { id:"TC-32", section:"setup", priority:"HIGH",
+    title:"Unsupported SQL constructs are refused with UNSUPPORTED",
+    pre:"TC-02 passed.",
+    steps:[
+      "Run (CP-2): .\\tpscli.exe --parse-only \"SELECT COUNT(*) FROM [testdata\\KEYS.TPS]\"",
+      "Run (CP-2): .\\tpscli.exe --parse-only \"SELECT ID FROM [testdata\\KEYS.TPS] WHERE CODE IS NULL\"",
+      "Run (CP-2): .\\tpscli.exe --parse-only \"SELECT ID FROM [testdata\\KEYS.TPS] GROUP BY CODE\"",
+      "Run (CP-2): .\\tpscli.exe --parse-only \"SELECT ID FROM [testdata\\KEYS.TPS] WHERE AMOUNT + 1 = 5\"",
+      "Run: $LASTEXITCODE"
+    ],
+    expected:"Each returns \"ok\": false, \"code\": \"UNSUPPORTED\" with a position and token naming the offending token (COUNT, IS, GROUP, +) and a message such as Aggregate functions are not supported (COUNT), IS NULL is not supported; TPS has no NULL, or Arithmetic expressions are not supported, \"outcome\": \"none\". Exit 1. The full grammar table is exercised by tests\\parser.ps1 in TC-26; these four are the ones a caller is most likely to try." }
+];
+
+// Run-header fields (key, label). Edit to fit the project; KEEP keys in sync with
+// freshState().header below. Values are free text the tester fills in.
+var HEADER_FIELDS = [
+  ["tester","Tester"],["lead","Reviewer / Lead"],["date","Date"],
+  ["build","Build / version under test"],["env","Environment"],
+  ["component","Component / area"],["ref","Ticket / branch"]
+];
+
+// Sign-off roles (key, label). KEEP keys in sync with freshState().signoff below.
+var SIGN_ROLES = [["tester","Tester"],["lead","Reviewer / Lead"],["owner","Owner"]];
+
+function freshState(){
+  var cases = {};
+  CASES.forEach(function(c){
+    cases[c.id] = { steps: c.steps.map(function(){ return false; }),
+                    verdict: "", notes: "", evidence: "" };
+  });
+  return {
+    // >>> keys here MUST match HEADER_FIELDS keys <<<
+    header:  { tester:"", lead:"", date:"", build:"", env:"", component:"", ref:"" },
+    // >>> keys here MUST match SIGN_ROLES keys <<<
+    signoff: { tester:{name:"",date:"",result:""}, lead:{name:"",date:"",result:""},
+               owner:{name:"",date:"",result:""} },
+    cases:   cases,
+    resumed: false
+  };
+}
+
+function renderPreamble(){
+  document.getElementById("preamble").innerHTML =
+    '<details class="pre" open><summary>Scope, prerequisites &amp; environment (read first)</summary>'+
+    '<p><b>Scope.</b> tpscli 0.1.0: a console executable that runs one SQL statement (DESCRIBE, SELECT, INSERT, UPDATE, DELETE) against a TopSpeed (.TPS) file and answers with one JSON line ending in <code>"complete": true</code>, or a text grid with <code>--table</code>. This suite validates the build, the CLI contract, every statement type on the generated corpus, the transactional rollback protocol, and the release-gate script.</p>'+
+    '<p><b>Prerequisites.</b> Windows with Clarion 12.0.14000 at C:\\Clarion12 and .NET Framework 4 MSBuild; the repository (branch feature/tpscli-impl or tag v0.1.0) checked out; a PowerShell 5 or 7 window opened at the repository root. Exit codes: 0 ok, 1 syntax/validation, 2 file/definition, 3 runtime; every failure JSON carries <code>"ok": false</code>, an <code>error.code</code> and, on writes, <code>"outcome"</code> (none, rolled_back or unknown).</p>'+
+    '<p><b>Known watch-point.</b> A crashed Clarion exe blocks behind a modal runtime dialog. If a command does not return within 20 seconds, look for that dialog, dismiss it, record FAIL with the dialog text, and continue. Never run any case against live store data: TC-17 onward write only to copies under testdata\\work.</p>'+
+    '<h4>Common procedures</h4>'+
+    '<p><b>CP-1 Repository root.</b> Open PowerShell and run <code>Set-Location C:\\Projects\\GitHub\\tpscli</code> (or wherever the repository was cloned). Every command in this suite is typed at that prompt. Read the exit code of the last native command with <code>$LASTEXITCODE</code>.</p>'+
+    '<p><b>CP-2 Run one statement.</b> Type <code>.\\tpscli.exe "&lt;statement&gt;"</code> with the SQL in double quotes; options such as <code>--owner</code>, <code>--table</code> or <code>--parse-only</code> go before or after the statement. Table names are bracketed paths relative to the repository root, for example <code>[testdata\\KEYS.TPS]</code>. To view the JSON as an object, run <code>.\\tpscli.exe "..." | ConvertFrom-Json</code>.</p>'+
+    '<p><b>CP-3 Fresh work copy.</b> Writes must never touch the corpus fixtures. Run <code>New-Item -ItemType Directory -Force testdata\\work | Out-Null</code> once, then <code>Copy-Item testdata\\&lt;NAME&gt;.TPS testdata\\work\\&lt;NAME&gt;.TPS -Force</code> for the file the case names (ALLTYPES, KEYS or MEMOS). Each case that says "fresh work copy" starts from this step; cases that say "same work copy" continue on the previous one.</p>'+
+    '<p><b>CP-4 Record-hold helper.</b> Build it once with <code>powershell -NoProfile -ExecutionPolicy Bypass -File tools\\build.ps1 -Proj tests\\hold.cwproj</code>. When started from the repository root, <code>tests\\hold.exe</code> opens testdata\\work\\KEYS.TPS shared, holds the record with ID 2 for eight seconds, creates testdata\\work\\held.flag while the hold is in place, then releases and deletes the flag. It exits 0 on success; exit 2, 3 or 4 means it could not open, hold, or write the flag.</p>'+
+    '</details>';
+}
+/* ============================= CUSTOMIZE END ============================= */
+
+
+/* ===== GENERIC ENGINE BELOW — do not edit ===== */
+var loadError = false, storageOK = true, saveTimer = null;
+
+function timeNow(){
+  var d = new Date(), p = function(n){ return (n<10?"0":"")+n; };
+  return p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds());
+}
+
+function loadState(){
+  var raw = null;
+  try { raw = localStorage.getItem(STORAGE_KEY); } catch(e){ storageOK = false; }
+  if(!raw) return freshState();
+  var s;
+  try { s = JSON.parse(raw); }
+  catch(e){ loadError = true; return freshState(); }   // unparseable — don't wipe; show notice
+  return hydrate(s);
+}
+
+// Merge valid values over a fresh skeleton so a drifted/partial save never throws at render.
+function hydrate(s){
+  var fresh = freshState();
+  if(!s || typeof s !== "object"){ loadError = true; return fresh; }
+  if(s.header && typeof s.header === "object"){
+    Object.keys(fresh.header).forEach(function(k){
+      if(typeof s.header[k] === "string") fresh.header[k] = s.header[k];
+    });
+  }
+  if(s.signoff && typeof s.signoff === "object"){
+    Object.keys(fresh.signoff).forEach(function(role){
+      var src = s.signoff[role]; if(!src) return;
+      ["name","date","result"].forEach(function(fld){
+        if(typeof src[fld] === "string") fresh.signoff[role][fld] = src[fld];
+      });
+    });
+  }
+  if(s.cases && typeof s.cases === "object"){
+    CASES.forEach(function(c){
+      var src = s.cases[c.id]; if(!src) return;
+      var dst = fresh.cases[c.id];
+      if(["PASS","FAIL","BLOCKED","NA",""].indexOf(src.verdict) !== -1) dst.verdict = src.verdict;
+      if(typeof src.notes === "string") dst.notes = src.notes;
+      if(typeof src.evidence === "string") dst.evidence = src.evidence;
+      if(Array.isArray(src.steps) && src.steps.length === dst.steps.length){
+        dst.steps = src.steps.map(function(b){ return !!b; });
+      }
+    });
+  }
+  fresh.resumed = true;
+  return fresh;
+}
+
+function flushState(){
+  if(loadError) return;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); storageOK = true; setSaveStatus("Saved " + timeNow()); }
+  catch(e){ storageOK = false; setSaveStatus("Not saving — print before you close"); }
+}
+function saveState(){ clearTimeout(saveTimer); saveTimer = setTimeout(flushState, 400); }
+
+var state = loadState();
+window.addEventListener("pagehide", flushState);
+document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "hidden") flushState(); });
+window.addEventListener("beforeprint", flushState);
+
+function setSaveStatus(msg){
+  var el = document.getElementById("saveStatus");
+  if(el){ el.textContent = msg; el.className = storageOK ? "ok" : "warn-text"; }
+}
+function bindHeaderInput(key){ return function(e){ state.header[key] = e.target.value; saveState(); }; }
+function renderHeader(){
+  var rows = HEADER_FIELDS.map(function(f){
+    return '<label class="hf">'+f[1]+'<input id="h_'+f[0]+'" value="'+esc(state.header[f[0]])+'"></label>';
+  }).join("");
+  var resume = state.resumed ? '<span class="resume">Resumed run — last-saved data restored</span>' : '';
+  document.getElementById("runHeader").innerHTML =
+    '<div class="runhdr"><div class="hgrid">'+rows+'</div>'+
+    '<div class="hstatus">'+resume+'<span id="saveStatus"></span></div></div>';
+  HEADER_FIELDS.forEach(function(f){
+    document.getElementById("h_"+f[0]).addEventListener("input", bindHeaderInput(f[0]));
+  });
+}
+
+function renderSignoff(){
+  var rows = SIGN_ROLES.map(function(r){
+    var s = state.signoff[r[0]];
+    return '<tr><td>'+r[1]+'</td>'+
+      '<td><input class="sign" data-role="'+r[0]+'" data-field="name" value="'+esc(s.name)+'"></td>'+
+      '<td><input class="sign" data-role="'+r[0]+'" data-field="date" value="'+esc(s.date)+'"></td>'+
+      '<td><input class="sign" data-role="'+r[0]+'" data-field="result" value="'+esc(s.result)+'"></td></tr>';
+  }).join("");
+  document.getElementById("signoff").innerHTML =
+    '<h2 class="sec">Sign-off</h2><table class="signtbl"><tr><th>Role</th><th>Name</th>'+
+    '<th>Date</th><th>Result</th></tr>'+rows+'</table>';
+}
+var signBound = false;
+function bindSignDelegation(){
+  if(signBound) return; signBound = true;
+  document.getElementById("signoff").addEventListener("input", function(e){
+    var el = e.target; if(!el.classList.contains("sign")) return;
+    state.signoff[el.getAttribute("data-role")][el.getAttribute("data-field")] = el.value;
+    saveState();
+  });
+}
+
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+var VERDICTS = ["PASS","FAIL","BLOCKED","NA"];
+
+function toggleStep(id, i, checked){ state.cases[id].steps[i] = checked; saveState(); afterChange(id); }
+function setVerdict(id, v){ state.cases[id].verdict = v; saveState(); afterChange(id); }
+function setField(id, field, val){ state.cases[id][field] = val; saveState(); afterChange(id); }
+
+function renderCase(c){
+  var st = state.cases[c.id];
+  var stepsHtml = c.steps.map(function(s, i){
+    var ck = st.steps[i] ? " checked" : "";
+    return '<li><label><input type="checkbox" class="step-cb" data-id="'+c.id+'" data-i="'+i+'"'+ck+'> '+esc(s)+'</label></li>';
+  }).join("");
+  var verdictHtml = VERDICTS.map(function(v){
+    var ck = (st.verdict===v) ? " checked" : "";
+    return '<label><input type="radio" class="verdict-radio" name="v_'+c.id+'" value="'+v+'" data-id="'+c.id+'"'+ck+'> '+v+'</label>';
+  }).join("");
+  return '<div class="case" id="case_'+c.id+'" data-section="'+c.section+'">'+
+     '<h3>'+c.id+' — '+esc(c.title)+'<span class="pill '+c.priority+'">'+c.priority+'</span>'+
+        '<span class="chip" id="chip_'+c.id+'"></span>'+
+        '<span class="stepcount" id="sc_'+c.id+'"></span><span id="fl_'+c.id+'"></span></h3>'+
+     '<div class="body-collapsible">'+
+       '<div class="ro"><b>Pre</b> <span class="escaped">'+esc(c.pre)+'</span></div>'+
+       '<div class="ro"><b>Steps</b><ul class="steplist">'+stepsHtml+'</ul></div>'+
+       '<div class="ro"><b>Expected</b> <span class="escaped">'+esc(c.expected)+'</span></div>'+
+       '<div class="verdict">'+verdictHtml+'</div>'+
+       '<textarea rows="2" class="notes-ta" data-id="'+c.id+'" placeholder="Notes">'+esc(st.notes)+'</textarea>'+
+       '<textarea rows="2" class="evid-ta" data-id="'+c.id+'" placeholder="Evidence (log line / count / screenshot file)">'+esc(st.evidence)+'</textarea>'+
+     '</div></div>';
+}
+
+function renderCases(){
+  var mount = document.getElementById("cases");
+  mount.innerHTML = CASES.map(renderCase).join("");
+  CASES.forEach(function(c){ updateCard(c.id); });
+  applyFilter(activeFilter);
+}
+
+var casesBound = false;
+function bindCaseDelegation(){
+  if(casesBound) return; casesBound = true;
+  var mount = document.getElementById("cases");
+  mount.addEventListener("change", function(e){
+    var el = e.target, id = el.getAttribute("data-id"); if(!id) return;
+    if(el.classList.contains("step-cb")) toggleStep(id, +el.getAttribute("data-i"), el.checked);
+    else if(el.classList.contains("verdict-radio")) setVerdict(id, el.value);
+  });
+  mount.addEventListener("input", function(e){
+    var el = e.target, id = el.getAttribute("data-id"); if(!id) return;
+    if(el.classList.contains("notes-ta")) setField(id, "notes", el.value);
+    else if(el.classList.contains("evid-ta")) setField(id, "evidence", el.value);
+  });
+}
+function updateChip(id){
+  var el = document.getElementById("chip_"+id); if(!el) return;
+  var v = state.cases[id].verdict;
+  el.textContent = verdictLabel(v);
+  el.className = "chip " + (v || "NOTRUN");
+}
+function afterChange(id){ updateCard(id); recompute(); }
+function updateCard(id){ updateChip(id); updateStepCount(id); updateFlags(id); }
+
+function stepStats(id){
+  var arr = state.cases[id].steps, done = 0;
+  arr.forEach(function(b){ if(b) done++; });
+  return { done: done, total: arr.length };
+}
+function updateStepCount(id){
+  var el = document.getElementById("sc_"+id); if(!el) return;
+  var s = stepStats(id);
+  el.textContent = " " + s.done + "/" + s.total + " steps" + (s.done===s.total ? " ✓" : "");
+  el.className = "stepcount" + (s.done===s.total ? " full" : "");
+}
+function caseFlags(id){
+  var c = state.cases[id], s = stepStats(id), flags = [];
+  if(c.verdict==="PASS" && s.done < s.total) flags.push("PASS with " + (s.total-s.done) + " step(s) un-ticked");
+  if((c.verdict==="FAIL" || c.verdict==="BLOCKED" || c.verdict==="NA") && !c.notes.trim())
+    flags.push("Note required for " + c.verdict);
+  return flags;
+}
+function updateFlags(id){
+  var el = document.getElementById("fl_"+id); if(!el) return;
+  el.innerHTML = caseFlags(id).map(function(f){ return '<span class="flag">'+esc(f)+'</span>'; }).join("");
+}
+
+var activeFilter = "all";
+function tally(){
+  var t = {PASS:0,FAIL:0,BLOCKED:0,NA:0,NOTRUN:0};
+  CASES.forEach(function(c){ var v = state.cases[c.id].verdict || "NOTRUN"; t[v] = (t[v]||0) + 1; });
+  return t;
+}
+function passRate(t){ var d = t.PASS + t.FAIL + t.BLOCKED; return d ? Math.round((t.PASS/d)*100) : 0; }
+function completion(t){ return Math.round(((t.PASS+t.FAIL+t.BLOCKED+t.NA)/CASES.length)*100); }
+
+function renderDashboard(){
+  var secOpts = '<option value="all">All sections</option>'+
+    '<option value="notrun">Not-run only</option><option value="failed">Failed only</option>'+
+    SECTIONS.map(function(s){ return '<option value="sec:'+s.key+'">'+s.label+'</option>'; }).join("");
+  document.getElementById("dashboard").innerHTML =
+    '<div class="dash"><div id="counts"></div>'+
+    '<div class="bar"><div id="barFill"></div></div>'+
+    '<div class="dashctl">Filter: <select id="filter" onchange="applyFilter(this.value)">'+secOpts+'</select>'+
+    '<button onclick="printReport()">Generate PDF Report</button>'+
+    '<button onclick="newRun()">New Run / Clear All</button>'+
+    '<button onclick="toggleAll()">Collapse / Expand</button></div></div>';
+  recompute();
+}
+function recompute(){
+  var t = tally(), el = document.getElementById("counts");
+  if(el){
+    el.innerHTML = '<b>Pass '+t.PASS+'</b> · Fail '+t.FAIL+' · Blocked '+t.BLOCKED+' · N/A '+t.NA+
+      ' · Not-run '+t.NOTRUN+'  —  Pass-rate '+passRate(t)+'% (of Pass+Fail+Blocked) · Completion '+completion(t)+'%';
+  }
+  var bar = document.getElementById("barFill");
+  if(bar) bar.style.width = completion(t) + "%";
+}
+function applyFilter(f){
+  activeFilter = f;
+  CASES.forEach(function(c){
+    var card = document.getElementById("case_"+c.id); if(!card) return;
+    var v = state.cases[c.id].verdict;
+    var show = (f==="all") || (f==="notrun" && !v) || (f==="failed" && v==="FAIL") ||
+      (f.indexOf("sec:")===0 && c.section===f.slice(4));
+    card.style.display = show ? "" : "none";
+  });
+}
+
+function renderLoadNotice(){
+  var el = document.getElementById("loadNotice");
+  if(loadError){
+    el.innerHTML = '<div class="notice">Saved data for this run could not be read. Auto-save is paused to avoid destroying it. '+
+      '<button onclick="startFreshAfterError()">Start a fresh run (clears it)</button></div>';
+  } else { el.innerHTML = ""; }
+}
+function startFreshAfterError(){
+  try { localStorage.removeItem(STORAGE_KEY); } catch(e){}
+  loadError = false; state = freshState(); renderAll();
+}
+
+var allCollapsed = false;
+function toggleAll(){
+  allCollapsed = !allCollapsed;
+  document.querySelectorAll(".case .body-collapsible").forEach(function(b){ b.style.display = allCollapsed ? "none" : ""; });
+}
+
+function printReport(){ flushState(); buildReport(); window.print(); }
+
+function newRun(){
+  if(!window.confirm("Start a NEW run? This clears the current run's verdicts, notes, and header. Print the PDF first if you need the current results.")) return;
+  try { localStorage.removeItem(STORAGE_KEY); } catch(e){}
+  loadError = false; state = freshState(); state.resumed = false; renderAll();
+}
+
+function verdictLabel(v){ return v || "Not run"; }
+
+// RPT-BUILDER:BEGIN
+/* ---- DT-branded completion report (printed PDF). Screen stays house; this prints. ---- */
+var RPT_LOGO = `<!-- BRAND-LOGO:BEGIN variant=combo-white — refreshed from skills/dollar-tree-branding/references/logo-snippets.md -->
+<img src="data:image/png;base64,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" alt="Dollar Tree" style="max-height:54px;width:auto;">
+<!-- BRAND-LOGO:END -->`;
+
+function badgeCell(v){
+  var map = {PASS:["pass","PASS"],FAIL:["fail","FAIL"],BLOCKED:["blk","BLOCKED"],NA:["na","N/A"]};
+  var m = map[v] || ["na","NOT RUN"];
+  return '<span class="rpt-badge '+m[0]+'">'+m[1]+'</span>';
+}
+function clearedToMerge(){   // cleared = every CORE and HIGH case is PASS
+  return CASES.every(function(c){
+    return !(c.priority==="CORE"||c.priority==="HIGH") || state.cases[c.id].verdict==="PASS";
+  });
+}
+function genStamp(){
+  var d = new Date(), p = function(n){ return (n<10?"0":"")+n; };
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes());
+}
+
+function buildReport(){
+  var t = tally(), h = state.header;
+
+  var meta = '<tr><td>Feature</td><td>'+esc(SUITE_TITLE)+'</td></tr>';
+  meta += HEADER_FIELDS.map(function(f){ return '<tr><td>'+f[1]+'</td><td>'+esc(h[f[0]]||"—")+'</td></tr>'; }).join("");
+  meta += '<tr><td>Report generated</td><td>'+genStamp()+'</td></tr>';
+
+  var blockers = CASES.filter(function(c){
+    return (c.priority==="CORE"||c.priority==="HIGH") && state.cases[c.id].verdict!=="PASS";
+  });
+  var verdict;
+  if(clearedToMerge()){
+    verdict = '<div class="rpt-verdict pass"><div class="rpt-vtitle">PASS &mdash; cleared to merge</div>'+
+      '<p>All CORE and HIGH priority cases passed.</p></div>';
+  } else {
+    var bl = blockers.map(function(c){ return c.id+' ('+verdictLabel(state.cases[c.id].verdict)+')'; }).join(', ');
+    verdict = '<div class="rpt-verdict fail"><div class="rpt-vtitle">NOT CLEARED &mdash; '+blockers.length+' CORE/HIGH case(s) outstanding</div>'+
+      '<p>Resolve before merge: '+esc(bl)+'.</p></div>';
+  }
+
+  var tiles = '<div class="rpt-tiles">'+
+    '<div class="tile pass"><b>'+t.PASS+'</b><span>PASS</span></div>'+
+    '<div class="tile fail"><b>'+t.FAIL+'</b><span>FAIL</span></div>'+
+    '<div class="tile blk"><b>'+t.BLOCKED+'</b><span>BLOCKED</span></div>'+
+    '<div class="tile na"><b>'+t.NA+'</b><span>N/A</span></div>'+
+    '<div class="tile nr"><b>'+t.NOTRUN+'</b><span>NOT RUN</span></div></div>';
+
+  var rows = CASES.map(function(c){
+    var st = state.cases[c.id];
+    var note = esc(st.notes);
+    if(st.evidence.trim()) note += (note?' &middot; ':'')+'<i>Ev:</i> '+esc(st.evidence);
+    return '<tr><td>'+c.id+'</td><td>'+c.priority+'</td><td>'+badgeCell(st.verdict)+'</td>'+
+      '<td>'+esc(c.title)+'</td><td>'+(note||'—')+'</td></tr>';
+  }).join("");
+
+  var sign = SIGN_ROLES.map(function(r){
+    var s = state.signoff[r[0]];
+    return '<tr><td>'+r[1]+'</td><td>'+(esc(s.name)||"—")+' &middot; '+(esc(s.date)||"—")+' &middot; '+(esc(s.result)||"—")+'</td></tr>';
+  }).join("");
+
+  document.getElementById("report").innerHTML =
+    '<div class="rpt">'+
+      '<header class="rpt-hd"><div class="rpt-logo">'+RPT_LOGO+'</div>'+
+        '<h1>'+esc(SUITE_TITLE)+' &mdash; Test Completion Report</h1>'+
+        '<p class="rpt-sub">Test results &mdash; a dated, signed completion report.</p></header>'+
+      '<table class="rpt-meta">'+meta+'</table>'+
+      verdict + tiles +
+      '<h2 class="rpt-h2">Results detail</h2>'+
+      '<table class="rpt-tbl"><tr><th>Case</th><th>Priority</th><th>Result</th><th>Title</th><th>Notes</th></tr>'+rows+'</table>'+
+      '<h2 class="rpt-h2">Sign-off</h2>'+
+      '<table class="rpt-sign">'+sign+'</table>'+
+      '<p class="rpt-foot">Dollar Tree &middot; '+esc(SUITE_TITLE)+'. Test cases mirror the QA Testing Guide (single source of truth). Self-contained; results stored only in this browser until you print or export.</p>'+
+    '</div>';
+}
+// RPT-BUILDER:END
+
+function renderAll(){
+  bindCaseDelegation(); bindSignDelegation();
+  renderPreamble(); renderLoadNotice(); renderHeader(); renderSignoff();
+  renderDashboard(); renderCases();
+  setSaveStatus(state.resumed ? "Resumed run from saved data" : "Ready");
+}
+renderAll();
+</script>
+</body></html>
