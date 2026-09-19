@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tpscli MCP server</title>
+<style>
+  :root{
+    --paper:#f4efe1; --ink:#221f18; --maroon:#8a2b27; --meta-bg:#e9e1cd;
+    --label:#6d5f4e; --value:#2b2820; --amber:#a8762b;
+    --serif:Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;
+    --rule:#d6cbb0; --rule-soft:#e0d6bf; --dim:#5b5140; --ok:#3f6f3a;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);
+       font-family:var(--serif);padding:3.5rem 2rem;}
+  .wrap{max-width:1040px;margin:0 auto;}
+
+  /* ---- ONE MEASURE ---- */
+  main p,main ul,main ol{max-width:84ch;}
+  main pre{max-width:100%;overflow-x:auto;}
+
+  /* ---- FIXED masthead (do not restyle) ---- */
+  .eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.35em;
+           font-size:.8rem;font-weight:700;color:var(--maroon);margin:0 0 1.1rem;}
+  h1{font-family:var(--serif);font-weight:700;font-size:clamp(2.6rem,6vw,4rem);
+     line-height:1.04;letter-spacing:-.01em;margin:0 0 .9rem;}
+  .subtitle{font-family:var(--serif);font-style:italic;font-weight:700;
+            font-size:clamp(1.25rem,2.4vw,1.7rem);line-height:1.3;
+            margin:0 0 1.9rem;max-width:46ch;}
+  .meta-card{display:grid;grid-template-columns:max-content 1fr;column-gap:1.75rem;
+             row-gap:.55rem;align-items:baseline;background:var(--meta-bg);
+             border-radius:14px;border-left:6px solid var(--maroon);padding:1.4rem 1.85rem;}
+  .meta-card dt{font-family:var(--mono);color:var(--label);font-size:.95rem;font-weight:400;}
+  .meta-card dd{font-family:var(--mono);color:var(--value);font-size:.95rem;margin:0;word-break:break-word;}
+  .status-pill{display:inline-block;border:1px solid var(--amber);color:var(--amber);
+               border-radius:999px;padding:.12rem .75rem;font-size:.82rem;letter-spacing:.08em;
+               text-transform:uppercase;line-height:1.45;background:transparent;}
+
+  /* ---- BODY ---- */
+  main{margin-top:3.25rem;}
+  main section{padding-top:2.6rem;margin-top:2.6rem;border-top:1px solid var(--rule);}
+  main section:first-child{border-top:none;margin-top:0;padding-top:0;}
+
+  main h2{font-family:var(--serif);font-size:1.95rem;line-height:1.15;
+          letter-spacing:-.005em;margin:0 0 1.1rem;font-weight:700;}
+  main h2 .num{font-family:var(--mono);font-size:.78rem;font-weight:700;color:var(--maroon);
+                letter-spacing:.2em;display:block;margin-bottom:.5rem;text-transform:uppercase;}
+  main h3{font-family:var(--mono);font-size:.9rem;text-transform:uppercase;letter-spacing:.14em;
+          color:var(--maroon);margin:2.1rem 0 .8rem;font-weight:700;}
+  main p{font-size:1.06rem;line-height:1.65;margin:0 0 1.05rem;}
+  main ul,main ol{font-size:1.06rem;line-height:1.65;padding-left:1.3rem;margin:0 0 1.05rem;}
+  main li{margin-bottom:.45rem;}
+  main li::marker{color:var(--maroon);}
+  strong{font-weight:700;}
+  main a{color:var(--maroon);}
+
+  code{font-family:var(--mono);font-size:.88em;background:var(--meta-bg);
+       padding:.1em .38em;border-radius:4px;}
+  pre{font-family:var(--mono);font-size:.83rem;line-height:1.55;background:var(--meta-bg);
+      border-left:4px solid var(--rule);border-radius:8px;padding:1.1rem 1.3rem;
+      overflow-x:auto;margin:0 0 1.2rem;}
+  pre code{background:none;padding:0;font-size:inherit;}
+
+  table{border-collapse:collapse;width:100%;margin:0 0 1.3rem;font-size:.96rem;}
+  th,td{text-align:left;padding:.6rem .8rem;border-bottom:1px solid var(--rule-soft);
+        vertical-align:top;line-height:1.5;}
+  th{font-family:var(--mono);font-size:.76rem;text-transform:uppercase;letter-spacing:.12em;
+     color:var(--label);border-bottom:1.5px solid var(--rule);font-weight:700;}
+  td code{font-size:.84em;white-space:nowrap;}
+  tbody tr:last-child td{border-bottom:none;}
+
+  .callout{background:var(--meta-bg);border-radius:12px;border-left:6px solid var(--amber);
+           padding:1.15rem 1.5rem;margin:0 0 1.3rem;}
+  .callout p{margin:0 0 .6rem;}
+  .callout p:last-child{margin:0;}
+  .callout .tag{font-family:var(--mono);font-size:.74rem;text-transform:uppercase;
+                letter-spacing:.16em;color:var(--amber);font-weight:700;display:block;margin-bottom:.5rem;}
+  .callout.ok{border-left-color:var(--ok);}
+  .callout.ok .tag{color:var(--ok);}
+
+  /* signature: the seam diagram */
+  .seam{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:.8rem;align-items:stretch;
+        margin:1.4rem 0 1.8rem;font-family:var(--mono);font-size:.82rem;}
+  .seam .box{background:var(--meta-bg);border:1px solid var(--rule);border-radius:10px;padding:.9rem 1rem;}
+  .seam .box b{display:block;font-size:.95rem;color:var(--maroon);margin-bottom:.4rem;letter-spacing:.04em;}
+  .seam .box span{display:block;color:var(--dim);line-height:1.5;}
+  .seam .arrow{align-self:center;color:var(--maroon);font-size:1.4rem;padding:0 .2rem;}
+  @media (max-width:720px){
+    .seam{grid-template-columns:1fr;}
+    .seam .arrow{transform:rotate(90deg);justify-self:center;}
+  }
+
+  .check{list-style:none;padding-left:0;}
+  .check li{padding-left:1.6rem;position:relative;}
+  .check li::before{content:"\2713";position:absolute;left:0;color:var(--ok);font-weight:700;}
+
+  @media (max-width:640px){
+    body{padding:2.25rem 1.1rem;}
+    .meta-card{grid-template-columns:1fr;row-gap:.2rem;}
+    .meta-card dt{margin-top:.6rem;}
+  }
+  @media (prefers-reduced-motion:no-preference){
+    main section{animation:rise .5s ease-out both;}
+    @keyframes rise{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+  }
+  a:focus-visible{outline:2px solid var(--maroon);outline-offset:3px;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <p class="eyebrow">Spec &middot; Design</p>
+      <h1>tpscli MCP server</h1>
+      <p class="subtitle">Every tpscli function as an MCP tool, over stdio, from a TypeScript server that treats the exe as a black box.</p>
+      <dl class="meta-card">
+        <dt>Date</dt><dd>2026-09-19</dd>
+        <dt>Branch</dt><dd>feature/tpscli-mcp</dd>
+        <dt>Status</dt><dd><span class="status-pill">Design &mdash; Awaiting Plan + Impl</span></dd>
+        <dt>Source</dt><dd>tpscli v0.1.0 is complete (cli/); this is the second component of the repository, brainstormed 2026-09-19.</dd>
+      </dl>
+    </header>
+
+    <main>
+      <section>
+        <h2><span class="num">1 &middot; Overview</span>What we are building</h2>
+        <p><code>mcp/</code> is a Model Context Protocol server, written in TypeScript on Node, that lets an LLM client (Claude Desktop, Claude Code, anything speaking MCP over stdio) run <code>tpscli.exe</code> on the machine that holds the TopSpeed files. It exposes the whole CLI surface: the five statements, <code>--owner</code>, <code>--limit-default</code>, <code>--parse-only</code>, <code>--table</code> and <code>--version</code>. It adds exactly three things the CLI does not have, all of them about running safely under an LLM: a read-only default, optional root folders with a file listing, and a process timeout that kills a hung exe.</p>
+        <p>The server never imports the Clarion sources. Its only knowledge of tpscli is the response contract and the exit codes in <code>cli/README.md</code>, and it passes that JSON through unchanged, so the README stays the single contract for both components.</p>
+
+        <div class="seam">
+          <div class="box"><b>MCP client</b><span>Claude Desktop / Claude Code<br>JSON-RPC over stdio<br>tool calls with zod-validated args</span></div>
+          <div class="arrow">&rarr;</div>
+          <div class="box"><b>mcp/dist/server.js</b><span>policy (writes, roots, owner)<br>SQL builder for structured tools<br>runner: spawn, timeout, parse</span></div>
+          <div class="arrow">&rarr;</div>
+          <div class="box"><b>tpscli.exe</b><span>one statement per process<br>one JSON object on stdout<br>exit 0 / 1 / 2 / 3</span></div>
+        </div>
+
+        <h3>Success looks like</h3>
+        <ul>
+          <li>A support person adds one line to a client config and the model can describe, select and (when enabled) change rows in any <code>.TPS</code> file on that box.</li>
+          <li>The model gets the same JSON a script would, including every error code, and is told plainly when a write's outcome is unknown.</li>
+          <li><code>npm test</code> is green on a machine with no Clarion installed; the end-to-end suite runs when the exe and the fixtures are present.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="num">2 &middot; Decisions</span>What was chosen and why</h2>
+        <table>
+          <thead><tr><th>Question</th><th>Decision</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Language</td><td>TypeScript on Node 20+, official <code>@modelcontextprotocol/sdk</code>, <code>zod</code></td><td>Node is already on the box (the instrument recorder uses it); one built <code>.js</code> is the easiest thing to point a client config at.</td></tr>
+            <tr><td>Transport</td><td>stdio, same machine as the files</td><td>No listener, no auth story. The tool layer is transport-agnostic, so HTTP can be added later without touching the tools.</td></tr>
+            <tr><td>Tool shape</td><td>One tool per statement with structured arguments, plus <code>tps_query</code> for raw SQL</td><td>Structured tools give the model schemas it cannot get wrong; raw SQL keeps exact parity with the CLI for anything the structured form cannot express.</td></tr>
+            <tr><td>Writes</td><td>Read-only unless started with <code>--allow-writes</code></td><td>The person editing the config decides, not the model. Write tools are still registered so the model gets a clear <code>WRITES_DISABLED</code> instead of a missing tool.</td></tr>
+            <tr><td>Owner string</td><td>Server default (<code>--owner</code> / <code>TPSCLI_OWNER</code>) with a per-call <code>owner</code> override</td><td>The default keeps the secret out of transcripts; the override covers a second encrypted file without starting a second server.</td></tr>
+            <tr><td>File paths</td><td>Absolute paths always; <code>--root</code> folders make bare names resolvable and enable <code>tps_list_files</code></td><td>Ad-hoc "look at this file" still works; a configured deployment gets discovery.</td></tr>
+            <tr><td>Result shape</td><td>tpscli's JSON verbatim; <code>format: "table"</code> returns the <code>--table</code> grid as text</td><td>One contract to document and test. The grid reads better for wide results.</td></tr>
+            <tr><td>Internals</td><td>Three modules: <code>runner</code>, <code>sql</code>, <code>server</code></td><td>The builder and the runner are unit-testable without Clarion; a single file would tangle timeout handling with tool registration.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2><span class="num">3 &middot; Surface</span>Server command line and the eight tools</h2>
+
+        <h3>Starting the server</h3>
+<pre><code>node mcp\dist\server.js [--exe &lt;path&gt;] [--root &lt;dir&gt;]... [--allow-writes]
+                        [--owner &lt;string&gt;] [--timeout &lt;seconds&gt;]</code></pre>
+        <table>
+          <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>--exe &lt;path&gt;</code></td><td>see discovery</td><td>Path to <code>tpscli.exe</code>.</td></tr>
+            <tr><td><code>--root &lt;dir&gt;</code></td><td>none</td><td>Repeatable. Folders that bare file names resolve against and that <code>tps_list_files</code> lists. Each must exist at startup.</td></tr>
+            <tr><td><code>--allow-writes</code></td><td>off</td><td>Enables <code>INSERT</code>, <code>UPDATE</code> and <code>DELETE</code>, structured and raw.</td></tr>
+            <tr><td><code>--owner &lt;string&gt;</code></td><td><code>TPSCLI_OWNER</code> env, else none</td><td>Owner string passed to every call that does not supply its own.</td></tr>
+            <tr><td><code>--timeout &lt;seconds&gt;</code></td><td>60</td><td>Wall-clock limit per exe invocation. Positive integer.</td></tr>
+          </tbody>
+        </table>
+        <p>Exe discovery, first hit wins: <code>--exe</code>, then <code>TPSCLI_EXE</code>, then <code>tpscli.exe</code> in the directory that holds <code>server.js</code>, then <code>..\..\cli\tpscli.exe</code> relative to that directory (the repository layout, where <code>server.js</code> is in <code>mcp\dist</code>). A missing exe, a missing root folder, or a bad flag value fails at startup with a message on stderr listing what was tried, not on the first tool call. Unknown flags are rejected the same way.</p>
+
+        <h3>Tools</h3>
+        <table>
+          <thead><tr><th>Tool</th><th>Arguments</th><th>Runs</th></tr></thead>
+          <tbody>
+            <tr><td><code>tps_version</code></td><td>none</td><td><code>tpscli.exe --version</code>. Returns <code>{ server: "&lt;package version&gt;", exe: &lt;the exe's version object&gt; }</code>.</td></tr>
+            <tr><td><code>tps_list_files</code></td><td><code>pattern?</code> (glob on the file name, default <code>*.TPS</code>, case-insensitive)</td><td>No exe. Lists matching files directly inside each <code>--root</code> folder (no recursion): <code>{ files: [{ name, path, size, modified }] }</code>, sorted by path. <code>NO_ROOT</code> when the server has no roots.</td></tr>
+            <tr><td><code>tps_describe</code></td><td><code>file</code>, <code>owner?</code></td><td><code>DESCRIBE [file]</code></td></tr>
+            <tr><td><code>tps_select</code></td><td><code>file</code>, <code>columns?</code> (string[]; default all), <code>where?</code>, <code>order_by?</code>, <code>limit?</code>, <code>offset?</code>, <code>format?</code>, <code>owner?</code></td><td>Built <code>SELECT</code>. <code>limit</code> omitted means the CLI's default cap of 1000; <code>limit: 0</code> means no cap, as in the CLI.</td></tr>
+            <tr><td><code>tps_insert</code></td><td><code>file</code>, <code>values</code> (object, column &rarr; value, at least one), <code>owner?</code></td><td>Built <code>INSERT</code></td></tr>
+            <tr><td><code>tps_update</code></td><td><code>file</code>, <code>set</code> (object, at least one), <code>where</code> (required), <code>owner?</code></td><td>Built <code>UPDATE</code></td></tr>
+            <tr><td><code>tps_delete</code></td><td><code>file</code>, <code>where</code> (required), <code>owner?</code></td><td>Built <code>DELETE</code></td></tr>
+            <tr><td><code>tps_query</code></td><td><code>sql</code>, <code>owner?</code>, <code>limit_default?</code>, <code>parse_only?</code>, <code>format?</code></td><td>The statement verbatim, with <code>--limit-default N</code>, <code>--parse-only</code> and <code>--table</code> added as given. No path resolution.</td></tr>
+          </tbody>
+        </table>
+        <p><code>format</code> is <code>"json"</code> (default) or <code>"table"</code>. <code>where</code> and <code>order_by</code> are raw fragments in the CLI's dialect (<code>ORDER BY</code> takes <code>col [ASC|DESC], ...</code>); the WHERE grammar is small enough that a JSON expression tree would add a second grammar without removing the first. Every tool description carries the three dialect facts the model needs without the README: paths go in square brackets, string literals use single quotes with <code>''</code> for an embedded quote, and <code>LIMIT 0</code> means no cap.</p>
+
+        <h3>The file argument</h3>
+        <p>A <code>file</code> that is absolute (drive letter or UNC) is used as given. Any other value is tried against each <code>--root</code> in order, and the first path that exists is used; with no roots, or no hit, the tool returns <code>FILE_NOT_FOUND</code> from the server before the exe runs, listing the folders tried. A resolved path that lies outside every root after normalisation (<code>..</code> segments) is refused with <code>FILE_NOT_FOUND</code> too: roots are a convenience for bare names, not a second way to spell an absolute path. The resolved path is what goes inside the brackets. Absolute paths are not sandboxed; that is a deliberate non-goal (section 10).</p>
+      </section>
+
+      <section>
+        <h2><span class="num">4 &middot; SQL builder</span>The part that is easy to get wrong</h2>
+        <p><code>sql.ts</code> is pure: string in, string out, no I/O. It owns every rule for turning arguments into a statement the CLI accepts.</p>
+        <table>
+          <thead><tr><th>Input</th><th>Rendered as</th></tr></thead>
+          <tbody>
+            <tr><td>file path</td><td><code>[C:\pos\data\ITEMS.TPS]</code>; always bracketed. A <code>]</code> in the path is rejected (<code>INVALID_ARGUMENT</code>) because the dialect has no escape for it.</td></tr>
+            <tr><td>column name</td><td>As given, after checking it matches <code>[A-Za-z_][A-Za-z0-9_:]*</code> (the CLI's identifier shape, colon for group members); anything else is <code>INVALID_ARGUMENT</code>. Unknown names are left to the exe's <code>UNKNOWN_COLUMN</code>, which lists the valid ones.</td></tr>
+            <tr><td>JSON string</td><td><code>'text'</code> with every <code>'</code> doubled.</td></tr>
+            <tr><td>JSON number</td><td>As JavaScript renders it. Non-finite is <code>INVALID_ARGUMENT</code>. Range and fraction errors are the exe's <code>VALUE_OUT_OF_RANGE</code>.</td></tr>
+            <tr><td>JSON boolean</td><td><code>1</code> / <code>0</code> (the dialect has no boolean literal; BYTE flags are numbers).</td></tr>
+            <tr><td>JSON null</td><td><code>INVALID_ARGUMENT</code>: the dialect has no <code>NULL</code> (TopSpeed has no nulls). The message says to omit the column instead.</td></tr>
+            <tr><td>object / array value</td><td><code>INVALID_ARGUMENT</code>. Dates, times, decimals and blobs are strings in the CLI's own formats (<code>YYYY-MM-DD</code>, <code>HH:MM:SS.hh</code>, exact decimal, base64), so the model passes strings.</td></tr>
+            <tr><td><code>where</code>, <code>order_by</code></td><td>Verbatim after trimming; empty string treated as absent. For <code>tps_update</code> and <code>tps_delete</code> an absent or empty <code>where</code> is <code>INVALID_ARGUMENT</code> before the exe would say <code>WHERE_REQUIRED</code>, so the message can point at the argument.</td></tr>
+            <tr><td><code>limit</code>, <code>offset</code>, <code>limit_default</code></td><td>Non-negative integers up to 2,147,483,647 (zod), matching the CLI's range.</td></tr>
+          </tbody>
+        </table>
+<pre><code>tps_select  { file:"ITEMS.TPS", columns:["SKU","DESC"], where:"PRICE &gt; 5 AND DESC LIKE 'a%'",
+              order_by:"SKU DESC", limit:20 }
+  &rarr; SELECT SKU, DESC FROM [C:\pos\data\ITEMS.TPS] WHERE PRICE &gt; 5 AND DESC LIKE 'a%'
+      ORDER BY SKU DESC LIMIT 20
+
+tps_insert  { file:"KEYS.TPS", values:{ ID:9, NAME:"O'Brien", CODE:"N" } }
+  &rarr; INSERT INTO [C:\pos\data\KEYS.TPS] (ID, NAME, CODE) VALUES (9, 'O''Brien', 'N')
+
+tps_update  { file:"KEYS.TPS", set:{ NAME:"niner" }, where:"ID = 9" }
+  &rarr; UPDATE [C:\pos\data\KEYS.TPS] SET NAME = 'niner' WHERE ID = 9</code></pre>
+        <p><code>classify(sql)</code> returns the first keyword of a raw statement after leading whitespace and <code>--</code> line comments, upper-cased, or <code>null</code>. The policy layer uses it to decide whether a <code>tps_query</code> is a write; the exe remains the authority on whether the statement is valid.</p>
+      </section>
+
+      <section>
+        <h2><span class="num">5 &middot; Runner</span>One exe call, one result</h2>
+        <p><code>runner.ts</code> exports one function:</p>
+<pre><code>run(exe: string, args: string[], opts: { timeoutMs: number }): Promise&lt;RunResult&gt;
+
+RunResult = { exitCode: number | null, stdout: string, stderr: string,
+              json: object | null, timedOut: boolean, durationMs: number }</code></pre>
+        <ul>
+          <li><code>child_process.spawn(exe, args, { windowsHide: true, shell: false })</code>. The SQL is one argv element; there is no shell and therefore no quoting layer. stdin is closed immediately so the exe never waits for it.</li>
+          <li>stdout and stderr are collected as UTF-8. <code>json</code> is the parse of the last non-empty stdout line that begins with <code>{</code> (the <code>--table</code> grid has no such line, so <code>json</code> is <code>null</code> there by design). Anything that fails to parse leaves <code>json</code> null.</li>
+          <li>On timeout the process tree is killed with <code>taskkill /PID &lt;pid&gt; /T /F</code>. A Clarion exe that crashes sits behind a modal dialog; a plain <code>child.kill()</code> leaves that dialog on screen and the handle open.</li>
+          <li>The owner string, when present in <code>args</code>, is never logged. The runner has no logging of its own; the server logs one line per call to stderr (tool name, duration, exit code) and nothing from argv.</li>
+        </ul>
+
+        <h3>From RunResult to a tool result</h3>
+        <table>
+          <thead><tr><th>Case</th><th>Tool result</th></tr></thead>
+          <tbody>
+            <tr><td>exit 0, <code>json</code> present</td><td><code>structuredContent</code> = the object; <code>content</code> = the same object pretty-printed. <code>isError</code> false.</td></tr>
+            <tr><td>exit 0, <code>format: "table"</code></td><td><code>content</code> = stdout verbatim (the grid plus its summary line); no <code>structuredContent</code>.</td></tr>
+            <tr><td>exit 1, 2 or 3, <code>json</code> present</td><td>Same shape as success; <code>isError</code> true. The exe's <code>error.code</code> and <code>error.message</code> are the explanation, and <code>outcome</code> is passed through for writes. With <code>format: "table"</code> the text is the exe's <code>ERROR CODE: message</code> line.</td></tr>
+            <tr><td>timeout, crash, exit &ge; 4, or no parseable object</td><td><code>isError</code> true with a server-made object <code>{ ok:false, complete:false, error:{ code:"INCOMPLETE", message }, exit_code, timed_out, stderr }</code>. The message repeats the README's rule: the response is incomplete, a write's outcome is unknown, do not retry without checking.</td></tr>
+          </tbody>
+        </table>
+        <p><code>isError</code> follows the exe: any non-zero exit is an error result, so a client that renders errors differently does the right thing, and the model still receives the full object.</p>
+      </section>
+
+      <section>
+        <h2><span class="num">6 &middot; Policy</span>Applied before anything is spawned</h2>
+        <table>
+          <thead><tr><th>Rule</th><th>Where</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td>Writes disabled (no <code>--allow-writes</code>)</td><td><code>tps_insert</code>, <code>tps_update</code>, <code>tps_delete</code>; <code>tps_query</code> when <code>classify()</code> returns <code>INSERT</code>, <code>UPDATE</code> or <code>DELETE</code></td><td><code>WRITES_DISABLED</code>, message says which flag enables them. A <code>tps_query</code> with <code>parse_only: true</code> is allowed regardless: it never touches a record.</td></tr>
+            <tr><td>Roots</td><td>Structured tools' <code>file</code></td><td>Section 3, "The file argument". <code>tps_query</code> is exempt: its SQL is the model's, verbatim.</td></tr>
+            <tr><td>Owner</td><td>All exe-running tools</td><td>Per-call <code>owner</code> if given, else the server default, else no <code>--owner</code> flag. Passed as its own argv element, never interpolated into the SQL.</td></tr>
+            <tr><td>Timeout</td><td>All exe-running tools</td><td>Server-wide value; not overridable per call.</td></tr>
+          </tbody>
+        </table>
+        <p>Server-made errors (<code>WRITES_DISABLED</code>, <code>NO_ROOT</code>, <code>FILE_NOT_FOUND</code> from resolution, <code>INVALID_ARGUMENT</code>, <code>INCOMPLETE</code>) use the exe's error shape, <code>{ ok:false, complete:true, op, error:{ code, message } }</code>, so the model sees one error format. <code>complete</code> is true for all of them except <code>INCOMPLETE</code>: nothing ran, so nothing is unknown.</p>
+      </section>
+
+      <section>
+        <h2><span class="num">7 &middot; Data flow</span>One structured call, end to end</h2>
+<pre><code>client   tools/call tps_update { file:"KEYS.TPS", set:{NAME:"niner"}, where:"ID = 9" }
+server   zod: shapes ok; set non-empty; where non-empty
+server   policy: --allow-writes present?  no  &rarr; WRITES_DISABLED, return (isError)
+                                          yes &rarr; continue
+server   resolve: KEYS.TPS against roots &rarr; C:\pos\data\KEYS.TPS (exists)
+server   build:  UPDATE [C:\pos\data\KEYS.TPS] SET NAME = 'niner' WHERE ID = 9
+server   argv:   [--owner, &lt;default&gt;]? + [&lt;sql&gt;]
+runner   spawn tpscli.exe, 60 s limit, collect stdout
+exe      { "ok": true, "op": "update", "matched": 1, "affected": 1, "complete": true }   exit 0
+server   structuredContent = that object; content = pretty JSON; isError = false
+server   stderr: tps_update 41ms exit 0
+client   renders the result</code></pre>
+      </section>
+
+      <section>
+        <h2><span class="num">8 &middot; Layout</span>Files, dependencies, build</h2>
+<pre><code>mcp/
+  package.json        name tpscli-mcp, version 0.1.0, type module, bin: dist/server.js
+                      deps: @modelcontextprotocol/sdk, zod   dev: typescript, @types/node
+  tsconfig.json       target ES2022, module NodeNext, strict, rootDir src, outDir dist
+  src/server.ts       argv parsing, exe discovery, policy, tool registration, StdioServerTransport
+  src/sql.ts          bracket(), quote(), buildDescribe/Select/Insert/Update/Delete(), classify()
+  src/runner.ts       run()
+  test/sql.test.ts    table-driven cases for every builder rule in section 4
+  test/runner.test.ts against test/fake-tpscli.js
+  test/fake-tpscli.js a Node script: prints a canned object and exits with a chosen code,
+                      prints garbage, prints nothing, or sleeps past the timeout, chosen by argv
+  test/e2e.test.ts    starts dist/server.js over stdio with the SDK's Client, runs against
+                      ..\cli\testdata\*.TPS copied into a temp folder; skips itself with a
+                      message when the exe or the fixtures are absent
+  README.md           install, client config snippet, flags, tool reference, error codes</code></pre>
+        <ul>
+          <li>Scripts: <code>build</code> = <code>tsc</code>; <code>test</code> = <code>tsc &amp;&amp; node --test test/</code>. Node's own test runner; no test framework dependency.</li>
+          <li><code>dist/</code> and <code>node_modules/</code> are gitignored. <code>package-lock.json</code> is committed.</li>
+          <li>Client configuration is one entry: <code>{ "command": "node", "args": ["C:\\...\\mcp\\dist\\server.js", "--root", "C:\\pos\\data"] }</code>, with <code>"--allow-writes"</code> appended when writes are wanted and the owner in <code>env: { "TPSCLI_OWNER": "..." }</code>.</li>
+          <li>Line endings: <code>.ts</code>, <code>.js</code>, <code>.json</code> and <code>.md</code> under <code>mcp/</code> follow the repository rule (CRLF, lone-LF 0).</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="num">9 &middot; Verification</span>What green means</h2>
+        <h3>Unit (no Clarion needed)</h3>
+        <ul>
+          <li><code>sql.test.ts</code>: every row of the section 4 table has at least one passing and one rejecting case; the three examples in section 4 are asserted byte for byte; <code>classify()</code> on leading whitespace, <code>--</code> comments, lower case, and an empty string.</li>
+          <li><code>runner.test.ts</code> with the fake: exit 0 with JSON; exit 3 with JSON; exit 0 with the <code>--table</code> grid (json null, stdout intact); garbage stdout (json null); empty stdout; a hang that trips a 500 ms timeout and leaves no child process behind (checked with <code>tasklist</code>).</li>
+          <li>Server unit surface: tool registration lists exactly the eight tools; <code>WRITES_DISABLED</code> and <code>NO_ROOT</code> paths, using the fake exe via <code>--exe</code>.</li>
+        </ul>
+        <h3>End to end (real exe, real fixtures)</h3>
+        <ul>
+          <li>One call per tool against the copied corpus: <code>tps_version</code>, <code>tps_list_files</code> (six files), <code>tps_describe</code> KEYS, <code>tps_select</code> with where/order/limit and again with <code>format: "table"</code>, <code>tps_insert</code> / <code>tps_update</code> / <code>tps_delete</code> of one row under <code>--allow-writes</code>, <code>tps_query</code> raw select.</li>
+          <li><code>SECRET.TPS</code> without owner &rarr; <code>OWNER_REQUIRED</code> passed through with <code>isError</code>; with <code>owner: "s3cret"</code> per call &rarr; ok; with <code>TPSCLI_OWNER</code> in the server's env &rarr; ok.</li>
+          <li>Read-only server: <code>tps_delete</code> &rarr; <code>WRITES_DISABLED</code>; <code>tps_query</code> with a <code>DELETE</code> and <code>parse_only: true</code> &rarr; ok with <code>parse_only: true</code>.</li>
+          <li><code>tps_update</code> without where is rejected by the schema; <code>tps_query "UPDATE ... SET X = 1"</code> under <code>--allow-writes</code> &rarr; the exe's <code>WHERE_REQUIRED</code>.</li>
+        </ul>
+        <h3>Manual gate, recorded in the implementation notes</h3>
+        <ul>
+          <li>Register the server in Claude Code's MCP config on this machine, call each of the eight tools once from a conversation, and paste the results into <code>docs/mySuperpower/implementation-notes/</code> for the MCP.</li>
+          <li>Docs: <code>mcp/README.md</code> written; the root <code>README.md</code> row for <code>mcp/</code> loses "not started yet".</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="num">10 &middot; Risks and non-goals</span>Known and accepted</h2>
+        <table>
+          <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+          <tbody>
+            <tr><td>The model writes a <code>where</code> that matches more rows than intended.</td><td>Read-only default; the client's own tool-approval prompt; <code>tps_select</code> with the same <code>where</code> first is the documented habit in the tool description. The server does not add a dry-run of its own: <code>--parse-only</code> validates syntax, not row counts, and inventing a count-first step would double every write's I/O.</td></tr>
+            <tr><td>A hung or crashed exe holds a file open.</td><td>Timeout with tree kill. The default of 60 s is generous for a single-statement scan; a full scan of a very large file can be raised with <code>--timeout</code>.</td></tr>
+            <tr><td>Owner string in transcripts.</td><td>Server default is the documented path; the per-call override is described as "for a second encrypted file", and the value is never echoed by the exe or the server.</td></tr>
+            <tr><td>Two contracts drift (README vs. tools).</td><td>There is one: the server passes the exe's JSON through. Server-made errors reuse its shape and are listed in <code>mcp/README.md</code>.</td></tr>
+            <tr><td>Absolute paths reach anything the user can read.</td><td>Accepted. The server runs as the user, on the user's machine, for the user's files; sandboxing absolute paths would only move the fence to a flag the same person sets.</td></tr>
+          </tbody>
+        </table>
+        <h3>Non-goals</h3>
+        <ul>
+          <li>HTTP transport, authentication, multi-user.</li>
+          <li>MCP prompts or resources; the dialect summary lives in the tool descriptions.</li>
+          <li>Batches or transactions across statements (the exe is one statement per process).</li>
+          <li>Reshaping rows into objects, pagination helpers, or result caching.</li>
+          <li>Recursive root listing; POS data folders are flat.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="num">11 &middot; Self-review</span>Checked before hand-off</h2>
+        <ul class="check">
+          <li>No placeholders: every flag has a default, every tool has its argv mapping, every error has a code and a shape.</li>
+          <li>Consistency: <code>format: "table"</code> yields <code>json: null</code> in the runner and no <code>structuredContent</code> in section 5; <code>parse_only</code> bypasses the write gate in sections 3, 6 and 9; roots apply to structured tools only in sections 3 and 6.</li>
+          <li>Scope: one implementation plan. The three modules and the three test files are the whole deliverable; the manual gate is one sitting.</li>
+          <li>Ambiguity resolved: bare-name resolution is first-existing-hit in root order; <code>limit</code> omitted vs. <code>0</code> mirrors the CLI; boolean renders as <code>1</code>/<code>0</code>; null is rejected rather than guessed.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
