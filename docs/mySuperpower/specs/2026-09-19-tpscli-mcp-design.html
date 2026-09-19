@@ -235,24 +235,27 @@ tps_update  { file:"KEYS.TPS", set:{ NAME:"niner" }, where:"ID = 9" }
 <pre><code>run(exe: string, args: string[], opts: { timeoutMs: number }): Promise&lt;RunResult&gt;
 
 RunResult = { exitCode: number | null, stdout: string, stderr: string,
-              json: object | null, timedOut: boolean, durationMs: number }</code></pre>
+              json: object | null, durationMs: number,
+              failure?: { kind: "spawn" | "timeout" | "output_limit" | "kill_failed",
+                          message: string, pid?: number } }</code></pre>
         <ul>
           <li><code>child_process.spawn(exe, args, { windowsHide: true, shell: false })</code>. The SQL is one argv element; there is no shell and therefore no quoting layer. stdin is closed immediately so the exe never waits for it.</li>
           <li>stdout and stderr are collected as UTF-8, up to a fixed ceiling of 64 MiB combined. Past the ceiling the process tree is killed and the result is <code>INCOMPLETE</code> ("output exceeded 64 MiB; add a LIMIT"), never a truncated success.</li>
-          <li><code>json</code> is the parse of the whole trimmed stdout as one JSON object (the exe writes exactly one object; the parse does not assume it is one line). It counts as a response only when it is an object with <code>complete === true</code> and <code>ok === (exitCode === 0)</code>; anything else, including <code>{}</code>, a partial object, or an <code>ok</code> that disagrees with the exit code, leaves <code>json</code> null and becomes <code>INCOMPLETE</code>. In table mode no parse is attempted and <code>json</code> is null.</li>
-          <li>On timeout the process tree is killed with <code>taskkill /PID &lt;pid&gt; /T /F</code>. A Clarion exe that crashes sits behind a modal dialog; a plain <code>child.kill()</code> leaves that dialog on screen and the handle open. The promise settles exactly once (on the child's <code>exit</code> or on a spawn <code>error</code>), and the timer is cleared when it does.</li>
-          <li>A spawn failure (<code>error</code> event, <code>exitCode</code> null) is an <code>INCOMPLETE</code> whose message is the system error. A <code>taskkill</code> that fails or does not return within 5 s is an <code>INCOMPLETE</code> whose message names the pid and says the process may still be running.</li>
+          <li><code>json</code> is the parse of the whole trimmed stdout as one JSON object (the exe writes exactly one object; the parse does not assume it is one line). It counts as a response only when it is an object with <code>complete === true</code> and <code>ok === (exitCode === 0)</code>; anything else, including <code>{}</code>, a partial object, or an <code>ok</code> that disagrees with the exit code, leaves <code>json</code> null and becomes <code>INCOMPLETE</code>. In table mode no parse is attempted and <code>json</code> is null; exit &ge; 4 in table mode is also <code>INCOMPLETE</code>.</li>
+          <li>On timeout the process tree is killed with <code>taskkill /PID &lt;pid&gt; /T /F</code>. A Clarion exe that crashes sits behind a modal dialog; a plain <code>child.kill()</code> leaves that dialog on screen and the handle open. The promise settles exactly once: on the child's <code>close</code> (after stdout and stderr have drained, which <code>exit</code> does not guarantee), on a spawn <code>error</code>, or when a kill attempt fails or passes its own 5 s deadline, in which case it settles without waiting for the child. The timer is cleared whichever way it settles.</li>
+          <li>Every runner-level failure is reported in <code>failure</code>, not inferred from stderr: a spawn failure (<code>kind:"spawn"</code>, the system error as the message, <code>exitCode</code> null), a timeout (<code>"timeout"</code>), the output ceiling (<code>"output_limit"</code>), and a <code>taskkill</code> that fails or does not return within 5 s (<code>"kill_failed"</code>, with <code>pid</code>, message saying the process may still be running). The server builds the <code>INCOMPLETE</code> message from <code>failure.message</code>.</li>
           <li>The owner string, when present in <code>args</code>, is never logged. The runner has no logging of its own; the server logs one line per call to stderr (tool name, duration, exit code) and nothing from argv.</li>
         </ul>
 
         <h3>From RunResult to a tool result</h3>
+        <p>Evaluated in this order, first match wins: a <code>failure</code> is <code>INCOMPLETE</code> whatever stdout holds (a timeout that races a complete exit is still a timeout); then table mode, which never looks at <code>json</code>; then JSON mode, where a null <code>json</code> is <code>INCOMPLETE</code>.</p>
         <table>
           <thead><tr><th>Case</th><th>Tool result</th></tr></thead>
           <tbody>
             <tr><td>exit 0, <code>json</code> present</td><td><code>structuredContent</code> = the object; <code>content</code> = <code>[{ type:"text", text: &lt;the object pretty-printed&gt; }]</code>. <code>isError</code> false.</td></tr>
             <tr><td>exit 1, 2 or 3, <code>json</code> present</td><td>Same shape as success; <code>isError</code> true. The exe's <code>error.code</code> and <code>error.message</code> are the explanation, and <code>outcome</code> is passed through for writes.</td></tr>
             <tr><td><code>format: "table"</code>, exit 0 to 3</td><td><code>content</code> = <code>[{ type:"text", text: stdout verbatim }]</code>: the grid plus its summary line, or on failure the exe's single <code>CODE: message</code> line. <code>isError</code> = exit &ne; 0. No <code>structuredContent</code>. Table mode is read-only by construction (section 3), so no <code>outcome</code> is lost.</td></tr>
-            <tr><td>timeout, spawn failure, output ceiling, exit &ge; 4, or no valid object</td><td><code>isError</code> true with a server-made object <code>{ ok:false, complete:false, op, error:{ code:"INCOMPLETE", message }, exit_code, timed_out, stderr }</code>, plus <code>outcome:"unknown"</code> when the statement was a write. The message repeats the README's rule: the response is incomplete, a write's outcome is unknown, do not retry without checking.</td></tr>
+            <tr><td>any <code>failure</code>; or, in JSON mode, exit &ge; 4 or no valid object</td><td><code>isError</code> true with a server-made object <code>{ ok:false, complete:false, op, error:{ code:"INCOMPLETE", message }, exit_code, timed_out, stderr }</code>, plus <code>outcome:"unknown"</code> when the statement was a write. The message repeats the README's rule: the response is incomplete, a write's outcome is unknown, do not retry without checking.</td></tr>
           </tbody>
         </table>
         <p><code>isError</code> follows the exe: any non-zero exit is an error result, so a client that renders errors differently does the right thing, and the model still receives the full object. No tool declares an <code>outputSchema</code>: the SDK would then require <code>structuredContent</code> on every success, and table results have none.</p>
@@ -276,7 +279,8 @@ RunResult = { exitCode: number | null, stdout: string, stderr: string,
       <section>
         <h2><span class="num">7 &middot; Data flow</span>One structured call, end to end</h2>
 <pre><code>client   tools/call tps_update { file:"KEYS.TPS", set:{NAME:"niner"}, where:"ID = 9" }
-server   zod: shapes ok; set non-empty; where non-empty
+server   zod (SDK): argument shapes valid
+server   handler: set non-empty, where non-empty, column names well-formed
 server   policy: --allow-writes present?  no  &rarr; WRITES_DISABLED, return (isError)
                                           yes &rarr; continue
 server   resolve: KEYS.TPS against roots &rarr; C:\pos\data\KEYS.TPS (exists)
@@ -322,7 +326,7 @@ client   renders the result</code></pre>
         <h2><span class="num">9 &middot; Verification</span>What green means</h2>
         <h3>Unit (no Clarion needed)</h3>
         <ul>
-          <li><code>sql.test.ts</code>: every row of the section 4 table has at least one passing and one rejecting case; the three examples in section 4 are asserted byte for byte; <code>classify()</code> on leading whitespace, <code>--</code> comments, lower case, and an empty string.</li>
+          <li><code>sql.test.js</code>: every row of the section 4 table has at least one passing and one rejecting case; the three examples in section 4 are asserted byte for byte; <code>classify()</code> on leading whitespace, <code>--</code> comments, lower case, and an empty string.</li>
           <li><code>runner.test.js</code> with the fake: exit 0 with JSON; exit 3 with JSON; <code>ok:true</code> with exit 1 (json null); <code>complete:false</code> (json null); table mode (json null, stdout intact); garbage stdout; empty stdout; a spawn of a path that does not exist; stdout past the ceiling (killed, INCOMPLETE); a hang that trips a 500 ms timeout and leaves no child process behind (checked with <code>tasklist</code>).</li>
           <li><code>server.test.js</code> with a stub <code>run()</code>: the tool list is exactly the eight tools; <code>WRITES_DISABLED</code> with <code>outcome:"none"</code>; <code>parse_only</code> passing the gate; <code>NO_ROOT</code>; bare name resolved against two roots in order; a <code>..</code> escape refused; <code>format:"table"</code> on a raw write refused; the argv handed to <code>run()</code> for each tool, owner as its own element.</li>
         </ul>
@@ -370,7 +374,7 @@ client   renders the result</code></pre>
           <li>Checked against the exe on 2026-09-19: a quoted decimal is refused (<code>VALUE_OUT_OF_RANGE</code>), <code>1e-7</code> is not a literal, <code>OFFSET</code> without <code>LIMIT</code> is <code>SYNTAX</code>, table-mode failures print one <code>CODE: message</code> line. Section 4 follows those facts.</li>
           <li>Scope: one implementation plan. The three modules and the three test files are the whole deliverable; the manual gate is one sitting.</li>
           <li>Ambiguity resolved: bare-name resolution is first-existing-hit in root order; <code>limit</code> omitted vs. <code>0</code> mirrors the CLI and <code>offset</code> needs <code>limit</code>; boolean renders as <code>1</code>/<code>0</code>; null is rejected rather than guessed; numbers are plain decimal or refused.</li>
-          <li>Reviewed by Codex (round 1, 13 findings): all accepted; three were checked against the running exe first.</li>
+          <li>Reviewed by Codex (round 1, 13 findings; round 2, 6 findings): all accepted; three were checked against the running exe first.</li>
         </ul>
       </section>
     </main>
