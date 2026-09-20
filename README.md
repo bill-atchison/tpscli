@@ -16,6 +16,31 @@ exe as a black box and never reaches into the Clarion sources.
 
 Build and test the CLI from `cli/`, the MCP server from `mcp/`; see each folder's README.
 
+## Install from a release
+
+Releases (`https://github.com/<owner>/tpscli/releases`) carry one zip per version,
+`tpscli-<version>-win-x64.zip`, with its SHA-256 beside it. Unzip it anywhere; it holds
+`dist\server.js` with `tpscli.exe` beside it, the production `node_modules`, `tools\call.js`
+and the guides under `docs\`. With Node 20 or later installed, register the server:
+
+```
+claude mcp add -s user tpscli -- node "C:\tools\tpscli-0.2.0-win-x64\dist\server.js" --allow-writes
+```
+
+No build, no npm. `node tools\call.js tps_version` from the unzipped folder checks the install.
+
+## Cutting a release (maintainers)
+
+A push of a tag `v<version>` runs `.github\workflows\release.yml` on the self-hosted Windows
+runner labelled `clarion`; it runs `tools\release.ps1` (the CLI gate `cli\verify.ps1`, `npm ci`,
+`npm run build`, `npm test`, then the zip) and publishes the zip, its `.sha256` and `notes.md`
+as a GitHub Release. `<version>` must equal `mcp\package.json`'s version. The workflow passes the
+real-file inputs of `cli\verify.ps1` from the repository variables `TPSCLI_EXTRA`, `TPSCLI_EXPECTED`
+and `TPSCLI_TPSFIX_LOG` (folders and a log on the runner machine); `release.ps1` refuses to package a
+run that skipped those checks unless `-AllowSkips` is given. Without the runner, run `tools\release.ps1`
+by hand with the same three arguments and `gh release create v<version> release\*.zip
+release\*.sha256 --notes-file release\notes.md`.
+
 ## Install the MCP server
 
 Node 20 or later and a built `cli\tpscli.exe`. From `mcp\`: `npm install`, `npm run build`, then

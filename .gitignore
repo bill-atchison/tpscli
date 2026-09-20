@@ -10,3 +10,4 @@ EXCEPTION*.LOG
 mcp/node_modules/
 mcp/dist/
 mcp/work/
+release/

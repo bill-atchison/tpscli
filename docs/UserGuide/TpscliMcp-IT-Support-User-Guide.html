@@ -179,6 +179,7 @@ footer{max-width:900px;margin:2.5rem auto 0;padding:1rem 1.5rem 2rem;border-top:
 
   <h2 id="install">Install and register</h2>
   <h3>Build once</h3>
+  <p>If you have a release zip, skip this: unzip it and go to <em>Register</em>; the exe is already inside <code>dist\</code>.</p>
   <ol class="steps">
     <li>Install Node 20 or later (<code>node --version</code> should print <code>v20</code> or higher; this guide was written on <code>v20.18.1</code>).</li>
     <li>Make sure <code>cli\tpscli.exe</code> exists (build it from <code>cli\</code> as its README describes, or copy a built exe into <code>cli\</code>). The server looks for the exe first at <code>--exe</code> / <code>TPSCLI_EXE</code>, then beside <code>dist\server.js</code>, then at <code>..\..\cli\tpscli.exe</code>.</li>
@@ -307,7 +308,7 @@ ID  NAME     CODE
 
   <h3>Move the server to another machine</h3>
   <ol class="steps">
-    <li>Copy the whole <code>mcp\dist\</code> folder (<code>server.js</code> imports <code>runner.js</code> and <code>sql.js</code> beside it) together with <code>mcp\package.json</code> and <code>mcp\node_modules\</code> (after <code>npm ci --omit=dev</code> in <code>mcp\</code>), keeping the same layout: <code>package.json</code> and <code>node_modules\</code> in the parent of <code>dist\</code>. Put <code>tpscli.exe</code> <em>inside</em> <code>dist\</code>, beside <code>server.js</code>; that location is second in the exe search order, so no <code>--exe</code> flag is needed.</li>
+    <li>Copy the whole <code>mcp\dist\</code> folder (<code>server.js</code> imports <code>runner.js</code> and <code>sql.js</code> beside it) together with <code>mcp\package.json</code> and <code>mcp\node_modules\</code> (after <code>npm ci --omit=dev</code> in <code>mcp\</code>), keeping the same layout: <code>package.json</code> and <code>node_modules\</code> in the parent of <code>dist\</code>. Put <code>tpscli.exe</code> <em>inside</em> <code>dist\</code>, beside <code>server.js</code>; that location is second in the exe search order, so no <code>--exe</code> flag is needed, or simply copy the release zip and unzip it there.</li>
     <li>Install Node 20+ on the target and register the server as above with the new path. <code>npm publish</code> is not part of the workflow: the package is marked private and is useless without the Windows exe.</li>
   </ol>
 

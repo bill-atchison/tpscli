@@ -7,6 +7,8 @@ codes*) is the contract here too. Design: `..\docs\mySuperpower\specs\2026-09-19
 
 ## Install
 
+Prefer the release zip (root README, *Install from a release*): no build, the exe is inside `dist\`.
+
 Node 20 or later. From this folder:
 
 ```
