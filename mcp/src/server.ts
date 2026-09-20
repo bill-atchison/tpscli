@@ -235,3 +235,69 @@ export function createServer(config: Config, run: Run): McpServer {
 
   return server;
 }
+
+// ---- command line ------------------------------------------------------------------------------
+
+const VERSION: string = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+
+// --exe (or TPSCLI_EXE) is the only candidate when given: a wrong explicit path must fail, not fall
+// through to some other exe. Otherwise: tpscli.exe beside server.js, then ..\..\cli\tpscli.exe (the repo).
+export function discoverExe(explicit: string | undefined, here: string): string {
+  const candidates = explicit !== undefined
+    ? [explicit]
+    : [path.join(here, 'tpscli.exe'), path.resolve(here, '..', '..', 'cli', 'tpscli.exe')];
+  const hit = candidates.find(c => existsSync(c) && statSync(c).isFile());
+  if (hit === undefined) {
+    throw new Error(`tpscli.exe not found; tried ${candidates.join(', ')}. Pass --exe <path> or set TPSCLI_EXE.`);
+  }
+  return hit;
+}
+
+export function parseArgs(argv: string[], env: NodeJS.ProcessEnv, here: string): Config {
+  let exe = env.TPSCLI_EXE || undefined;
+  const roots: string[] = [];
+  let allowWrites = false;
+  let owner = env.TPSCLI_OWNER || undefined;
+  let timeoutMs = 60_000;
+  const value = (i: number): string => {
+    const v = argv[i + 1];
+    if (v === undefined) throw new Error(`${argv[i]} needs a value`);
+    return v;
+  };
+  for (let i = 0; i < argv.length; i++) {
+    switch (argv[i]) {
+      case '--exe': exe = value(i++); break;
+      case '--root': roots.push(path.resolve(value(i++))); break;
+      case '--allow-writes': allowWrites = true; break;
+      case '--owner': owner = value(i++); break;
+      case '--timeout': {
+        const s = value(i++);
+        if (!/^\d+$/.test(s) || Number(s) === 0) throw new Error(`--timeout needs a positive whole number of seconds, not ${s}`);
+        if (Number(s) > 2147483) throw new Error(`--timeout is at most 2147483 seconds (Node's timer limit), not ${s}`);
+        timeoutMs = Number(s) * 1000;
+        break;
+      }
+      default: throw new Error(`unknown option ${argv[i]}`);
+    }
+  }
+  for (const r of roots) {
+    if (!existsSync(r) || !statSync(r).isDirectory()) throw new Error(`--root ${r} is not a folder`);
+  }
+  return { exe: discoverExe(exe, here), roots, allowWrites, owner, timeoutMs, version: VERSION };
+}
+
+async function main(): Promise<void> {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const config = parseArgs(process.argv.slice(2), process.env, here);
+  await createServer(config, spawnRun).connect(new StdioServerTransport());
+  process.stderr.write(`tpscli-mcp ${config.version} ready: exe ${config.exe}; roots ${config.roots.length ? config.roots.join('; ') : '(none)'}; `
+    + `writes ${config.allowWrites ? 'enabled' : 'disabled'}; owner ${config.owner === undefined ? 'none' : 'set'}; timeout ${config.timeoutMs / 1000}s\n`);
+}
+
+// Start only when run as a program; the tests import this module.
+if (process.argv[1] !== undefined && path.resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase()) {
+  main().catch((e: Error) => {
+    process.stderr.write(`tpscli-mcp: ${e.message}\n`);
+    process.exit(2);
+  });
+}
