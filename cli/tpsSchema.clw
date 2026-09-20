@@ -153,7 +153,7 @@ nk    LONG
   END
   SELF.buf[o+1 : o+64] = db
 
-tpsSchema.DeRle PROCEDURE(LONG o, LONG clen, StringTheory outp)
+tpsSchema.DeRle PROCEDURE(LONG o, LONG clen, LONG want, StringTheory outp)
 p     LONG
 endo  LONG
 skip  LONG
@@ -162,7 +162,9 @@ rep   LONG
 cnt   LONG
   CODE
   p = o; endo = o + clen
-  LOOP WHILE p < endo
+  ! Real-world files (dtpos CONFIG) pad the compressed page with a trailing zero byte after
+  ! the stream has produced every byte of the page, so the walk ends on length, not on input.
+  LOOP WHILE p < endo AND outp.Length() < want
     skip = SELF.U8(p); p += 1
     IF skip = 0 THEN RETURN 0.
     IF skip > 7Fh
@@ -230,7 +232,7 @@ merged   StringTheory
       IF flags = 0
         page.Free()
         IF psize <> pusize
-          IF NOT SELF.DeRle(pos+13, psize-13, page) THEN RETURN SELF.Bad('bad RLE data in page at ' & pos).
+          IF NOT SELF.DeRle(pos+13, psize-13, pusize-13, page) THEN RETURN SELF.Bad('bad RLE data in page at ' & pos).
           IF page.Length() <> pusize - 13 THEN RETURN SELF.Bad('decompressed size mismatch in page at ' & pos).
         ELSE
           page.SetValue(SELF.buf[pos+14 : pos+psize])

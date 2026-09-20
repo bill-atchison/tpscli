@@ -89,7 +89,7 @@ Decrypt      PROCEDURE(STRING owner)
 Decrypt64    PROCEDURE(LONG o)
 Walk         PROCEDURE(),LONG                ! finds and merges 0xFA records
 Bad          PROCEDURE(STRING why),LONG      ! sets DEFINITION_UNREADABLE, returns 2
-DeRle        PROCEDURE(LONG o, LONG clen, StringTheory outp),LONG
+DeRle        PROCEDURE(LONG o, LONG clen, LONG want, StringTheory outp),LONG   ! stops once want bytes are out
 Parse        PROCEDURE(),LONG                ! fills Fields/Keys/Comps/Memos from Def
 SchemaDumpJson PROCEDURE(tpsOut o),STRING    ! oracle vocabulary, hidden --dump-schema
 DescribeJson PROCEDURE(tpsOut o, LONG records),STRING   ! public DESCRIBE shape, spec §4
