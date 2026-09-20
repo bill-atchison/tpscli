@@ -17,11 +17,18 @@ npm test             # unit tests with a fake exe; e2e when ..\cli\tpscli.exe an
 
 ## Configure a client
 
-One entry in the client's MCP configuration. Claude Code, from any folder:
+One entry in the client's MCP configuration. Claude Code, from any folder (`-s user` registers
+it for every project; drop it to register for the current folder only):
 
 ```
-claude mcp add tpscli -- node "C:\Projects\GitHub\tpscli\mcp\dist\server.js" --root "C:\pos\data"
+claude mcp add -s user tpscli -- node "C:\Projects\GitHub\tpscli\mcp\dist\server.js" --root "C:\pos\data"
+claude mcp list          # tpscli: ... - Connected
 ```
+
+Open a new session afterwards (or `/mcp` in a running one); servers attach at startup. Remove
+with `claude mcp remove -s user tpscli`. `--root` is optional: without it every tool needs an
+absolute path and `tps_list_files` has nothing to list (`NO_ROOT`; see
+`..\docs\tickets\2026-09-19-tps-list-files-without-root.md`).
 
 Claude Desktop (`claude_desktop_config.json`):
 
@@ -118,6 +125,9 @@ tests/run-instrument.ps1, record-instrument.cjs, embed-run.py   the unit-test in
 
 ## Documentation
 
+- `..\docs\UserGuide\TpscliMcp-IT-Support-User-Guide.html`: the IT support user guide for this server
+  (install, tools, results, troubleshooting); the CLI has its own guide beside it.
+- `..\docs\tickets\`: open issues, one file each.
 - `..\docs\Testing\TpscliMcp-Unit-Test-Cases.html`: the interactive unit-test instrument for this
   server (16 cases driven through `tools\call.js` against copies of the corpus under `work\`).
   It opens showing the last recorded run; `New Run` clears it. To record a run yourself, from
