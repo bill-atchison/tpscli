@@ -195,7 +195,7 @@ test('tps_query: verbatim SQL, flags, the write gate, parse_only, and no table f
   assert.equal(run.calls.length, 4);
 });
 
-test('tps_list_files lists the roots, one level, by pattern, or NO_ROOT', async () => {
+test('tps_list_files lists the roots or one directory, one level, by pattern', async () => {
   const client = await connect(base, stub());
   const all = await call(client, 'tps_list_files');
   assert.deepEqual(all.structuredContent.files.map(f => f.path), [path.join(rootA, 'KEYS.TPS'), path.join(rootB, 'KEYS.TPS'), path.join(rootB, 'ONLYB.TPS')]);
@@ -207,10 +207,29 @@ test('tps_list_files lists the roots, one level, by pattern, or NO_ROOT', async 
   assert.deepEqual(one.structuredContent.files.map(x => x.name), ['ONLYB.TPS']);
   const none = await call(client, 'tps_list_files', { pattern: 'k?ys.tps' });
   assert.equal(none.structuredContent.files.length, 2);
+  const dir = await call(client, 'tps_list_files', { directory: rootB });          // one folder, the roots ignored
+  assert.deepEqual(dir.structuredContent.files.map(x => x.name), ['KEYS.TPS', 'ONLYB.TPS']);
+  const above = await call(client, 'tps_list_files', { directory: tmp, pattern: '*.txt' });   // outside every root: still listed
+  assert.deepEqual(above.structuredContent.files.map(x => x.name), ['notes.txt']);
   const noRoots = await connect({ ...base, roots: [] }, stub());
   const r = await call(noRoots, 'tps_list_files');
   assert.equal(r.isError, true);
-  assert.equal(r.structuredContent.error.code, 'NO_ROOT');
+  assert.equal(r.structuredContent.error.code, 'INVALID_ARGUMENT');
+  assert.match(r.structuredContent.error.message, /pass directory, or call tps_set_roots first/);
+  assert.equal((await call(noRoots, 'tps_list_files', { directory: rootA })).structuredContent.files.length, 1);
+  assert.match((await call(noRoots, 'tps_list_files', { directory: 'data' })).structuredContent.error.message, /directory "data" must be an absolute path/);
+  assert.match((await call(noRoots, 'tps_list_files', { directory: path.join(tmp, 'nope') })).structuredContent.error.message, /is not a folder/);
+  assert.match((await call(noRoots, 'tps_list_files', { directory: path.join(tmp, 'notes.txt') })).structuredContent.error.message, /is not a folder/);
+  // A root that stopped being a folder after startup: readdirSync throws and the envelope still comes back.
+  const broken = await connect({ ...base, roots: [path.join(tmp, 'notes.txt')] }, stub());
+  const b = await call(broken, 'tps_list_files');
+  assert.equal(b.isError, true);
+  assert.equal(b.structuredContent.error.code, 'INVALID_ARGUMENT');
+  assert.match(b.structuredContent.error.message, /^cannot list /);
+  // Clearing the roots at runtime puts a server in the same state as one started without --root.
+  const cleared = await connect(base, stub());
+  await call(cleared, 'tps_set_roots', { roots: [] });
+  assert.equal((await call(cleared, 'tps_list_files')).structuredContent.error.code, 'INVALID_ARGUMENT');
 });
 
 test('tps_version pairs the server version with the exe object', async () => {

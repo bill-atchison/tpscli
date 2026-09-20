@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,6 +44,7 @@ test('e2e: read-only server, every read tool, every gate', { skip }, async t => 
   const keys = path.join(work, 'KEYS.TPS');
   const client = await start(work);
   t.after(() => client.close());
+  const mtime0 = statSync(keys).mtimeMs;
 
   const v = ok(await call(client, 'tps_version'));
   assert.equal(v.server, serverVersion);
@@ -63,6 +64,17 @@ test('e2e: read-only server, every read tool, every gate', { skip }, async t => 
   assert.equal(tbl.isError, false);
   assert.match(tbl.content[0].text, /^ID\s+NAME/);
   assert.equal(tbl.structuredContent, undefined);
+
+  // Task 1: reads open ReadOnly, so a describe and two selects left the fixture's stamp alone.
+  assert.equal(statSync(keys).mtimeMs, mtime0);
+
+  // Roots change at runtime; bare names follow the new set.
+  assert.deepEqual(ok(await call(client, 'tps_set_roots', { roots: [] })), { roots: [] });
+  err(await call(client, 'tps_describe', { file: 'KEYS.TPS' }), 'FILE_NOT_FOUND');
+  assert.equal(ok(await call(client, 'tps_list_files', { directory: work })).files.length, 6);
+  assert.deepEqual(ok(await call(client, 'tps_set_roots', { roots: [work] })), { roots: [work] });
+  assert.equal(ok(await call(client, 'tps_describe', { file: 'KEYS.TPS' })).records, 5);
+  assert.deepEqual(ok(await call(client, 'tps_version')).roots, [work]);
 
   assert.equal(ok(await call(client, 'tps_query', { sql: `SELECT ID FROM [${keys}] WHERE ID = 1` })).row_count, 1);
 

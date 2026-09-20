@@ -181,20 +181,22 @@ export function createServer(config: Config, run: Run): McpServer {
 
   server.registerTool('tps_list_files', {
     title: 'List TopSpeed files',
-    description: 'Lists the .TPS files directly inside the server\'s --root folders (no recursion): name, path, size and modified time. Returns NO_ROOT when the server has no roots; then pass absolute paths to the other tools.',
-    inputSchema: { pattern: z.string().optional().describe('Glob on the file name, case-insensitive, * and ? only. Default *.TPS.') },
-  }, async ({ pattern }) => attempt(null, false, async () => {
-    if (roots.length === 0) {
-      throw new ToolError('NO_ROOT', 'The server was started without --root folders, so there is nothing to list; pass absolute paths to the other tools.');
-    }
+    description: 'Lists the .TPS files directly inside a folder (no recursion): name, path, size and modified time. With directory, that folder; without it, the server\'s root folders (see tps_set_roots).',
+    inputSchema: {
+      pattern: z.string().optional().describe('Glob on the file name, case-insensitive, * and ? only. Default *.TPS.'),
+      directory: z.string().min(1).optional().describe('Absolute path of one folder to list instead of the roots.'),
+    },
+  }, async ({ pattern, directory }) => attempt(null, false, async () => {
+    const folders = directory !== undefined ? [folderArg('directory', directory)] : roots;
+    if (folders.length === 0) throw new InvalidArgument('The server has no root folders; pass directory, or call tps_set_roots first.');
     const glob = pattern ?? '*.TPS';
     const re = new RegExp(`^${glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`, 'i');
     const files: { name: string; path: string; size: number; modified: string }[] = [];
-    for (const root of roots) {
-      for (const entry of readdirSync(root, { withFileTypes: true })) {
+    for (const folder of folders) {
+      for (const entry of fsGuard(`list ${folder}`, () => readdirSync(folder, { withFileTypes: true }))) {
         if (!entry.isFile() || !re.test(entry.name)) continue;
-        const full = path.join(root, entry.name);
-        const st = statSync(full);
+        const full = path.join(folder, entry.name);
+        const st = fsGuard(`read ${full}`, () => statSync(full));
         files.push({ name: entry.name, path: full, size: st.size, modified: st.mtime.toISOString() });
       }
     }
