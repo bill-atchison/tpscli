@@ -7,3 +7,5 @@ cli/testdata/work/
 RT_ERROR*.LOG
 EXCEPTION*.LOG
 .claude/settings.local.json
+mcp/node_modules/
+mcp/dist/

@@ -1,0 +1,21 @@
+{
+  "name": "tpscli-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that exposes tpscli.exe (SQL over TopSpeed files) over stdio",
+  "type": "module",
+  "private": true,
+  "bin": { "tpscli-mcp": "dist/server.js" },
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && node --test test/sql.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.6.0"
+  }
+}
