@@ -273,18 +273,19 @@ RunResult = { exitCode: number | null, stdout: string, stderr: string,
           </tbody>
         </table>
         <p>Server-made errors (<code>WRITES_DISABLED</code>, <code>NO_ROOT</code>, <code>FILE_NOT_FOUND</code> from resolution, <code>INVALID_ARGUMENT</code>, <code>INCOMPLETE</code>) use the exe's error shape, <code>{ ok:false, complete:true, op, error:{ code, message } }</code>, so the model sees one error format. <code>op</code> is the statement's operation when the tool implies one (<code>describe</code>, <code>select</code>, <code>insert</code>, <code>update</code>, <code>delete</code>; for <code>tps_query</code> the lower-cased <code>classify()</code> result when it is one of those five) and <code>null</code> otherwise. A write refused before launch carries <code>outcome:"none"</code>, as the exe's own pre-write refusals do. <code>complete</code> is true for all of them except <code>INCOMPLETE</code>: nothing ran, so nothing is unknown.</p>
-        <p>Argument-shape failures are the SDK's: <code>registerTool</code> validates the zod schema before the handler runs and answers a JSON-RPC <code>InvalidParams</code> error (<code>Input validation error: Invalid arguments for tool ...</code>), which the SDK client surfaces as a thrown <code>McpError</code>, not a tool result. The envelope above applies to everything the handler itself refuses (empty <code>set</code>, a bad column name, a null value, <code>offset</code> without <code>limit</code>).</p>
+        <p>Argument-shape failures are the SDK's: <code>registerTool</code> validates the zod schema before the handler runs and answers the failure itself as a tool result with <code>isError: true</code>, text <code>MCP error -32602: Input validation error: Invalid arguments for tool ...</code> and no <code>structuredContent</code> (SDK 1.30.0, checked by running it). The envelope above applies to everything the handler itself refuses (empty <code>set</code>, a bad column name, a null value, <code>offset</code> without <code>limit</code>).</p>
       </section>
 
       <section>
         <h2><span class="num">7 &middot; Data flow</span>One structured call, end to end</h2>
 <pre><code>client   tools/call tps_update { file:"KEYS.TPS", set:{NAME:"niner"}, where:"ID = 9" }
-server   zod (SDK): argument shapes valid
-server   handler: set non-empty, where non-empty, column names well-formed
+server   zod (SDK): argument shapes valid (a failure ends here as the SDK's own isError result)
 server   policy: --allow-writes present?  no  &rarr; WRITES_DISABLED, return (isError)
                                           yes &rarr; continue
 server   resolve: KEYS.TPS against roots &rarr; C:\pos\data\KEYS.TPS (exists)
-server   build:  UPDATE [C:\pos\data\KEYS.TPS] SET NAME = 'niner' WHERE ID = 9
+server   build:  set non-empty, where non-empty, column names well-formed, values spellable
+                 (any failure &rarr; INVALID_ARGUMENT envelope with outcome "none")
+         &rarr;   UPDATE [C:\pos\data\KEYS.TPS] SET NAME = 'niner' WHERE ID = 9
 server   argv:   [--owner, &lt;default&gt;]? + [&lt;sql&gt;]
 runner   spawn tpscli.exe, 60 s limit, collect stdout
 exe      { "ok": true, "op": "update", "matched": 1, "affected": 1, "complete": true }   exit 0
