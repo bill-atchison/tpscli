@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<!--
+  IMPLEMENTATION NOTES / REVIEW DOC — a LIVE doc with TWO regions, both updated in REAL
+  TIME as work happens:
+    1. TASK STATUS table — one task-row per plan task with its TDD SUBTASK rows beneath.
+       Flip each pill pending -> in progress -> done (done rows show commit short-SHA),
+       in sync with the TodoWrite list.
+    2. IMPLEMENTATION LOG · BY TASK — everything for each task together, in task order.
+       The log OPENS with a "PRE-IMPL · CONTEXT" card when the run needs process context
+       (adapted workflow, environment constraints). Then, per task, append a GROUP:
+         a. an <h3 class="tglabel"> task-group heading — task number + title, with a
+            <span class="st-mini"> status/sha annotation ("· abc1234" or "(no code)");
+         b. one dd-card per substantive item (off-spec decision, plan deviation, important
+            fix, cross-task interaction, tradeoff — NOT routine progress). Each card has a
+            maroon tag ("TASK N · DONE · <sha>", "PRE-IMPL · CONTEXT", …), a bold title,
+            and prose/bullets with inline <code> chips;
+         c. one .cc CODE-CHANGE card per applied edit — heading, mono .loc location line,
+            then labelled BEFORE (red) / AFTER (green) <pre> blocks. Keep excerpts minimal:
+            the changed lines plus just enough context; elide unchanged runs with "...".
+       Append new groups at the TASK_LOG comment marker so decisions and code stay co-located.
+
+  FIXED MASTHEAD + PALETTE (per owner spec): header, palette, table, card, and code-block
+  styles are FIXED — reproduce as-is so this doc shares the editorial identity of the spec
+  (Spec · Design) and plan (Plan · Implementation). Stay on-palette.
+
+  HARD RULES: one self-contained .html; ALL CSS inline; web-safe/system fonts only;
+  NO external fonts/CDN/images/<link>/external <script>; renders from file:// offline.
+  An inline <meta refresh> is allowed for the live phase.
+
+  LIVE-VIEW: the <meta refresh> only fires when the tab is the ACTIVE/visible tab
+  (browsers throttle background tabs) — tell the owner to keep the notes tab visible.
+  At completion: flip Status pill to "Implementation — Complete" and REMOVE the <meta refresh>.
+
+  WHO UPDATES WHAT (the controller/agent owns ALL writes; implementer subagents stay report-only):
+    - subagent-driven-development: the CONTROLLER renders the table at setup (all rows
+      pending), flips each task's row to in-progress before dispatch and to done·<sha> after
+      review (filling its subtask rows from the implementer's report), and appends the task's
+      log group (tglabel heading, dd-cards, .cc code cards) from the implementer's report.
+      Implementer subagents never write this file.
+    - executing-plans: the agent renders, flips rows, and appends log groups itself, live.
+
+  PLACEHOLDERS: Roots at runtime, read-only reads, and a release: implementation notes Decisions the spec did not make, deviations, and the before/after of every applied change, task by task. 2026-09-20 feature/tpscli-mcp docs/mySuperpower/specs/2026-09-20-tpscli-mcp-roots-and-readonly-design.html docs/mySuperpower/plans/2026-09-20-tpscli-mcp-roots-and-readonly.html
+    <tr class="task-row"><td class="num">1</td><td class="desc">CLI: reads open ReadOnly</td><td class="st"><span class="tstatus done">&check; done &middot; bf965e7</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="task-row"><td class="num">2</td><td class="desc">Server: roots as session state, tps_set_roots, version 0.2.0</td><td class="st"><span class="tstatus done">&check; done &middot; f5a41ca</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="task-row"><td class="num">3</td><td class="desc">Server: tps_list_files for any folder, NO_ROOT retired, one e2e case</td><td class="st"><span class="tstatus done">&check; done &middot; 5db49db</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="task-row"><td class="num">4</td><td class="desc">Documents and tickets</td><td class="st"><span class="tstatus done">&check; done &middot; 46061b2</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="task-row"><td class="num">5</td><td class="desc">The two instruments</td><td class="st"><span class="tstatus done">&check; done &middot; bfeb52f</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="task-row"><td class="num">6</td><td class="desc">Release: one script, one workflow, a zip people can pull</td><td class="st"><span class="tstatus done">&check; done &middot; 3a2e33a</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>   -> task-row + sub rows per plan task (START all "pending")
+          <h3 class="tglabel">Task 1 &mdash; CLI: reads open ReadOnly <span class="st-mini">&middot; bf965e7</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 1 &middot; Done &middot; bf965e7</span>
+        <h3>The deny-write ACE narrowed from generic (W) to (WD,AD,WA,WEA)</h3>
+        <p><strong>Deviation from the plan.</strong> The plan's ACL case denied generic write, <code>icacls &lt;file&gt; /deny "user:(W)"</code>. Generic write bundles SYNCHRONIZE, and every synchronous <code>CreateFile</code> requests SYNCHRONIZE, so the deny blocked <em>every</em> open, reads included; the implementer proved it with a bare .NET <code>File.Open(..., FileAccess.Read)</code> on the locked file, which failed the same way. The failure happened in <code>tpsSchema.Load</code>'s byte read, before <code>Open</code> ran, so no open-mode fallback could have fixed it.</p>
+        <ul><li><strong>Ruling:</strong> deny only the specific write rights, <code>(WD,AD,WA,WEA)</code>, which leave SYNCHRONIZE alone. The UPDATE control then fails as the spec requires (exit 2, <code>ok:false</code>, <code>error.code DRIVER</code>, driver text "5 Access Denied") and the SELECT succeeds. The <code>/remove:d</code> cleanup is unchanged.</li>
+        <li><strong>Spec &sect;5 watch-point did not fire:</strong> the TopSpeed driver accepted <code>OPEN(F, 40h)</code> on the reconstructed structure; part 1 of the suite (LastWriteTime and SHA-256 unchanged after DESCRIBE + SELECT, moved after UPDATE) went red under SHARE and green under the change with no fallback needed.</li>
+        <li><strong>Interaction for Task 3 and Task 5:</strong> the e2e mtime assertion and CONFIG TC-09's LastWriteTime step build on this exe; <code>verify.ps1</code> reports "all steps PASS (2 skipped - not a release qualification)" on a default run, which Task 6's release script must reject unless <code>-AllowSkips</code> is given.</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 1 &middot; Change 1 &mdash; Open takes a writing flag</h3>
+        <p class="loc"><code>cli/tpsSchema.inc</code> line 98; <code>cli/tpsSchema.clw</code> lines 665-676. Committed <code>bf965e7</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>Open         PROCEDURE(),LONG                ! SHARE(SELF.F), maps field numbers to WHAT() indexes into Who
+...
+tpsSchema.Open PROCEDURE()
+...
+  CODE
+  SHARE(SELF.F)
+  CASE ERRORCODE()</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>Open         PROCEDURE(BYTE writing),LONG    ! 0: OPEN(F,40h) ReadOnly+DenyNone; 1: SHARE(F). Maps field numbers to WHAT() indexes into Who
+...
+tpsSchema.Open PROCEDURE(BYTE writing)
+...
+  CODE
+  ! Reads open ReadOnly + DenyNone (40h) so a DESCRIBE or SELECT leaves the file's modified
+  ! time alone and works on a folder the account can only read; writes keep SHARE (ReadWrite +
+  ! DenyNone, 42h). Ticket docs\tickets\2026-09-20-reads-open-read-write.md.
+  IF writing
+    SHARE(SELF.F)
+  ELSE
+    OPEN(SELF.F, 40h)
+  END
+  CASE ERRORCODE()</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 1 &middot; Change 2 &mdash; the two call sites pass the flag</h3>
+        <p class="loc"><code>cli/tpscli.clw</code> lines 189 (DESCRIBE branch) and 224 (after ParseBody). Committed <code>bf965e7</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>    IF rc = 0 THEN rc = Sc.Open().
+...
+  IF rc = 0 THEN rc = Sc.Open().</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>    IF rc = 0 THEN rc = Sc.Open(0).
+...
+  IF rc = 0 THEN rc = Sc.Open(CHOOSE(Stmt.Op = OP:Select, 0, 1)).</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 1 &middot; Change 3 &mdash; readonly.ps1 suite, verify.ps1 step 2, docs wording</h3>
+        <p class="loc"><code>cli/tests/readonly.ps1</code> (new, 74 lines); <code>cli/verify.ps1</code> line 364; <code>cli/README.md</code> lines 126-128; <code>docs/UserGuide/Tpscli-IT-Support-User-Guide.html</code> line 209. Committed <code>bf965e7</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>    foreach ($t in @('describe','parser','select','insert','update')) {
+...
+    icacls $locked /deny "${who}:(W)" | Out-Null          (the plan's text)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>    foreach ($t in @('describe','parser','select','insert','update','readonly')) {
+...
+# (W) is generic write and bundles SYNCHRONIZE, which every synchronous CreateFile requests, so it
+# would block reads too; deny only the specific write rights instead.
+...
+    icacls $locked /deny "${who}:(WD,AD,WA,WEA)" | Out-Null</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 2 &mdash; Server: roots as session state, tps_set_roots, 0.2.0 <span class="st-mini">&middot; f5a41ca</span></h3>
+      <div class="cc">
+        <h3>Task 2 &middot; Change 1 &mdash; roots become server state; two shared helpers</h3>
+        <p class="loc"><code>mcp/src/server.ts</code> directly after <code>const server = new McpServer(...)</code> (lines 83-100). Committed <code>f5a41ca</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>  const server = new McpServer({ name: 'tpscli-mcp', version: config.version });
+
+  const resolveFile = (file: string): string =&gt; {
+    if (FULLY_QUALIFIED.test(file)) return file;
+    if (config.roots.length === 0) {
+      throw new ToolError('FILE_NOT_FOUND', `${file} is not an absolute path and the server was started without --root folders`);
+    }
+    ...
+    for (const root of config.roots) {
+      ...
+      if (!config.roots.some(r =&gt; inside(r, candidate))) continue;
+    ...
+    throw new ToolError('FILE_NOT_FOUND', `${file} not found inside ${config.roots.join('; ')}`);</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>  const server = new McpServer({ name: 'tpscli-mcp', version: config.version });
+
+  // The roots are the server's own state: tps_set_roots replaces them for the session, and the
+  // Config it was built from is never written back (the tests share one config across servers).
+  let roots: string[] = [...config.roots];
+
+  // existsSync/statSync/readdirSync can throw (access denied, a folder removed between the check
+  // and the read); the model needs the structured envelope, not the SDK's text-only error.
+  const fsGuard = &lt;T&gt;(what: string, fn: () =&gt; T): T =&gt; {
+    try { return fn(); } catch (e) { throw new InvalidArgument(`cannot ${what}: ${(e as Error).message}`); }
+  };
+
+  // One rule for a folder argument, shared by tps_set_roots and tps_list_files: fully qualified
+  // (a relative folder would resolve against the server's cwd, which the model cannot see) and an
+  // existing directory. Returns the resolved path.
+  const folderArg = (label: string, value: string): string =&gt; {
+    if (!FULLY_QUALIFIED.test(value)) throw new InvalidArgument(`${label} "${value}" must be an absolute path`);
+    const full = path.resolve(value);
+    if (!fsGuard(`check ${full}`, () =&gt; existsSync(full) &amp;&amp; statSync(full).isDirectory())) throw new InvalidArgument(`${full} is not a folder`);
+    return full;
+  };
+
+  const resolveFile = (file: string): string =&gt; {
+    if (FULLY_QUALIFIED.test(file)) return file;
+    if (roots.length === 0) {
+      throw new ToolError('FILE_NOT_FOUND', `${file} is not an absolute path and the server currently has no root folders; call tps_set_roots or pass an absolute path`);
+    }
+    ...   (the other three config.roots reads become roots)</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 2 &middot; Change 2 &mdash; tps_version snapshots the roots; tps_set_roots registered</h3>
+        <p class="loc"><code>mcp/src/server.ts</code> lines 160-180. Committed <code>f5a41ca</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>  }, async () =&gt; {
+    const r = await run(config.exe, ['--version'], { timeoutMs: config.timeoutMs });
+    ...
+    return res.isError ? res : body({ server: config.version, exe: r.json! }, false);
+  });</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>  }, async () =&gt; {
+    const snapshot = [...roots];   // the set as it was when the call started
+    const r = await run(config.exe, ['--version'], { timeoutMs: config.timeoutMs });
+    ...
+    return res.isError ? res : body({ server: config.version, exe: r.json!, roots: snapshot }, false);
+  });
+
+  server.registerTool('tps_set_roots', {
+    title: 'Set root folders',
+    description: 'Replaces the server\'s root folders for this session: ... A restart returns to the --root flags.',
+    inputSchema: { roots: z.array(z.string().min(1)).describe('The whole new set, in lookup order; [] clears it.') },
+  }, async ({ roots: wanted }) =&gt; attempt(null, false, async () =&gt; {
+    // Validate everything before changing anything, so a bad entry leaves the set as it was.
+    const next: string[] = [];
+    wanted.forEach((r, i) =&gt; {
+      const full = folderArg(`roots[${i}]`, r);
+      if (!next.some(n =&gt; n.toLowerCase() === full.toLowerCase())) next.push(full);   // the file system compares case-insensitively
+    });
+    roots = next;
+    process.stderr.write(`tpscli-mcp tps_set_roots ${roots.length} root(s)${roots.length ? ': ' + roots.join('; ') : ''}\n`);
+    return body({ roots }, false);
+  }));</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 2 &middot; Change 3 &mdash; version 0.2.0 by hand; tests for nine tools and the setter</h3>
+        <p class="loc"><code>mcp/package.json</code> line 3, <code>mcp/package-lock.json</code> lines 3 and 9 (edited by hand so package.json keeps CRLF); <code>mcp/test/server.test.js</code>: inventory of nine names, the no-roots message match, <code>tps_version</code> carries <code>roots</code>, one new test for the setter (13 tests, 40 across the five suites). Committed <code>f5a41ca</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>  "version": "0.1.0",
+...
+test('exactly the eight tools are registered', async () =&gt; {
+  ...
+  assert.deepEqual(names, ['tps_delete', 'tps_describe', 'tps_insert', 'tps_list_files', 'tps_query', 'tps_select', 'tps_update', 'tps_version']);</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>  "version": "0.2.0",
+...
+test('exactly the nine tools are registered', async () =&gt; {
+  ...
+  assert.deepEqual(names, ['tps_delete', 'tps_describe', 'tps_insert', 'tps_list_files', 'tps_query', 'tps_select', 'tps_set_roots', 'tps_update', 'tps_version']);
+...
+test('tps_set_roots replaces the set, validates everything first, and leaves the config alone', async () =&gt; {
+  ... two distinct roots in a new order, a name resolved in the second, the combined listing,
+  ... FILE_NOT_FOUND naming the current set, case-insensitive dedupe, INVALID_ARGUMENT leaves the
+  ... set unchanged, [] clears, base.roots and a second server untouched, non-array -&gt; -32602</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 3 &mdash; Server: tps_list_files for any folder, NO_ROOT retired, one e2e case <span class="st-mini">&middot; 5db49db</span></h3>
+      <div class="cc">
+        <h3>Task 3 &middot; Change 1 &mdash; tps_list_files takes a directory; filesystem failures wear the envelope</h3>
+        <p class="loc"><code>mcp/src/server.ts</code>, the <code>tps_list_files</code> registration. Committed <code>5db49db</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>    inputSchema: { pattern: z.string().optional().describe(...) },
+  }, async ({ pattern }) =&gt; attempt(null, false, async () =&gt; {
+    if (roots.length === 0) {
+      throw new ToolError('NO_ROOT', 'The server was started without --root folders, ...');
+    }
+    ...
+    for (const root of roots) {
+      for (const entry of readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isFile() || !re.test(entry.name)) continue;
+        const full = path.join(root, entry.name);
+        const st = statSync(full);</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>    inputSchema: {
+      pattern: z.string().optional().describe(...),
+      directory: z.string().min(1).optional().describe('Absolute path of one folder to list instead of the roots.'),
+    },
+  }, async ({ pattern, directory }) =&gt; attempt(null, false, async () =&gt; {
+    const folders = directory !== undefined ? [folderArg('directory', directory)] : roots;
+    if (folders.length === 0) throw new InvalidArgument('The server has no root folders; pass directory, or call tps_set_roots first.');
+    ...
+    for (const folder of folders) {
+      for (const entry of fsGuard(`list ${folder}`, () =&gt; readdirSync(folder, { withFileTypes: true }))) {
+        if (!entry.isFile() || !re.test(entry.name)) continue;
+        const full = path.join(folder, entry.name);
+        const st = fsGuard(`read ${full}`, () =&gt; statSync(full));</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 3 &middot; Change 2 &mdash; call.js runs a comma-separated tool list on one server</h3>
+        <p class="loc"><code>mcp/tools/call.js</code> from <code>const [tool, ...serverArgs]</code> to the end; the single-tool output is byte-identical to before. Committed <code>5db49db</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>  const r = await client.callTool({ name: tool, arguments: args });
+  console.log(r.structuredContent ? JSON.stringify(r.structuredContent, null, 2) : r.content.map(c =&gt; c.text).join('\n'));
+  await client.close();
+  process.exit(r.isError ? 1 : 0);</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>const tools = tool.split(',');
+...
+if (tools.length &gt; 1 &amp;&amp; (!Array.isArray(args) || args.length !== tools.length)) {
+  console.error(`expected a JSON array of ${tools.length} argument objects, one per tool`);
+  process.exit(2);
+}
+...
+  const results = [];
+  for (const [i, name] of tools.entries()) results.push(await client.callTool({ name, arguments: tools.length &gt; 1 ? args[i] : args }));
+  if (tools.length === 1) console.log(show(results[0]));
+  else console.log(JSON.stringify(results.map(r =&gt; r.structuredContent ?? r.content.map(c =&gt; c.text).join('\n')), null, 2));
+  await client.close();
+  process.exit(results.some(r =&gt; r.isError) ? 1 : 0);</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 3 &middot; Change 3 &mdash; the listing test replaced; one e2e case through the rebuilt exe</h3>
+        <p class="loc"><code>mcp/test/server.test.js</code> (the NO_ROOT test becomes the directory/no-roots/broken-root/cleared cases); <code>mcp/test/e2e.test.js</code> (statSync import, mtime unchanged after describe + two selects, set roots [] &rarr; FILE_NOT_FOUND, directory listing, set roots [work] &rarr; bare-name describe records 5, tps_version.roots). Committed <code>5db49db</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>  const noRoots = await connect({ ...base, roots: [] }, stub());
+  const r = await call(noRoots, 'tps_list_files');
+  assert.equal(r.isError, true);
+  assert.equal(r.structuredContent.error.code, 'NO_ROOT');</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>  const r = await call(noRoots, 'tps_list_files');
+  assert.equal(r.structuredContent.error.code, 'INVALID_ARGUMENT');
+  assert.match(r.structuredContent.error.message, /pass directory, or call tps_set_roots first/);
+  ...
+  const broken = await connect({ ...base, roots: [path.join(tmp, 'notes.txt')] }, stub());
+  assert.match((await call(broken, 'tps_list_files')).structuredContent.error.message, /^cannot list /);
+...   (e2e)
+  assert.equal(statSync(keys).mtimeMs, mtime0);   // reads open ReadOnly: three reads left the stamp alone
+  assert.deepEqual(ok(await call(client, 'tps_set_roots', { roots: [work] })), { roots: [work] });
+  assert.equal(ok(await call(client, 'tps_describe', { file: 'KEYS.TPS' })).records, 5);</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 4 &mdash; Documents and tickets <span class="st-mini">&middot; d0d0269, 46061b2</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 4 &middot; Done &middot; d0d0269</span>
+        <h3>One plan instruction had nothing to act on</h3>
+        <p><strong>Plan mismatch, no change made.</strong> The plan asked to turn around "any sentence saying a read moves the file's modified time" in the MCP guide and the two READMEs. No such sentence exists in those three files (the watch-point lived in the CLI-side docs, handled in Task 1, and in the CONFIG instrument's TC-09, which Task 5 rewrites). The implementer searched for <code>modified time</code>, <code>LastWriteTime</code>, <code>shared mode</code> and <code>mtime</code> and reported the no-op rather than inventing a sentence to fix.</p>
+        <ul><li><strong>Also in scope by the plan's own check:</strong> a third "eight tools" phrase in the guide's Claude Code registration steps, not named in the plan's line list, was caught by the <code>rg -n "eight tools"</code> gate and changed to nine.</li></ul>
+      </div>
+      <div class="dd-card">
+        <span class="dd-tag">Task 4 &middot; Fix round 1 &middot; 46061b2</span>
+        <h3>Server version 0.2.0 everywhere the guide states it</h3>
+        <p><strong>Review finding (plan-mandated).</strong> The plan named only the version chip; five other server-version mentions in the guide (meta line, breadcrumb, sample ready line, <code>tps_version</code> example, footer) still read 0.1.0 beside the 0.2.0 chip. Ruling: every server-version mention becomes 0.2.0; the exe's own <code>"version": "0.1.0"</code> inside the example stays, because the CLI did not change version. The file's opening provenance comment ("run against tpscli-mcp 0.1.0 (1a8c478)") is left as recorded: it names the build the examples were captured on, not the current version.</p>
+      </div>
+      <div class="cc">
+        <h3>Task 4 &middot; Change 1 &mdash; READMEs: nine tools, runtime roots, directory listing, error table</h3>
+        <p class="loc"><code>mcp/README.md</code> (install paragraph, flag row, three tool rows, error table); <code>README.md</code> (mcp/ row, --root sentence, tool table). Committed <code>d0d0269</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>| `tps_list_files` | `pattern?` (`*.TPS`) | no exe; `{ files: [{ name, path, size, modified }] }` from the roots, one level deep |
+...
+| `NO_ROOT` | `tps_list_files` on a server with no `--root`. |</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>| `tps_version` | | `--version`; returns `{ server, exe, roots }` |
+| `tps_list_files` | `pattern?` (`*.TPS`), `directory?` | no exe; `{ files: [{ name, path, size, modified }] }` from `directory` or, without it, the roots, one level deep |
+| `tps_set_roots` | `roots` (string[]) | no exe; replaces the root set for this session, returns `{ roots }`; `[]` clears |
+...
+| `INVALID_ARGUMENT` | ...; a relative or missing folder given to `tps_set_roots` or `directory`; `tps_list_files` with neither roots nor `directory`; a folder that cannot be listed. |</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 4 &middot; Change 2 &mdash; MCP guide: 0.2.0, nine tools, a new procedure, troubleshooting row</h3>
+        <p class="loc"><code>docs/UserGuide/TpscliMcp-IT-Support-User-Guide.html</code>: chip, Purpose card, ToC/heading, Roots bullet, "Build once" test count 40, flag row, tools table, new h3 "Change the working folder without restarting" after "Let the model look at a file", codes paragraph, NO_ROOT row replaced, reference ticket line. Committed <code>d0d0269</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>&lt;tr&gt;&lt;td&gt;&lt;code&gt;"code": "NO_ROOT", "message": "The server was started without --root folders, ..."&lt;/code&gt;&lt;/td&gt;...&lt;/tr&gt;</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>&lt;h3&gt;Change the working folder without restarting&lt;/h3&gt;
+&lt;ol class="steps"&gt;
+  &lt;li&gt;Ask: &lt;em&gt;work in C:\pos\data from now on&lt;/em&gt;. The assistant calls &lt;code&gt;tps_set_roots&lt;/code&gt; ...&lt;/li&gt;
+  &lt;li&gt;For a one-off look at another folder ask &lt;em&gt;list the TPS files in D:\backup&lt;/em&gt;; that is &lt;code&gt;tps_list_files&lt;/code&gt; with &lt;code&gt;directory&lt;/code&gt; ...&lt;/li&gt;
+  &lt;li&gt;The change lasts for the session. ... &lt;code&gt;tps_version&lt;/code&gt; shows the current set at any time.&lt;/li&gt;
+&lt;/ol&gt;
+...
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;"code": "INVALID_ARGUMENT", "message": "The server has no root folders; pass directory, or call tps_set_roots first."&lt;/code&gt;&lt;/td&gt;...&lt;/tr&gt;</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 4 &middot; Change 3 &mdash; both tickets closed</h3>
+        <p class="loc"><code>docs/tickets/2026-09-19-tps-list-files-without-root.md</code>, <code>docs/tickets/2026-09-20-reads-open-read-write.md</code>. Committed <code>d0d0269</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>- Status: open</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>- Status: closed 2026-09-20 (spec docs/mySuperpower/specs/2026-09-20-tpscli-mcp-roots-and-readonly-design.html; commits in feature/tpscli-mcp)
+...
+- Changed at implementation (spec section 2): a `directory` outside the roots is listed, not refused; ...</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 5 &mdash; The two instruments <span class="st-mini">&middot; 9871aaa, bfeb52f</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 5 &middot; Done &middot; bfeb52f</span>
+        <h3>Four stale spots outside the plan's line list, fixed before review</h3>
+        <p><strong>Plan gap, ruled at implementation.</strong> The plan enumerated the corpus instrument's title, h1, SUITE_ID, SUITE_TITLE, preamble and five cases, and the CONFIG instrument's title, h1, SUITE_TITLE, preamble, TC-03 and TC-09. The implementer found, and flagged rather than silently fixed, four more places still saying 0.1.0 / "eight tools" or a now-false claim: both instruments' <code>&lt;p class="sub"&gt;</code> subtitles, the CONFIG instrument's tool-listing case TC-01 (eight tools, no <code>tps_set_roots</code>), the CONFIG "Known watch-points" paragraph ("a read moves LastWriteTime"), and the corpus runner's results-JSON <code>suite = 'tpscli-mcp-0-1-0'</code> literal. Ruling: fix all four (spec intent over the plan's literal list); re-record and re-embed the corpus page because its subtitle prints in the report; the runner itself was not re-run, so the committed results JSON still carries the old suite label (deferred minor; the next run corrects it).</p>
+        <ul><li><strong>RED before edits:</strong> exactly the five cases the plan predicted (TC-02 count, TC-03 ready line, TC-04 version, TC-05 NO_ROOT, TC-10 message) failed against the 0.2.0 server; 11 passed.</li>
+        <li><strong>GREEN:</strong> 16 PASS / 0 FAIL / 0 BLOCKED; recorder tally 16/0/0 with 62 ticked steps (TC-05 now six); embed line "build 46061b2 ... PASS 16 FAIL 0 BLOCKED 0; CRLF 813 lone-LF 0"; fresh-profile render shows the 0.2.0 heading and TC-05 6/6 (checked with a read-only DevTools script; the Chrome extension was not connected).</li>
+        <li><strong>The CONFIG instrument's run is the owner's gate:</strong> its cases are rewritten (TC-03: directory listing of the real folder, <code>tps_set_roots</code>, bare-name describe; TC-09: SHA-256 and LastWriteTime both unchanged) but its SUITE_ID and embedded 0.1.0 run stay until a Claude Code session performs it on the rebuilt server.</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 5 &middot; Change 1 &mdash; corpus instrument cases and runner blocks</h3>
+        <p class="loc"><code>docs/Testing/TpscliMcp-Unit-Test-Cases.html</code> (TC-02, TC-03, TC-04, TC-05, TC-10, SUITE_ID, titles, subtitle, preamble, SEED_STATE); <code>mcp/tests/run-instrument.ps1</code> (TC-02/03/04/05/10 blocks, <code>$workJson</code>, suite literal). Committed <code>9871aaa</code>, <code>bfeb52f</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>var SUITE_ID = "tpscli-mcp-0-1-0";
+...
+    title:"tps_list_files lists the root folder, filters by pattern, and needs a root",
+    steps:[ ... 3 steps ... ],
+    expected:"... Step 3: error.code NO_ROOT with a message saying the server was started without --root folders, exit 1. ..."
+...
+    $r = Call tps_list_files '' @(); Expect-Error $r 'NO_ROOT' | Out-Null
+    Expect-Contains $r 'without --root folders'; Tick 3</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>var SUITE_ID = "tpscli-mcp-0-2-0";
+...
+    title:"tps_list_files lists the roots or a directory and filters by pattern; tps_set_roots changes the roots at runtime",
+    steps:[ ... 6 steps: roots, pattern, directory, no roots, tps_set_roots,tps_list_files sequence, relative root ... ],
+...
+    $r = Call tps_list_files '' @(); Expect-Error $r 'INVALID_ARGUMENT' 'The server has no root folders; pass directory, or call tps_set_roots first.' | Out-Null; Tick 4
+    $r = Call 'tps_set_roots,tps_list_files' ('[{"roots":["' + $workJson + '"]},{}]') @(); $j = Json $r
+    ...
+    Expect-StderrContains $r "tpscli-mcp tps_set_roots 1 root(s): $work"; Expect-Exit $r 0; Tick 5
+    $r = Call tps_set_roots '{"roots":["work"]}' @(); Expect-Error $r 'INVALID_ARGUMENT' 'roots[0] "work" must be an absolute path' | Out-Null; Tick 6</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 5 &middot; Change 2 &mdash; CONFIG instrument: TC-01, TC-03, TC-09, watch-point</h3>
+        <p class="loc"><code>docs/Testing/TpscliMcpConfig-Unit-Test-Cases.html</code>; <code>mcp/tests/run-config-instrument.ps1</code> line 190. Committed <code>9871aaa</code>, <code>bfeb52f</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>      "title": "Listing needs a root: tps_list_files answers NO_ROOT on this registration",
+      "steps": [
+          "Ask: \"list the TPS files\"  -&gt;  Tool call: tps_list_files {}",
+          ...
+...
+      "pre": "TC-04 passed. The TopSpeed driver opens files read/write, so a read moves the file's modified time; this case proves the bytes do not change.",</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>      "title": "Listing without a root: tps_list_files by directory, then tps_set_roots makes CONFIG the root",
+      "steps": [
+          "Ask: \"list the TPS files in C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\"  -&gt;  Tool call: tps_list_files {\"directory\": \"C:\\\\...\\\\CONFIG\"}",
+          "PowerShell: (Get-ChildItem '...\\CONFIG\\*.TPS').Count ; (Get-Item '...\\OPTIONS.TPS').Length",
+          "Ask: \"use that folder as the root from now on\"  -&gt;  Tool call: tps_set_roots {\"roots\": [\"C:\\\\...\\\\CONFIG\"]}",
+          "Ask: \"describe OPTIONS.TPS\"  -&gt;  Tool call: tps_describe {\"file\": \"OPTIONS.TPS\"}",
+          "Ask: \"list the TPS files\"  -&gt;  Tool call: tps_list_files {}"
+      ],
+...
+      "pre": "TC-04 passed. Reads open the file ReadOnly, so neither the bytes nor the modified time change.",
+      "steps": [ "... $h1 ... $m1 = (Get-Item ...).LastWriteTimeUtc ...", "... tps_describe ... tps_select ...", "... ($h1 -eq $h2) ; ($m1 -eq $m2)" ]</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 6 &mdash; Release: one script, one workflow, a zip people can pull <span class="st-mini">&middot; 3a2e33a</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 6 &middot; Done &middot; 3a2e33a</span>
+        <h3>What the zip really holds, and what stays unverified</h3>
+        <p><strong>Deviation from the plan's description, not from its script.</strong> The plan expected the staged <code>node_modules\</code> to hold "@modelcontextprotocol and zod, no typescript". <code>npm ci --omit=dev</code> installs ~94 packages because <code>@modelcontextprotocol/sdk</code> declares <code>express</code>, <code>hono</code>, <code>cors</code>, <code>ajv</code> and their dependencies as production dependencies (its HTTP transport, unused by this stdio server). The zip is 5.1 MB, within the plan's "a few MB". Nothing to fix in the script; the README describes the zip by what it is for, not by package count.</p>
+        <ul><li><strong>Verified locally:</strong> the <code>-SkipVerify</code> dry run; the unzipped layout (<code>dist\server.js, runner.js, sql.js, tpscli.exe</code>; <code>package.json</code>; <code>node_modules\</code>; <code>tools\call.js</code>; <code>README.md</code>; <code>docs\</code> with the two guides and the CLI README); <code>node tools\call.js tps_version</code> from the unzipped folder answering server 0.2.0 / exe 0.1.0 / roots [] with the ready line naming the exe inside <code>dist\</code>; a directory listing of six files; the plain run <em>refusing</em> with exit 1 because <code>verify.ps1</code> skipped the real-file checks; the <code>-AllowSkips</code> run green (verify.ps1 all steps PASS, npm test 40).</li>
+        <li><strong>Unverified, by design:</strong> the Actions trigger (no remote, no runner yet) and the real-file qualification (<code>-Extra/-Expected/-TpsFixLog</code>: the dtpos copies are not on this machine). Both are the owner's steps in the README's maintainer section.</li>
+        <li><strong>Cosmetic:</strong> the <code>Run</code> helper prints native-command output twice in the console (captured and inherited); execution is single (one "# tests 40" line). Left as the plan wrote it.</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 6 &middot; Change 1 &mdash; tools\release.ps1 (new, 101 lines)</h3>
+        <p class="loc"><code>tools/release.ps1</code>: verify.ps1 (or build.ps1 under -SkipVerify) &rarr; bounded <code>tpscli.exe --version</code> &rarr; npm ci/build/test &rarr; stage &rarr; <code>npm ci --omit=dev</code> in the stage &rarr; Compress-Archive &rarr; .sha256 &rarr; notes.md. Committed <code>3a2e33a</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>(no release tooling; "Move the server to another machine" in the guide described the layout by hand)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>param([string]$Version = '', [string]$Extra = '', [string]$Expected = '', [string]$TpsFixLog = '', [switch]$AllowSkips, [switch]$SkipVerify)
+...
+    $verifyOutput = Run 'cli\verify.ps1 (build, corpus, suites, gate)' (Join-Path $repo 'cli') { powershell -NoProfile -ExecutionPolicy Bypass -File verify.ps1 @verifyArgs }
+    if (($verifyOutput -join "`n") -match 'not a release qualification' -and -not $AllowSkips) {
+        throw 'release.ps1: verify.ps1 skipped the real-file checks (no -Extra/-Expected/-TpsFixLog); pass them, or -AllowSkips for a local build'
+    }
+...
+Run 'npm ci --omit=dev (production node_modules in the stage)' $stage { npm ci --omit=dev --ignore-scripts }
+...
+Compress-Archive -Path $stage -DestinationPath $zip
+$hash = (Get-FileHash $zip -Algorithm SHA256).Hash</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 6 &middot; Change 2 &mdash; .github\workflows\release.yml (new), .gitignore, READMEs, guide</h3>
+        <p class="loc"><code>.github/workflows/release.yml</code> (on push tags v*, self-hosted windows clarion runner, release.ps1 with the tag and the three <code>vars.TPSCLI_*</code> inputs, <code>gh release create</code>); <code>.gitignore</code> + <code>release/</code>; root <code>README.md</code> "Install from a release" and "Cutting a release (maintainers)"; <code>mcp/README.md</code> one pointer; the MCP guide's "Build once" and "Move the server". Committed <code>3a2e33a</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>## Install the MCP server</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>## Install from a release
+
+Releases (`https://github.com/&lt;owner&gt;/tpscli/releases`) carry one zip per version, ...
+
+## Cutting a release (maintainers)
+
+A push of a tag `v&lt;version&gt;` runs `.github\workflows\release.yml` on the self-hosted Windows
+runner labelled `clarion`; ... repository variables `TPSCLI_EXTRA`, `TPSCLI_EXPECTED` and
+`TPSCLI_TPSFIX_LOG` ... `release.ps1` refuses to package a run that skipped those checks unless
+`-AllowSkips` is given. ...
+
+## Install the MCP server</code></pre>
+        </div>
+      </div>
+
+      <div class="dd-card">
+        <span class="dd-tag">Ablation pass &middot; before the final review</span>
+        <h3>Every added abstraction was challenged; none removed</h3>
+        <p><strong>Controller pass, no subagent.</strong> <code>fsGuard</code> was removed from all three call sites and the server suite run: test 10 (a root that names a file) failed, because the <code>ENOTDIR</code> from <code>readdirSync</code> escaped <code>attempt</code> as an SDK text error with no structured envelope; restored. <code>folderArg</code> (two callers), <code>Run</code> in <code>release.ps1</code> (five callers), the <code>call.js</code> tool-sequence form (used by the corpus instrument's TC-05 step 5) and <code>readonly.ps1</code>'s four small helpers each have more than one caller, so inlining them would duplicate a logic block verbatim. <code>-SkipVerify</code> and <code>-AllowSkips</code> are both exercised by the documented dry-run and local-build flows. Nothing to commit.</p>
+      </div>
+
+      <h3 class="tglabel">Final review and fix wave <span class="st-mini">&middot; 0066a5e</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Final review &middot; Opus &middot; 5986cb6..3a2e33a</span>
+        <h3>One Important finding: a PowerShell 5.1 trap in the release script</h3>
+        <p><strong>Finding.</strong> With the script-level <code>$ErrorActionPreference = 'Stop'</code>, <code>Run</code>'s <code>&amp; $Body 2&gt;&amp;1</code> turns the first stderr line of any native command (an <code>npm warn</code>, the daily <code>npm notice</code> update nag) into a terminating <code>NativeCommandError</code> before the exit-code check. Task 6's three runs were green only because nothing wrote to stderr that day. Proved by probe before the fix; after it, a stderr line flows through as text and a non-zero exit still throws.</p>
+        <ul><li><strong>Fix (one commit, eight items):</strong> <code>$ErrorActionPreference = 'Continue'</code> scoped inside <code>Run</code>; the four unconsumed <code>Run</code> calls piped to <code>Out-Null</code> (the double echo was PowerShell printing the returned output a second time); <code>notes.md</code> written BOM-less with <code>[IO.File]::WriteAllText</code>; the "second in the search order" comment corrected to first (release.ps1 and the guide); <code>timeout-minutes: 60</code> on the workflow job; the guide's second <code>tps_version</code> example gains <code>roots</code>; the CONFIG instrument's scope paragraph names <code>tps_set_roots</code>; <code>readonly.ps1</code> clears a stale deny ACE and the locked copy before copying, so an aborted run cannot wedge the next one.</li>
+        <li><strong>Left as triaged "can wait":</strong> a README note on the SYNCHRONIZE gotcha; call.js does not validate array-shaped stdin for a single tool; the committed results JSON's <code>suite</code> label (rewritten by the next run); the redundant <code>-TimeoutMs 20000</code>; a trailing backslash when a UNC root is echoed; three commits carry a <code>Claude Sonnet 5</code> co-author trailer (the model that made them).</li>
+        <li><strong>Reviewer's verdict on the ledgered deviations:</strong> all justified (ACE narrowing, version sweep beyond the plan's line list, the four instrument spots, the provenance comment, the review range); nothing built beyond the ask. Ready to merge with the fixes above.</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Final fix &middot; Change 1 &mdash; Run survives native stderr; single echo; BOM-less notes</h3>
+        <p class="loc"><code>tools/release.ps1</code>. Committed <code>0066a5e</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>    try {
+        $global:LASTEXITCODE = 0
+        $output = &amp; $Body 2&gt;&amp;1 | ForEach-Object { "$_" }
+...
+Run 'npm ci' (Join-Path $repo 'mcp') { npm ci }
+...
+"@ | Set-Content (Join-Path $out 'notes.md') -Encoding UTF8</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>    try {
+        $ErrorActionPreference = 'Continue'    # scoped to this function; a native command's stderr line
+                                                # (npm warn/notice) must not become a terminating error under
+                                                # the script-level Stop -- only $LASTEXITCODE decides failure
+        $global:LASTEXITCODE = 0
+        $output = &amp; $Body 2&gt;&amp;1 | ForEach-Object { "$_" }
+...
+Run 'npm ci' (Join-Path $repo 'mcp') { npm ci } | Out-Null
+...
+$notes = @"
+...
+"@
+[IO.File]::WriteAllText((Join-Path $out 'notes.md'), $notes, (New-Object System.Text.UTF8Encoding($false)))</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Final fix &middot; Change 2 &mdash; readonly.ps1 self-heals; workflow timeout; doc nits</h3>
+        <p class="loc"><code>cli/tests/readonly.ps1</code> (before the copy), <code>.github/workflows/release.yml</code>, <code>docs/UserGuide/TpscliMcp-IT-Support-User-Guide.html</code>, <code>docs/Testing/TpscliMcpConfig-Unit-Test-Cases.html</code>. Committed <code>0066a5e</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>Copy-Item (Join-Path $root 'testdata\KEYS.TPS') $locked -Force
+...
+    runs-on: [self-hosted, windows, clarion]</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>$who = "$env:USERDOMAIN\$env:USERNAME"
+if (Test-Path $locked) { icacls $locked /remove:d $who | Out-Null }   # a prior run that died between the deny and the finally
+Remove-Item $locked -Force -ErrorAction SilentlyContinue
+Copy-Item (Join-Path $root 'testdata\KEYS.TPS') $locked -Force
+...
+    runs-on: [self-hosted, windows, clarion]
+    timeout-minutes: 60</code></pre>
+        </div>
+      </div>
+ -> Implementation Log groups, appended as tasks complete (may start
+                       empty, or with a single PRE-IMPL · CONTEXT card)
+  Eyebrow FIXED "Notes · Implementation". Status pill starts "Implementation — In Progress".
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roots at runtime, read-only reads, and a release: implementation notes</title>
+<style>
+  :root{
+    --paper:#f4efe1; --ink:#221f18; --maroon:#8a2b27; --meta-bg:#e9e1cd;
+    --label:#6d5f4e; --value:#2b2820; --amber:#a8762b; --olive:#7a6a2e;
+    --rule:#ddd3bc; --subrule:#ece4d0; --green:#3f7d3f; --card:#faf7ef;
+    --code-bg:#2b2820; --code-ink:#f4efe1; --add:#3f7d3f; --del:#8a2b27;
+    --serif:Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);padding:3.5rem 2rem;}
+  .wrap{max-width:1040px;margin:0 auto;}
+  .eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.35em;
+           font-size:.8rem;font-weight:700;color:var(--maroon);margin:0 0 1.1rem;}
+  h1{font-family:var(--serif);font-weight:700;font-size:clamp(2.6rem,6vw,4rem);
+     line-height:1.04;letter-spacing:-.01em;margin:0 0 .9rem;}
+  .subtitle{font-family:var(--serif);font-style:italic;font-weight:700;
+            font-size:clamp(1.25rem,2.4vw,1.7rem);line-height:1.3;margin:0 0 1.9rem;max-width:48ch;}
+  .meta-card{display:grid;grid-template-columns:max-content 1fr;column-gap:1.75rem;row-gap:.55rem;
+             align-items:baseline;background:var(--meta-bg);border-radius:14px;
+             border-left:6px solid var(--maroon);padding:1.4rem 1.85rem;}
+  .meta-card dt{font-family:var(--mono);color:var(--label);font-size:.95rem;font-weight:400;}
+  .meta-card dd{font-family:var(--mono);color:var(--value);font-size:.95rem;margin:0;word-break:break-word;}
+  .status-pill{display:inline-block;border:1px solid var(--amber);color:var(--amber);border-radius:999px;
+               padding:.12rem .75rem;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;
+               line-height:1.45;background:transparent;}
+  .section-label{font-family:var(--mono);text-transform:uppercase;letter-spacing:.2em;font-size:.95rem;
+                 font-weight:700;color:var(--ink);border-bottom:2px solid var(--ink);
+                 padding-bottom:.5rem;margin:2.6rem 0 1.4rem;}
+  table.tasks{width:100%;border-collapse:collapse;}
+  table.tasks th{font-family:var(--mono);text-transform:uppercase;letter-spacing:.12em;font-size:.72rem;
+                 color:var(--label);text-align:left;font-weight:400;padding:.4rem .75rem;}
+  table.tasks td{padding:.6rem .75rem;vertical-align:middle;}
+  td.num{font-family:var(--mono);color:var(--label);width:3rem;}
+  td.st{width:1%;white-space:nowrap;text-align:right;}
+  tr.task-row td{border-top:2px solid var(--ink);font-size:1.05rem;}
+  tr.task-row td.desc{font-weight:700;}
+  tr.sub td{border-top:1px solid var(--subrule);}
+  td.subtask{padding-left:2.1rem;color:var(--label);font-size:.95rem;}
+  .tstatus{font-family:var(--mono);font-size:.78rem;padding:.22rem .65rem;border-radius:7px;white-space:nowrap;}
+  .tstatus.done{background:#d6e8cf;color:var(--green);}
+  .tstatus.inprogress{background:#ecdcbf;color:#9a6a1f;}
+  .tstatus.pending{background:#e7dfca;color:var(--label);}
+  .tglabel{font-family:var(--serif);font-weight:700;font-size:1.55rem;color:var(--maroon);margin:2.8rem 0 .2rem;padding-bottom:.3rem;border-bottom:2px solid var(--rule);}
+  .tglabel .st-mini{font-family:var(--mono);font-size:.72rem;font-weight:400;color:var(--label);letter-spacing:.05em;}
+  .cc{margin:1.7rem 0;}
+  .cc h3{font-family:var(--serif);font-weight:700;font-size:1.25rem;margin:.3rem 0 .3rem;color:var(--maroon);}
+  .cc .loc{font-family:var(--mono);font-size:.8rem;color:var(--label);margin:0 0 .6rem;}
+  .cc .ba{display:grid;grid-template-columns:1fr;gap:.5rem;}
+  .cc .lbl{font-family:var(--mono);text-transform:uppercase;letter-spacing:.1em;font-size:.68rem;font-weight:700;margin:.2rem 0 -.2rem;}
+  .cc .lbl.before{color:var(--del);}
+  .cc .lbl.after{color:var(--add);}
+  pre{font-family:var(--mono);font-size:.8rem;line-height:1.5;background:var(--code-bg);color:var(--code-ink);
+      border-radius:10px;padding:1rem 1.2rem;overflow-x:auto;margin:.3rem 0;}
+  pre.before{border-left:4px solid var(--del);}
+  pre.after{border-left:4px solid var(--add);}
+  pre code{background:none;padding:0;font-size:1em;color:inherit;border:none;}
+  .pending-note{font-family:var(--mono);font-size:.85rem;color:var(--label);font-style:italic;}
+  .dd-card{position:relative;background:var(--card);border:1px solid var(--rule);border-radius:14px;
+           padding:1.7rem 1.85rem 1.4rem;margin:1.7rem 0;}
+  .dd-tag{position:absolute;top:-0.75rem;left:1.5rem;background:var(--maroon);color:var(--paper);
+          font-family:var(--mono);text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;
+          font-weight:700;padding:.28rem .7rem;border-radius:6px;}
+  .dd-card h3{font-family:var(--serif);font-weight:700;font-size:1.3rem;margin:.3rem 0 .8rem;}
+  .dd-card p{font-size:1.05rem;line-height:1.55;margin:.5rem 0;}
+  .dd-card ul{margin:.6rem 0;padding-left:1.4rem;}
+  .dd-card li{margin:.5rem 0;line-height:1.55;}
+  code{font-family:var(--mono);background:var(--meta-bg);border:1px solid var(--rule);
+       padding:.05em .35em;border-radius:5px;font-size:.85em;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <p class="eyebrow">Notes &middot; Implementation</p>
+      <h1>Roots at runtime, read-only reads, and a release: implementation notes</h1>
+      <p class="subtitle">Decisions the spec did not make, deviations, and the before/after of every applied change, task by task.</p>
+      <dl class="meta-card">
+        <dt>Started</dt><dd>2026-09-20</dd>
+        <dt>Branch</dt><dd>feature/tpscli-mcp</dd>
+        <dt>Spec</dt><dd>docs/mySuperpower/specs/2026-09-20-tpscli-mcp-roots-and-readonly-design.html</dd>
+        <dt>Plan</dt><dd>docs/mySuperpower/plans/2026-09-20-tpscli-mcp-roots-and-readonly.html</dd>
+        <dt>Status</dt><dd><span class="status-pill">Implementation &mdash; Complete</span></dd>
+      </dl>
+    </header>
+
+    <section class="task-status">
+      <h2 class="section-label">Task Status</h2>
+      <table class="tasks">
+        <thead><tr><th>Task</th><th>Description</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr class="task-row"><td class="num">1</td><td class="desc">CLI: reads open ReadOnly</td><td class="st"><span class="tstatus done">&check; done &middot; bf965e7</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="task-row"><td class="num">2</td><td class="desc">Server: roots as session state, tps_set_roots, version 0.2.0</td><td class="st"><span class="tstatus done">&check; done &middot; f5a41ca</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="task-row"><td class="num">3</td><td class="desc">Server: tps_list_files for any folder, NO_ROOT retired, one e2e case</td><td class="st"><span class="tstatus done">&check; done &middot; 5db49db</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="task-row"><td class="num">4</td><td class="desc">Documents and tickets</td><td class="st"><span class="tstatus done">&check; done &middot; 46061b2</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="task-row"><td class="num">5</td><td class="desc">The two instruments</td><td class="st"><span class="tstatus done">&check; done &middot; bfeb52f</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="task-row"><td class="num">6</td><td class="desc">Release: one script, one workflow, a zip people can pull</td><td class="st"><span class="tstatus done">&check; done &middot; 3a2e33a</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+<tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <!-- One task-row per plan task + its subtask rows. START all "pending"; flip live:
+          <tr class="task-row"><td class="num">1</td><td class="desc">Task title</td><td class="st"><span class="tstatus done">&check; done &middot; abc1234</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus inprogress">in progress</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          -->
+        </tbody>
+      </table>
+    </section>
+
+    <section class="log">
+      <h2 class="section-label">Implementation Log &middot; By Task</h2>
+      <p class="pending-note">Everything for each task together &mdash; decisions/deviations and the before&rarr;after code.</p>
+            <h3 class="tglabel">Task 1 &mdash; CLI: reads open ReadOnly <span class="st-mini">&middot; bf965e7</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 1 &middot; Done &middot; bf965e7</span>
+        <h3>The deny-write ACE narrowed from generic (W) to (WD,AD,WA,WEA)</h3>
+        <p><strong>Deviation from the plan.</strong> The plan's ACL case denied generic write, <code>icacls &lt;file&gt; /deny "user:(W)"</code>. Generic write bundles SYNCHRONIZE, and every synchronous <code>CreateFile</code> requests SYNCHRONIZE, so the deny blocked <em>every</em> open, reads included; the implementer proved it with a bare .NET <code>File.Open(..., FileAccess.Read)</code> on the locked file, which failed the same way. The failure happened in <code>tpsSchema.Load</code>'s byte read, before <code>Open</code> ran, so no open-mode fallback could have fixed it.</p>
+        <ul><li><strong>Ruling:</strong> deny only the specific write rights, <code>(WD,AD,WA,WEA)</code>, which leave SYNCHRONIZE alone. The UPDATE control then fails as the spec requires (exit 2, <code>ok:false</code>, <code>error.code DRIVER</code>, driver text "5 Access Denied") and the SELECT succeeds. The <code>/remove:d</code> cleanup is unchanged.</li>
+        <li><strong>Spec &sect;5 watch-point did not fire:</strong> the TopSpeed driver accepted <code>OPEN(F, 40h)</code> on the reconstructed structure; part 1 of the suite (LastWriteTime and SHA-256 unchanged after DESCRIBE + SELECT, moved after UPDATE) went red under SHARE and green under the change with no fallback needed.</li>
+        <li><strong>Interaction for Task 3 and Task 5:</strong> the e2e mtime assertion and CONFIG TC-09's LastWriteTime step build on this exe; <code>verify.ps1</code> reports "all steps PASS (2 skipped - not a release qualification)" on a default run, which Task 6's release script must reject unless <code>-AllowSkips</code> is given.</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 1 &middot; Change 1 &mdash; Open takes a writing flag</h3>
+        <p class="loc"><code>cli/tpsSchema.inc</code> line 98; <code>cli/tpsSchema.clw</code> lines 665-676. Committed <code>bf965e7</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>Open         PROCEDURE(),LONG                ! SHARE(SELF.F), maps field numbers to WHAT() indexes into Who
+...
+tpsSchema.Open PROCEDURE()
+...
+  CODE
+  SHARE(SELF.F)
+  CASE ERRORCODE()</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>Open         PROCEDURE(BYTE writing),LONG    ! 0: OPEN(F,40h) ReadOnly+DenyNone; 1: SHARE(F). Maps field numbers to WHAT() indexes into Who
+...
+tpsSchema.Open PROCEDURE(BYTE writing)
+...
+  CODE
+  ! Reads open ReadOnly + DenyNone (40h) so a DESCRIBE or SELECT leaves the file's modified
+  ! time alone and works on a folder the account can only read; writes keep SHARE (ReadWrite +
+  ! DenyNone, 42h). Ticket docs\tickets\2026-09-20-reads-open-read-write.md.
+  IF writing
+    SHARE(SELF.F)
+  ELSE
+    OPEN(SELF.F, 40h)
+  END
+  CASE ERRORCODE()</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 1 &middot; Change 2 &mdash; the two call sites pass the flag</h3>
+        <p class="loc"><code>cli/tpscli.clw</code> lines 189 (DESCRIBE branch) and 224 (after ParseBody). Committed <code>bf965e7</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>    IF rc = 0 THEN rc = Sc.Open().
+...
+  IF rc = 0 THEN rc = Sc.Open().</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>    IF rc = 0 THEN rc = Sc.Open(0).
+...
+  IF rc = 0 THEN rc = Sc.Open(CHOOSE(Stmt.Op = OP:Select, 0, 1)).</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 1 &middot; Change 3 &mdash; readonly.ps1 suite, verify.ps1 step 2, docs wording</h3>
+        <p class="loc"><code>cli/tests/readonly.ps1</code> (new, 74 lines); <code>cli/verify.ps1</code> line 364; <code>cli/README.md</code> lines 126-128; <code>docs/UserGuide/Tpscli-IT-Support-User-Guide.html</code> line 209. Committed <code>bf965e7</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>    foreach ($t in @('describe','parser','select','insert','update')) {
+...
+    icacls $locked /deny "${who}:(W)" | Out-Null          (the plan's text)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>    foreach ($t in @('describe','parser','select','insert','update','readonly')) {
+...
+# (W) is generic write and bundles SYNCHRONIZE, which every synchronous CreateFile requests, so it
+# would block reads too; deny only the specific write rights instead.
+...
+    icacls $locked /deny "${who}:(WD,AD,WA,WEA)" | Out-Null</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 2 &mdash; Server: roots as session state, tps_set_roots, 0.2.0 <span class="st-mini">&middot; f5a41ca</span></h3>
+      <div class="cc">
+        <h3>Task 2 &middot; Change 1 &mdash; roots become server state; two shared helpers</h3>
+        <p class="loc"><code>mcp/src/server.ts</code> directly after <code>const server = new McpServer(...)</code> (lines 83-100). Committed <code>f5a41ca</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>  const server = new McpServer({ name: 'tpscli-mcp', version: config.version });
+
+  const resolveFile = (file: string): string =&gt; {
+    if (FULLY_QUALIFIED.test(file)) return file;
+    if (config.roots.length === 0) {
+      throw new ToolError('FILE_NOT_FOUND', `${file} is not an absolute path and the server was started without --root folders`);
+    }
+    ...
+    for (const root of config.roots) {
+      ...
+      if (!config.roots.some(r =&gt; inside(r, candidate))) continue;
+    ...
+    throw new ToolError('FILE_NOT_FOUND', `${file} not found inside ${config.roots.join('; ')}`);</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>  const server = new McpServer({ name: 'tpscli-mcp', version: config.version });
+
+  // The roots are the server's own state: tps_set_roots replaces them for the session, and the
+  // Config it was built from is never written back (the tests share one config across servers).
+  let roots: string[] = [...config.roots];
+
+  // existsSync/statSync/readdirSync can throw (access denied, a folder removed between the check
+  // and the read); the model needs the structured envelope, not the SDK's text-only error.
+  const fsGuard = &lt;T&gt;(what: string, fn: () =&gt; T): T =&gt; {
+    try { return fn(); } catch (e) { throw new InvalidArgument(`cannot ${what}: ${(e as Error).message}`); }
+  };
+
+  // One rule for a folder argument, shared by tps_set_roots and tps_list_files: fully qualified
+  // (a relative folder would resolve against the server's cwd, which the model cannot see) and an
+  // existing directory. Returns the resolved path.
+  const folderArg = (label: string, value: string): string =&gt; {
+    if (!FULLY_QUALIFIED.test(value)) throw new InvalidArgument(`${label} "${value}" must be an absolute path`);
+    const full = path.resolve(value);
+    if (!fsGuard(`check ${full}`, () =&gt; existsSync(full) &amp;&amp; statSync(full).isDirectory())) throw new InvalidArgument(`${full} is not a folder`);
+    return full;
+  };
+
+  const resolveFile = (file: string): string =&gt; {
+    if (FULLY_QUALIFIED.test(file)) return file;
+    if (roots.length === 0) {
+      throw new ToolError('FILE_NOT_FOUND', `${file} is not an absolute path and the server currently has no root folders; call tps_set_roots or pass an absolute path`);
+    }
+    ...   (the other three config.roots reads become roots)</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 2 &middot; Change 2 &mdash; tps_version snapshots the roots; tps_set_roots registered</h3>
+        <p class="loc"><code>mcp/src/server.ts</code> lines 160-180. Committed <code>f5a41ca</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>  }, async () =&gt; {
+    const r = await run(config.exe, ['--version'], { timeoutMs: config.timeoutMs });
+    ...
+    return res.isError ? res : body({ server: config.version, exe: r.json! }, false);
+  });</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>  }, async () =&gt; {
+    const snapshot = [...roots];   // the set as it was when the call started
+    const r = await run(config.exe, ['--version'], { timeoutMs: config.timeoutMs });
+    ...
+    return res.isError ? res : body({ server: config.version, exe: r.json!, roots: snapshot }, false);
+  });
+
+  server.registerTool('tps_set_roots', {
+    title: 'Set root folders',
+    description: 'Replaces the server\'s root folders for this session: ... A restart returns to the --root flags.',
+    inputSchema: { roots: z.array(z.string().min(1)).describe('The whole new set, in lookup order; [] clears it.') },
+  }, async ({ roots: wanted }) =&gt; attempt(null, false, async () =&gt; {
+    // Validate everything before changing anything, so a bad entry leaves the set as it was.
+    const next: string[] = [];
+    wanted.forEach((r, i) =&gt; {
+      const full = folderArg(`roots[${i}]`, r);
+      if (!next.some(n =&gt; n.toLowerCase() === full.toLowerCase())) next.push(full);   // the file system compares case-insensitively
+    });
+    roots = next;
+    process.stderr.write(`tpscli-mcp tps_set_roots ${roots.length} root(s)${roots.length ? ': ' + roots.join('; ') : ''}\n`);
+    return body({ roots }, false);
+  }));</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 2 &middot; Change 3 &mdash; version 0.2.0 by hand; tests for nine tools and the setter</h3>
+        <p class="loc"><code>mcp/package.json</code> line 3, <code>mcp/package-lock.json</code> lines 3 and 9 (edited by hand so package.json keeps CRLF); <code>mcp/test/server.test.js</code>: inventory of nine names, the no-roots message match, <code>tps_version</code> carries <code>roots</code>, one new test for the setter (13 tests, 40 across the five suites). Committed <code>f5a41ca</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>  "version": "0.1.0",
+...
+test('exactly the eight tools are registered', async () =&gt; {
+  ...
+  assert.deepEqual(names, ['tps_delete', 'tps_describe', 'tps_insert', 'tps_list_files', 'tps_query', 'tps_select', 'tps_update', 'tps_version']);</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>  "version": "0.2.0",
+...
+test('exactly the nine tools are registered', async () =&gt; {
+  ...
+  assert.deepEqual(names, ['tps_delete', 'tps_describe', 'tps_insert', 'tps_list_files', 'tps_query', 'tps_select', 'tps_set_roots', 'tps_update', 'tps_version']);
+...
+test('tps_set_roots replaces the set, validates everything first, and leaves the config alone', async () =&gt; {
+  ... two distinct roots in a new order, a name resolved in the second, the combined listing,
+  ... FILE_NOT_FOUND naming the current set, case-insensitive dedupe, INVALID_ARGUMENT leaves the
+  ... set unchanged, [] clears, base.roots and a second server untouched, non-array -&gt; -32602</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 3 &mdash; Server: tps_list_files for any folder, NO_ROOT retired, one e2e case <span class="st-mini">&middot; 5db49db</span></h3>
+      <div class="cc">
+        <h3>Task 3 &middot; Change 1 &mdash; tps_list_files takes a directory; filesystem failures wear the envelope</h3>
+        <p class="loc"><code>mcp/src/server.ts</code>, the <code>tps_list_files</code> registration. Committed <code>5db49db</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>    inputSchema: { pattern: z.string().optional().describe(...) },
+  }, async ({ pattern }) =&gt; attempt(null, false, async () =&gt; {
+    if (roots.length === 0) {
+      throw new ToolError('NO_ROOT', 'The server was started without --root folders, ...');
+    }
+    ...
+    for (const root of roots) {
+      for (const entry of readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isFile() || !re.test(entry.name)) continue;
+        const full = path.join(root, entry.name);
+        const st = statSync(full);</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>    inputSchema: {
+      pattern: z.string().optional().describe(...),
+      directory: z.string().min(1).optional().describe('Absolute path of one folder to list instead of the roots.'),
+    },
+  }, async ({ pattern, directory }) =&gt; attempt(null, false, async () =&gt; {
+    const folders = directory !== undefined ? [folderArg('directory', directory)] : roots;
+    if (folders.length === 0) throw new InvalidArgument('The server has no root folders; pass directory, or call tps_set_roots first.');
+    ...
+    for (const folder of folders) {
+      for (const entry of fsGuard(`list ${folder}`, () =&gt; readdirSync(folder, { withFileTypes: true }))) {
+        if (!entry.isFile() || !re.test(entry.name)) continue;
+        const full = path.join(folder, entry.name);
+        const st = fsGuard(`read ${full}`, () =&gt; statSync(full));</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 3 &middot; Change 2 &mdash; call.js runs a comma-separated tool list on one server</h3>
+        <p class="loc"><code>mcp/tools/call.js</code> from <code>const [tool, ...serverArgs]</code> to the end; the single-tool output is byte-identical to before. Committed <code>5db49db</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>  const r = await client.callTool({ name: tool, arguments: args });
+  console.log(r.structuredContent ? JSON.stringify(r.structuredContent, null, 2) : r.content.map(c =&gt; c.text).join('\n'));
+  await client.close();
+  process.exit(r.isError ? 1 : 0);</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>const tools = tool.split(',');
+...
+if (tools.length &gt; 1 &amp;&amp; (!Array.isArray(args) || args.length !== tools.length)) {
+  console.error(`expected a JSON array of ${tools.length} argument objects, one per tool`);
+  process.exit(2);
+}
+...
+  const results = [];
+  for (const [i, name] of tools.entries()) results.push(await client.callTool({ name, arguments: tools.length &gt; 1 ? args[i] : args }));
+  if (tools.length === 1) console.log(show(results[0]));
+  else console.log(JSON.stringify(results.map(r =&gt; r.structuredContent ?? r.content.map(c =&gt; c.text).join('\n')), null, 2));
+  await client.close();
+  process.exit(results.some(r =&gt; r.isError) ? 1 : 0);</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 3 &middot; Change 3 &mdash; the listing test replaced; one e2e case through the rebuilt exe</h3>
+        <p class="loc"><code>mcp/test/server.test.js</code> (the NO_ROOT test becomes the directory/no-roots/broken-root/cleared cases); <code>mcp/test/e2e.test.js</code> (statSync import, mtime unchanged after describe + two selects, set roots [] &rarr; FILE_NOT_FOUND, directory listing, set roots [work] &rarr; bare-name describe records 5, tps_version.roots). Committed <code>5db49db</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>  const noRoots = await connect({ ...base, roots: [] }, stub());
+  const r = await call(noRoots, 'tps_list_files');
+  assert.equal(r.isError, true);
+  assert.equal(r.structuredContent.error.code, 'NO_ROOT');</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>  const r = await call(noRoots, 'tps_list_files');
+  assert.equal(r.structuredContent.error.code, 'INVALID_ARGUMENT');
+  assert.match(r.structuredContent.error.message, /pass directory, or call tps_set_roots first/);
+  ...
+  const broken = await connect({ ...base, roots: [path.join(tmp, 'notes.txt')] }, stub());
+  assert.match((await call(broken, 'tps_list_files')).structuredContent.error.message, /^cannot list /);
+...   (e2e)
+  assert.equal(statSync(keys).mtimeMs, mtime0);   // reads open ReadOnly: three reads left the stamp alone
+  assert.deepEqual(ok(await call(client, 'tps_set_roots', { roots: [work] })), { roots: [work] });
+  assert.equal(ok(await call(client, 'tps_describe', { file: 'KEYS.TPS' })).records, 5);</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 4 &mdash; Documents and tickets <span class="st-mini">&middot; d0d0269, 46061b2</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 4 &middot; Done &middot; d0d0269</span>
+        <h3>One plan instruction had nothing to act on</h3>
+        <p><strong>Plan mismatch, no change made.</strong> The plan asked to turn around "any sentence saying a read moves the file's modified time" in the MCP guide and the two READMEs. No such sentence exists in those three files (the watch-point lived in the CLI-side docs, handled in Task 1, and in the CONFIG instrument's TC-09, which Task 5 rewrites). The implementer searched for <code>modified time</code>, <code>LastWriteTime</code>, <code>shared mode</code> and <code>mtime</code> and reported the no-op rather than inventing a sentence to fix.</p>
+        <ul><li><strong>Also in scope by the plan's own check:</strong> a third "eight tools" phrase in the guide's Claude Code registration steps, not named in the plan's line list, was caught by the <code>rg -n "eight tools"</code> gate and changed to nine.</li></ul>
+      </div>
+      <div class="dd-card">
+        <span class="dd-tag">Task 4 &middot; Fix round 1 &middot; 46061b2</span>
+        <h3>Server version 0.2.0 everywhere the guide states it</h3>
+        <p><strong>Review finding (plan-mandated).</strong> The plan named only the version chip; five other server-version mentions in the guide (meta line, breadcrumb, sample ready line, <code>tps_version</code> example, footer) still read 0.1.0 beside the 0.2.0 chip. Ruling: every server-version mention becomes 0.2.0; the exe's own <code>"version": "0.1.0"</code> inside the example stays, because the CLI did not change version. The file's opening provenance comment ("run against tpscli-mcp 0.1.0 (1a8c478)") is left as recorded: it names the build the examples were captured on, not the current version.</p>
+      </div>
+      <div class="cc">
+        <h3>Task 4 &middot; Change 1 &mdash; READMEs: nine tools, runtime roots, directory listing, error table</h3>
+        <p class="loc"><code>mcp/README.md</code> (install paragraph, flag row, three tool rows, error table); <code>README.md</code> (mcp/ row, --root sentence, tool table). Committed <code>d0d0269</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>| `tps_list_files` | `pattern?` (`*.TPS`) | no exe; `{ files: [{ name, path, size, modified }] }` from the roots, one level deep |
+...
+| `NO_ROOT` | `tps_list_files` on a server with no `--root`. |</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>| `tps_version` | | `--version`; returns `{ server, exe, roots }` |
+| `tps_list_files` | `pattern?` (`*.TPS`), `directory?` | no exe; `{ files: [{ name, path, size, modified }] }` from `directory` or, without it, the roots, one level deep |
+| `tps_set_roots` | `roots` (string[]) | no exe; replaces the root set for this session, returns `{ roots }`; `[]` clears |
+...
+| `INVALID_ARGUMENT` | ...; a relative or missing folder given to `tps_set_roots` or `directory`; `tps_list_files` with neither roots nor `directory`; a folder that cannot be listed. |</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 4 &middot; Change 2 &mdash; MCP guide: 0.2.0, nine tools, a new procedure, troubleshooting row</h3>
+        <p class="loc"><code>docs/UserGuide/TpscliMcp-IT-Support-User-Guide.html</code>: chip, Purpose card, ToC/heading, Roots bullet, "Build once" test count 40, flag row, tools table, new h3 "Change the working folder without restarting" after "Let the model look at a file", codes paragraph, NO_ROOT row replaced, reference ticket line. Committed <code>d0d0269</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>&lt;tr&gt;&lt;td&gt;&lt;code&gt;"code": "NO_ROOT", "message": "The server was started without --root folders, ..."&lt;/code&gt;&lt;/td&gt;...&lt;/tr&gt;</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>&lt;h3&gt;Change the working folder without restarting&lt;/h3&gt;
+&lt;ol class="steps"&gt;
+  &lt;li&gt;Ask: &lt;em&gt;work in C:\pos\data from now on&lt;/em&gt;. The assistant calls &lt;code&gt;tps_set_roots&lt;/code&gt; ...&lt;/li&gt;
+  &lt;li&gt;For a one-off look at another folder ask &lt;em&gt;list the TPS files in D:\backup&lt;/em&gt;; that is &lt;code&gt;tps_list_files&lt;/code&gt; with &lt;code&gt;directory&lt;/code&gt; ...&lt;/li&gt;
+  &lt;li&gt;The change lasts for the session. ... &lt;code&gt;tps_version&lt;/code&gt; shows the current set at any time.&lt;/li&gt;
+&lt;/ol&gt;
+...
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;"code": "INVALID_ARGUMENT", "message": "The server has no root folders; pass directory, or call tps_set_roots first."&lt;/code&gt;&lt;/td&gt;...&lt;/tr&gt;</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 4 &middot; Change 3 &mdash; both tickets closed</h3>
+        <p class="loc"><code>docs/tickets/2026-09-19-tps-list-files-without-root.md</code>, <code>docs/tickets/2026-09-20-reads-open-read-write.md</code>. Committed <code>d0d0269</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>- Status: open</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>- Status: closed 2026-09-20 (spec docs/mySuperpower/specs/2026-09-20-tpscli-mcp-roots-and-readonly-design.html; commits in feature/tpscli-mcp)
+...
+- Changed at implementation (spec section 2): a `directory` outside the roots is listed, not refused; ...</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 5 &mdash; The two instruments <span class="st-mini">&middot; 9871aaa, bfeb52f</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 5 &middot; Done &middot; bfeb52f</span>
+        <h3>Four stale spots outside the plan's line list, fixed before review</h3>
+        <p><strong>Plan gap, ruled at implementation.</strong> The plan enumerated the corpus instrument's title, h1, SUITE_ID, SUITE_TITLE, preamble and five cases, and the CONFIG instrument's title, h1, SUITE_TITLE, preamble, TC-03 and TC-09. The implementer found, and flagged rather than silently fixed, four more places still saying 0.1.0 / "eight tools" or a now-false claim: both instruments' <code>&lt;p class="sub"&gt;</code> subtitles, the CONFIG instrument's tool-listing case TC-01 (eight tools, no <code>tps_set_roots</code>), the CONFIG "Known watch-points" paragraph ("a read moves LastWriteTime"), and the corpus runner's results-JSON <code>suite = 'tpscli-mcp-0-1-0'</code> literal. Ruling: fix all four (spec intent over the plan's literal list); re-record and re-embed the corpus page because its subtitle prints in the report; the runner itself was not re-run, so the committed results JSON still carries the old suite label (deferred minor; the next run corrects it).</p>
+        <ul><li><strong>RED before edits:</strong> exactly the five cases the plan predicted (TC-02 count, TC-03 ready line, TC-04 version, TC-05 NO_ROOT, TC-10 message) failed against the 0.2.0 server; 11 passed.</li>
+        <li><strong>GREEN:</strong> 16 PASS / 0 FAIL / 0 BLOCKED; recorder tally 16/0/0 with 62 ticked steps (TC-05 now six); embed line "build 46061b2 ... PASS 16 FAIL 0 BLOCKED 0; CRLF 813 lone-LF 0"; fresh-profile render shows the 0.2.0 heading and TC-05 6/6 (checked with a read-only DevTools script; the Chrome extension was not connected).</li>
+        <li><strong>The CONFIG instrument's run is the owner's gate:</strong> its cases are rewritten (TC-03: directory listing of the real folder, <code>tps_set_roots</code>, bare-name describe; TC-09: SHA-256 and LastWriteTime both unchanged) but its SUITE_ID and embedded 0.1.0 run stay until a Claude Code session performs it on the rebuilt server.</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 5 &middot; Change 1 &mdash; corpus instrument cases and runner blocks</h3>
+        <p class="loc"><code>docs/Testing/TpscliMcp-Unit-Test-Cases.html</code> (TC-02, TC-03, TC-04, TC-05, TC-10, SUITE_ID, titles, subtitle, preamble, SEED_STATE); <code>mcp/tests/run-instrument.ps1</code> (TC-02/03/04/05/10 blocks, <code>$workJson</code>, suite literal). Committed <code>9871aaa</code>, <code>bfeb52f</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>var SUITE_ID = "tpscli-mcp-0-1-0";
+...
+    title:"tps_list_files lists the root folder, filters by pattern, and needs a root",
+    steps:[ ... 3 steps ... ],
+    expected:"... Step 3: error.code NO_ROOT with a message saying the server was started without --root folders, exit 1. ..."
+...
+    $r = Call tps_list_files '' @(); Expect-Error $r 'NO_ROOT' | Out-Null
+    Expect-Contains $r 'without --root folders'; Tick 3</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>var SUITE_ID = "tpscli-mcp-0-2-0";
+...
+    title:"tps_list_files lists the roots or a directory and filters by pattern; tps_set_roots changes the roots at runtime",
+    steps:[ ... 6 steps: roots, pattern, directory, no roots, tps_set_roots,tps_list_files sequence, relative root ... ],
+...
+    $r = Call tps_list_files '' @(); Expect-Error $r 'INVALID_ARGUMENT' 'The server has no root folders; pass directory, or call tps_set_roots first.' | Out-Null; Tick 4
+    $r = Call 'tps_set_roots,tps_list_files' ('[{"roots":["' + $workJson + '"]},{}]') @(); $j = Json $r
+    ...
+    Expect-StderrContains $r "tpscli-mcp tps_set_roots 1 root(s): $work"; Expect-Exit $r 0; Tick 5
+    $r = Call tps_set_roots '{"roots":["work"]}' @(); Expect-Error $r 'INVALID_ARGUMENT' 'roots[0] "work" must be an absolute path' | Out-Null; Tick 6</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 5 &middot; Change 2 &mdash; CONFIG instrument: TC-01, TC-03, TC-09, watch-point</h3>
+        <p class="loc"><code>docs/Testing/TpscliMcpConfig-Unit-Test-Cases.html</code>; <code>mcp/tests/run-config-instrument.ps1</code> line 190. Committed <code>9871aaa</code>, <code>bfeb52f</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>      "title": "Listing needs a root: tps_list_files answers NO_ROOT on this registration",
+      "steps": [
+          "Ask: \"list the TPS files\"  -&gt;  Tool call: tps_list_files {}",
+          ...
+...
+      "pre": "TC-04 passed. The TopSpeed driver opens files read/write, so a read moves the file's modified time; this case proves the bytes do not change.",</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>      "title": "Listing without a root: tps_list_files by directory, then tps_set_roots makes CONFIG the root",
+      "steps": [
+          "Ask: \"list the TPS files in C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\"  -&gt;  Tool call: tps_list_files {\"directory\": \"C:\\\\...\\\\CONFIG\"}",
+          "PowerShell: (Get-ChildItem '...\\CONFIG\\*.TPS').Count ; (Get-Item '...\\OPTIONS.TPS').Length",
+          "Ask: \"use that folder as the root from now on\"  -&gt;  Tool call: tps_set_roots {\"roots\": [\"C:\\\\...\\\\CONFIG\"]}",
+          "Ask: \"describe OPTIONS.TPS\"  -&gt;  Tool call: tps_describe {\"file\": \"OPTIONS.TPS\"}",
+          "Ask: \"list the TPS files\"  -&gt;  Tool call: tps_list_files {}"
+      ],
+...
+      "pre": "TC-04 passed. Reads open the file ReadOnly, so neither the bytes nor the modified time change.",
+      "steps": [ "... $h1 ... $m1 = (Get-Item ...).LastWriteTimeUtc ...", "... tps_describe ... tps_select ...", "... ($h1 -eq $h2) ; ($m1 -eq $m2)" ]</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 6 &mdash; Release: one script, one workflow, a zip people can pull <span class="st-mini">&middot; 3a2e33a</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 6 &middot; Done &middot; 3a2e33a</span>
+        <h3>What the zip really holds, and what stays unverified</h3>
+        <p><strong>Deviation from the plan's description, not from its script.</strong> The plan expected the staged <code>node_modules\</code> to hold "@modelcontextprotocol and zod, no typescript". <code>npm ci --omit=dev</code> installs ~94 packages because <code>@modelcontextprotocol/sdk</code> declares <code>express</code>, <code>hono</code>, <code>cors</code>, <code>ajv</code> and their dependencies as production dependencies (its HTTP transport, unused by this stdio server). The zip is 5.1 MB, within the plan's "a few MB". Nothing to fix in the script; the README describes the zip by what it is for, not by package count.</p>
+        <ul><li><strong>Verified locally:</strong> the <code>-SkipVerify</code> dry run; the unzipped layout (<code>dist\server.js, runner.js, sql.js, tpscli.exe</code>; <code>package.json</code>; <code>node_modules\</code>; <code>tools\call.js</code>; <code>README.md</code>; <code>docs\</code> with the two guides and the CLI README); <code>node tools\call.js tps_version</code> from the unzipped folder answering server 0.2.0 / exe 0.1.0 / roots [] with the ready line naming the exe inside <code>dist\</code>; a directory listing of six files; the plain run <em>refusing</em> with exit 1 because <code>verify.ps1</code> skipped the real-file checks; the <code>-AllowSkips</code> run green (verify.ps1 all steps PASS, npm test 40).</li>
+        <li><strong>Unverified, by design:</strong> the Actions trigger (no remote, no runner yet) and the real-file qualification (<code>-Extra/-Expected/-TpsFixLog</code>: the dtpos copies are not on this machine). Both are the owner's steps in the README's maintainer section.</li>
+        <li><strong>Cosmetic:</strong> the <code>Run</code> helper prints native-command output twice in the console (captured and inherited); execution is single (one "# tests 40" line). Left as the plan wrote it.</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 6 &middot; Change 1 &mdash; tools\release.ps1 (new, 101 lines)</h3>
+        <p class="loc"><code>tools/release.ps1</code>: verify.ps1 (or build.ps1 under -SkipVerify) &rarr; bounded <code>tpscli.exe --version</code> &rarr; npm ci/build/test &rarr; stage &rarr; <code>npm ci --omit=dev</code> in the stage &rarr; Compress-Archive &rarr; .sha256 &rarr; notes.md. Committed <code>3a2e33a</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>(no release tooling; "Move the server to another machine" in the guide described the layout by hand)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>param([string]$Version = '', [string]$Extra = '', [string]$Expected = '', [string]$TpsFixLog = '', [switch]$AllowSkips, [switch]$SkipVerify)
+...
+    $verifyOutput = Run 'cli\verify.ps1 (build, corpus, suites, gate)' (Join-Path $repo 'cli') { powershell -NoProfile -ExecutionPolicy Bypass -File verify.ps1 @verifyArgs }
+    if (($verifyOutput -join "`n") -match 'not a release qualification' -and -not $AllowSkips) {
+        throw 'release.ps1: verify.ps1 skipped the real-file checks (no -Extra/-Expected/-TpsFixLog); pass them, or -AllowSkips for a local build'
+    }
+...
+Run 'npm ci --omit=dev (production node_modules in the stage)' $stage { npm ci --omit=dev --ignore-scripts }
+...
+Compress-Archive -Path $stage -DestinationPath $zip
+$hash = (Get-FileHash $zip -Algorithm SHA256).Hash</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 6 &middot; Change 2 &mdash; .github\workflows\release.yml (new), .gitignore, READMEs, guide</h3>
+        <p class="loc"><code>.github/workflows/release.yml</code> (on push tags v*, self-hosted windows clarion runner, release.ps1 with the tag and the three <code>vars.TPSCLI_*</code> inputs, <code>gh release create</code>); <code>.gitignore</code> + <code>release/</code>; root <code>README.md</code> "Install from a release" and "Cutting a release (maintainers)"; <code>mcp/README.md</code> one pointer; the MCP guide's "Build once" and "Move the server". Committed <code>3a2e33a</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>## Install the MCP server</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>## Install from a release
+
+Releases (`https://github.com/&lt;owner&gt;/tpscli/releases`) carry one zip per version, ...
+
+## Cutting a release (maintainers)
+
+A push of a tag `v&lt;version&gt;` runs `.github\workflows\release.yml` on the self-hosted Windows
+runner labelled `clarion`; ... repository variables `TPSCLI_EXTRA`, `TPSCLI_EXPECTED` and
+`TPSCLI_TPSFIX_LOG` ... `release.ps1` refuses to package a run that skipped those checks unless
+`-AllowSkips` is given. ...
+
+## Install the MCP server</code></pre>
+        </div>
+      </div>
+
+      <div class="dd-card">
+        <span class="dd-tag">Ablation pass &middot; before the final review</span>
+        <h3>Every added abstraction was challenged; none removed</h3>
+        <p><strong>Controller pass, no subagent.</strong> <code>fsGuard</code> was removed from all three call sites and the server suite run: test 10 (a root that names a file) failed, because the <code>ENOTDIR</code> from <code>readdirSync</code> escaped <code>attempt</code> as an SDK text error with no structured envelope; restored. <code>folderArg</code> (two callers), <code>Run</code> in <code>release.ps1</code> (five callers), the <code>call.js</code> tool-sequence form (used by the corpus instrument's TC-05 step 5) and <code>readonly.ps1</code>'s four small helpers each have more than one caller, so inlining them would duplicate a logic block verbatim. <code>-SkipVerify</code> and <code>-AllowSkips</code> are both exercised by the documented dry-run and local-build flows. Nothing to commit.</p>
+      </div>
+
+      <h3 class="tglabel">Final review and fix wave <span class="st-mini">&middot; 0066a5e</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Final review &middot; Opus &middot; 5986cb6..3a2e33a</span>
+        <h3>One Important finding: a PowerShell 5.1 trap in the release script</h3>
+        <p><strong>Finding.</strong> With the script-level <code>$ErrorActionPreference = 'Stop'</code>, <code>Run</code>'s <code>&amp; $Body 2&gt;&amp;1</code> turns the first stderr line of any native command (an <code>npm warn</code>, the daily <code>npm notice</code> update nag) into a terminating <code>NativeCommandError</code> before the exit-code check. Task 6's three runs were green only because nothing wrote to stderr that day. Proved by probe before the fix; after it, a stderr line flows through as text and a non-zero exit still throws.</p>
+        <ul><li><strong>Fix (one commit, eight items):</strong> <code>$ErrorActionPreference = 'Continue'</code> scoped inside <code>Run</code>; the four unconsumed <code>Run</code> calls piped to <code>Out-Null</code> (the double echo was PowerShell printing the returned output a second time); <code>notes.md</code> written BOM-less with <code>[IO.File]::WriteAllText</code>; the "second in the search order" comment corrected to first (release.ps1 and the guide); <code>timeout-minutes: 60</code> on the workflow job; the guide's second <code>tps_version</code> example gains <code>roots</code>; the CONFIG instrument's scope paragraph names <code>tps_set_roots</code>; <code>readonly.ps1</code> clears a stale deny ACE and the locked copy before copying, so an aborted run cannot wedge the next one.</li>
+        <li><strong>Left as triaged "can wait":</strong> a README note on the SYNCHRONIZE gotcha; call.js does not validate array-shaped stdin for a single tool; the committed results JSON's <code>suite</code> label (rewritten by the next run); the redundant <code>-TimeoutMs 20000</code>; a trailing backslash when a UNC root is echoed; three commits carry a <code>Claude Sonnet 5</code> co-author trailer (the model that made them).</li>
+        <li><strong>Reviewer's verdict on the ledgered deviations:</strong> all justified (ACE narrowing, version sweep beyond the plan's line list, the four instrument spots, the provenance comment, the review range); nothing built beyond the ask. Ready to merge with the fixes above.</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Final fix &middot; Change 1 &mdash; Run survives native stderr; single echo; BOM-less notes</h3>
+        <p class="loc"><code>tools/release.ps1</code>. Committed <code>0066a5e</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>    try {
+        $global:LASTEXITCODE = 0
+        $output = &amp; $Body 2&gt;&amp;1 | ForEach-Object { "$_" }
+...
+Run 'npm ci' (Join-Path $repo 'mcp') { npm ci }
+...
+"@ | Set-Content (Join-Path $out 'notes.md') -Encoding UTF8</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>    try {
+        $ErrorActionPreference = 'Continue'    # scoped to this function; a native command's stderr line
+                                                # (npm warn/notice) must not become a terminating error under
+                                                # the script-level Stop -- only $LASTEXITCODE decides failure
+        $global:LASTEXITCODE = 0
+        $output = &amp; $Body 2&gt;&amp;1 | ForEach-Object { "$_" }
+...
+Run 'npm ci' (Join-Path $repo 'mcp') { npm ci } | Out-Null
+...
+$notes = @"
+...
+"@
+[IO.File]::WriteAllText((Join-Path $out 'notes.md'), $notes, (New-Object System.Text.UTF8Encoding($false)))</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Final fix &middot; Change 2 &mdash; readonly.ps1 self-heals; workflow timeout; doc nits</h3>
+        <p class="loc"><code>cli/tests/readonly.ps1</code> (before the copy), <code>.github/workflows/release.yml</code>, <code>docs/UserGuide/TpscliMcp-IT-Support-User-Guide.html</code>, <code>docs/Testing/TpscliMcpConfig-Unit-Test-Cases.html</code>. Committed <code>0066a5e</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>Copy-Item (Join-Path $root 'testdata\KEYS.TPS') $locked -Force
+...
+    runs-on: [self-hosted, windows, clarion]</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>$who = "$env:USERDOMAIN\$env:USERNAME"
+if (Test-Path $locked) { icacls $locked /remove:d $who | Out-Null }   # a prior run that died between the deny and the finally
+Remove-Item $locked -Force -ErrorAction SilentlyContinue
+Copy-Item (Join-Path $root 'testdata\KEYS.TPS') $locked -Force
+...
+    runs-on: [self-hosted, windows, clarion]
+    timeout-minutes: 60</code></pre>
+        </div>
+      </div>
+
+      <!-- Append one GROUP per task as it completes: an h3.tglabel heading, then that task's
+           dd-card decision/deviation cards (substantive items only — off-spec decisions, plan
+           deviations, important fixes, cross-task interactions, tradeoffs; NOT routine
+           progress), then one .cc card per applied code change (BEFORE/AFTER excerpts, elide
+           unchanged runs with "..."). A run may open with a PRE-IMPL · CONTEXT dd-card
+           (no tglabel) for process context. Example group:
+
+      <h3 class="tglabel">Task 1 &mdash; Short task title <span class="st-mini">&middot; abc1234</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 1 &middot; Done &middot; abc1234</span>
+        <h3>Short decision title</h3>
+        <p><strong>Decision (off-spec).</strong> What was decided and why; use inline <code>code</code> chips.</p>
+        <ul><li><strong>Rationale:</strong> …</li><li><strong>Interaction for Task N:</strong> …</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 1 &middot; Change 1 &mdash; short change title</h3>
+        <p class="loc"><code>path/to/file.ext</code> &mdash; where in the file. Committed <code>abc1234</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>old lines (minimal excerpt; "..." for elided runs)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>new lines</code></pre>
+        </div>
+      </div>
+      -->
+      <!-- TASK_LOG: append the next task group here (h3.tglabel heading, then its dd-card decisions, then its .cc before/after blocks) -->
+    </section>
+  </div>
+</body>
+</html>
