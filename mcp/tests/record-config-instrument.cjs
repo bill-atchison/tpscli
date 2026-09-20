@@ -41,7 +41,9 @@ function evidenceSummary(text) {
 }
 const header = {
   tester: results.runner || 'automated (tests\\run-config-instrument.ps1)', lead: '', date: results.started.slice(0, 10),
-  build: results.build, env: results.env, component: 'mcp\\dist\\server.js + tools\\call.js', ref: results.ref
+  build: results.build, env: results.env, ref: results.ref,
+  // a session-driven run names its client in results.runner; a call.js run drives the server through tools\call.js
+  component: results.component || (/session/i.test(results.runner || '') ? 'mcp\\dist\\server.js (MCP client: ' + results.runner + ')' : 'mcp\\dist\\server.js + tools\\call.js')
 };
 const cases = results.cases.map(c => ({ id: c.id, steps: c.steps, verdict: c.verdict, notes: c.notes, evidence: evidenceSummary(c.evidence) }));
 
