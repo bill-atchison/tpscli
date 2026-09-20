@@ -113,11 +113,25 @@ src/sql.ts       statement builder and literal rules
 src/runner.ts    spawn, timeout, output ceiling, response validation
 test/*.test.js   node --test; fake-tpscli.js stands in for the exe
 tools/call.js    one tool call from the command line
+tests/run-instrument.ps1, record-instrument.cjs, embed-run.py   the unit-test instrument's automation
 ```
 
 ## Documentation
 
 - `..\docs\Testing\TpscliMcp-Unit-Test-Cases.html`: the interactive unit-test instrument for this
   server (16 cases driven through `tools\call.js` against copies of the corpus under `work\`).
+  It opens showing the last recorded run; `New Run` clears it. To record a run yourself, from
+  this folder (the CLI built and its corpus generated first):
+
+  ```
+  powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-instrument.ps1
+  node --experimental-websocket tests\record-instrument.cjs
+  python tests\embed-run.py
+  ```
+
+  The first runs every case and writes `..\docs\Testing\TpscliMcp-Unit-Test-Results.json`; the
+  second loads that run into the page through its own engine in headless Chrome and prints
+  `..\docs\Testing\TpscliMcp-Unit-Test-Report-<date>.pdf`; the third embeds the saved state in
+  the instrument (`SEED_STATE`).
 - `..\docs\mySuperpower\specs\2026-09-19-tpscli-mcp-design.html`, the plan beside it under `plans\`,
   and `..\docs\mySuperpower\implementation-notes\2026-09-19-tpscli-mcp.html`.
