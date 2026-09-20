@@ -44,10 +44,10 @@ async function connect(config, run) {
 }
 const call = (client, name, args = {}) => client.callTool({ name, arguments: args });
 
-test('exactly the eight tools are registered', async () => {
+test('exactly the nine tools are registered', async () => {
   const client = await connect(base, stub());
   const names = (await client.listTools()).tools.map(t => t.name).sort();
-  assert.deepEqual(names, ['tps_delete', 'tps_describe', 'tps_insert', 'tps_list_files', 'tps_query', 'tps_select', 'tps_update', 'tps_version']);
+  assert.deepEqual(names, ['tps_delete', 'tps_describe', 'tps_insert', 'tps_list_files', 'tps_query', 'tps_select', 'tps_set_roots', 'tps_update', 'tps_version']);
 });
 
 test('bare names resolve against the roots in order; absolute paths pass through', async () => {
@@ -77,7 +77,7 @@ test('a name that is missing or escapes the roots is FILE_NOT_FOUND before the e
   const noRoots = await connect({ ...base, roots: [] }, run);
   const r = await call(noRoots, 'tps_describe', { file: 'KEYS.TPS' });
   assert.equal(r.structuredContent.error.code, 'FILE_NOT_FOUND');
-  assert.match(r.structuredContent.error.message, /--root/);
+  assert.match(r.structuredContent.error.message, /currently has no root folders; call tps_set_roots or pass an absolute path/);
   for (const notQualified of ['\\data\\KEYS.TPS', 'C:KEYS.TPS']) {
     assert.equal((await call(noRoots, 'tps_describe', { file: notQualified })).structuredContent.error.code, 'FILE_NOT_FOUND');
   }
@@ -218,10 +218,50 @@ test('tps_version pairs the server version with the exe object', async () => {
   const client = await connect(base, run);
   const r = await call(client, 'tps_version');
   assert.deepEqual(run.calls[0].args, ['--version']);
-  assert.deepEqual(r.structuredContent, { server: '0.0.0-test', exe: VERSION.json });
+  assert.deepEqual(r.structuredContent, { server: '0.0.0-test', exe: VERSION.json, roots: [rootA, rootB] });
   assert.equal(r.isError, false);
   const broken = await connect(base, stub(TIMEOUT));
   assert.equal((await call(broken, 'tps_version')).structuredContent.error.code, 'INCOMPLETE');
+});
+
+test('tps_set_roots replaces the set, validates everything first, and leaves the config alone', async () => {
+  const run = stub();
+  const client = await connect(base, run);
+  const two = await call(client, 'tps_set_roots', { roots: [rootB, tmp] });    // two distinct folders, new order
+  assert.equal(two.isError, false, two.content[0].text);
+  assert.deepEqual(two.structuredContent, { roots: [rootB, tmp] });
+  await call(client, 'tps_describe', { file: 'KEYS.TPS' });
+  assert.equal(run.calls[0].opts.stdin, `DESCRIBE [${path.join(rootB, 'KEYS.TPS')}]`);   // rootB first now; rootA not searched
+  await call(client, 'tps_describe', { file: 'notes.txt' });
+  assert.equal(run.calls[1].opts.stdin, `DESCRIBE [${path.join(tmp, 'notes.txt')}]`);    // resolved in the second root
+  const both = await call(client, 'tps_list_files', { pattern: '*' });
+  assert.deepEqual(both.structuredContent.files.map(f => f.name), ['KEYS.TPS', 'ONLYB.TPS', 'notes.txt']);
+  const nope = await call(client, 'tps_describe', { file: 'NOPE.TPS' });
+  assert.equal(nope.structuredContent.error.message, `NOPE.TPS not found inside ${rootB}; ${tmp}`);   // the current set, not the startup one
+  const set = await call(client, 'tps_set_roots', { roots: [rootB, rootB.toUpperCase()] });
+  assert.deepEqual(set.structuredContent, { roots: [rootB] });                 // case-insensitive duplicate dropped
+  const files = await call(client, 'tps_list_files');
+  assert.deepEqual(files.structuredContent.files.map(f => f.name), ['KEYS.TPS', 'ONLYB.TPS']);
+  const bad = await call(client, 'tps_set_roots', { roots: [rootA, 'data'] });
+  assert.equal(bad.isError, true);
+  assert.equal(bad.structuredContent.error.code, 'INVALID_ARGUMENT');
+  assert.match(bad.structuredContent.error.message, /roots\[1\] "data" must be an absolute path/);
+  assert.equal(bad.structuredContent.op, null);
+  assert.equal(bad.structuredContent.outcome, undefined);
+  const missing = await call(client, 'tps_set_roots', { roots: [path.join(tmp, 'nope')] });
+  assert.match(missing.structuredContent.error.message, /is not a folder/);
+  assert.deepEqual((await call(client, 'tps_version')).structuredContent.roots, [rootB]);   // untouched by the two refusals
+  const cleared = await call(client, 'tps_set_roots', { roots: [] });
+  assert.deepEqual(cleared.structuredContent, { roots: [] });
+  const gone = await call(client, 'tps_describe', { file: 'KEYS.TPS' });
+  assert.equal(gone.structuredContent.error.code, 'FILE_NOT_FOUND');
+  assert.match(gone.structuredContent.error.message, /currently has no root folders/);
+  assert.deepEqual(base.roots, [rootA, rootB]);                               // the shared config was never written
+  const other = await connect(base, stub());
+  assert.deepEqual((await call(other, 'tps_version')).structuredContent.roots, [rootA, rootB]);
+  const notArray = await call(client, 'tps_set_roots', { roots: 'C:\\x' });
+  assert.equal(notArray.isError, true);
+  assert.match(notArray.content[0].text, /Invalid arguments for tool tps_set_roots/);
 });
 
 test('toResult: precedence and the INCOMPLETE envelope', () => {

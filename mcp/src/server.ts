@@ -68,7 +68,7 @@ export function toResult(r: RunResult, op: Op, write: boolean, table: boolean): 
 
 const DIALECT = `Dialect: the file goes in square brackets, e.g. [C:\\pos\\data\\ITEMS.TPS]; string literals use single quotes with '' for an embedded quote; WHERE supports = <> != < > <= >=, AND OR NOT, parentheses, LIKE with % and _, IN (...), and has no IS NULL (compare to '' or 0); dates are 'YYYY-MM-DD', times 'HH:MM:SS.hh', DECIMAL values are plain numbers; LIMIT 0 means no cap. Look before you write: run tps_select with the same where first.`;
 
-const FILE_ARG = z.string().min(1).describe('Path to the .TPS file: absolute, or a bare name resolved inside the server\'s --root folders.');
+const FILE_ARG = z.string().min(1).describe('Path to the .TPS file: absolute, or a bare name resolved inside the server\'s current root folders (--root at startup, or tps_set_roots).');
 const OWNER_ARG = z.string().optional().describe('Owner (encryption) string for this call only. Prefer the server-wide --owner / TPSCLI_OWNER so the secret stays out of the conversation.');
 const WHERE_ARG = z.string().describe('Filter in the tpscli dialect without the WHERE keyword, e.g. "PRICE > 5 AND DESC LIKE \'a%\'".');
 const FORMAT_ARG = z.enum(['json', 'table']).optional().describe('"json" (default) returns the exe\'s response object; "table" returns the aligned text grid, easier to read for wide results.');
@@ -79,21 +79,45 @@ const FULLY_QUALIFIED = /^(?:[A-Za-z]:[\\/]|\\\\)/;    // drive letter or UNC; \
 export function createServer(config: Config, run: Run): McpServer {
   const server = new McpServer({ name: 'tpscli-mcp', version: config.version });
 
+  // The roots are the server's own state: tps_set_roots replaces them for the session, and the
+  // Config it was built from is never written back (the tests share one config across servers).
+  let roots: string[] = [...config.roots];
+
+  // existsSync/statSync/readdirSync can throw (access denied, a folder removed between the check
+  // and the read); the model needs the structured envelope, not the SDK's text-only error.
+  const fsGuard = <T>(what: string, fn: () => T): T => {
+    try {
+      return fn();
+    } catch (e) {
+      throw new InvalidArgument(`cannot ${what}: ${(e as Error).message}`);
+    }
+  };
+
+  // One rule for a folder argument, shared by tps_set_roots and tps_list_files: fully qualified
+  // (a relative folder would resolve against the server's cwd, which the model cannot see) and an
+  // existing directory. Returns the resolved path.
+  const folderArg = (label: string, value: string): string => {
+    if (!FULLY_QUALIFIED.test(value)) throw new InvalidArgument(`${label} "${value}" must be an absolute path`);
+    const full = path.resolve(value);
+    if (!fsGuard(`check ${full}`, () => existsSync(full) && statSync(full).isDirectory())) throw new InvalidArgument(`${full} is not a folder`);
+    return full;
+  };
+
   const resolveFile = (file: string): string => {
     if (FULLY_QUALIFIED.test(file)) return file;
-    if (config.roots.length === 0) {
-      throw new ToolError('FILE_NOT_FOUND', `${file} is not an absolute path and the server was started without --root folders`);
+    if (roots.length === 0) {
+      throw new ToolError('FILE_NOT_FOUND', `${file} is not an absolute path and the server currently has no root folders; call tps_set_roots or pass an absolute path`);
     }
     const inside = (root: string, candidate: string) => {
       const rel = path.relative(root, candidate);
       return rel !== '' && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
     };
-    for (const root of config.roots) {
+    for (const root of roots) {
       const candidate = path.resolve(root, file);
-      if (!config.roots.some(r => inside(r, candidate))) continue;   // escaped every root
+      if (!roots.some(r => inside(r, candidate))) continue;   // escaped every root
       if (existsSync(candidate)) return candidate;
     }
-    throw new ToolError('FILE_NOT_FOUND', `${file} not found inside ${config.roots.join('; ')}`);
+    throw new ToolError('FILE_NOT_FOUND', `${file} not found inside ${roots.join('; ')}`);
   };
 
   const invoke = async (
@@ -132,24 +156,41 @@ export function createServer(config: Config, run: Run): McpServer {
     title: 'tpscli version',
     description: 'Version of this MCP server and of the tpscli.exe it runs.',
   }, async () => {
+    const snapshot = [...roots];   // the set as it was when the call started
     const r = await run(config.exe, ['--version'], { timeoutMs: config.timeoutMs });
     process.stderr.write(`tpscli-mcp tps_version ${r.durationMs}ms exit ${r.exitCode}${r.failure ? ` ${r.failure.kind}` : ''}\n`);
     const res = toResult(r, null, false, false);
-    return res.isError ? res : body({ server: config.version, exe: r.json! }, false);
+    return res.isError ? res : body({ server: config.version, exe: r.json!, roots: snapshot }, false);
   });
+
+  server.registerTool('tps_set_roots', {
+    title: 'Set root folders',
+    description: 'Replaces the server\'s root folders for this session: where bare file names resolve and what tps_list_files lists by default. Absolute paths; each must be an existing folder. Pass [] to clear. Roots are a convenience, not a fence: every tool accepts an absolute path regardless. A restart returns to the --root flags.',
+    inputSchema: { roots: z.array(z.string().min(1)).describe('The whole new set, in lookup order; [] clears it.') },
+  }, async ({ roots: wanted }) => attempt(null, false, async () => {
+    // Validate everything before changing anything, so a bad entry leaves the set as it was.
+    const next: string[] = [];
+    wanted.forEach((r, i) => {
+      const full = folderArg(`roots[${i}]`, r);
+      if (!next.some(n => n.toLowerCase() === full.toLowerCase())) next.push(full);   // the file system compares case-insensitively
+    });
+    roots = next;
+    process.stderr.write(`tpscli-mcp tps_set_roots ${roots.length} root(s)${roots.length ? ': ' + roots.join('; ') : ''}\n`);
+    return body({ roots }, false);
+  }));
 
   server.registerTool('tps_list_files', {
     title: 'List TopSpeed files',
     description: 'Lists the .TPS files directly inside the server\'s --root folders (no recursion): name, path, size and modified time. Returns NO_ROOT when the server has no roots; then pass absolute paths to the other tools.',
     inputSchema: { pattern: z.string().optional().describe('Glob on the file name, case-insensitive, * and ? only. Default *.TPS.') },
   }, async ({ pattern }) => attempt(null, false, async () => {
-    if (config.roots.length === 0) {
+    if (roots.length === 0) {
       throw new ToolError('NO_ROOT', 'The server was started without --root folders, so there is nothing to list; pass absolute paths to the other tools.');
     }
     const glob = pattern ?? '*.TPS';
     const re = new RegExp(`^${glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`, 'i');
     const files: { name: string; path: string; size: number; modified: string }[] = [];
-    for (const root of config.roots) {
+    for (const root of roots) {
       for (const entry of readdirSync(root, { withFileTypes: true })) {
         if (!entry.isFile() || !re.test(entry.name)) continue;
         const full = path.join(root, entry.name);
