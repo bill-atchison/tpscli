@@ -123,11 +123,11 @@ footer{max-width:900px;margin:2.5rem auto 0;padding:1rem 1.5rem 2rem;border-top:
     <span class="wordmark">tpscli-mcp</span>
     <h1>tpscli MCP server &mdash; IT Support User Guide</h1>
     <p class="sub">A small Node program that lets an AI assistant (Claude Code, Claude Desktop or any other MCP client) look inside TopSpeed <code>.TPS</code> files and, when you allow it, change rows, by running <code>tpscli.exe</code> on your behalf.</p>
-    <p class="meta">Applies to: <b>tpscli-mcp 0.1.0</b> &middot; Windows, Node 20 or later, <b>tpscli.exe 0.1.0</b> &middot; build <b>1a8c478</b></p>
+    <p class="meta">Applies to: <b>tpscli-mcp 0.2.0</b> &middot; Windows, Node 20 or later, <b>tpscli.exe 0.1.0</b> &middot; build <b>1a8c478</b></p>
   </div>
 </header>
 <main id="top">
-  <div class="crumbs">tpscli 0.1.0<span class="sep">&rsaquo;</span>User Guides<span class="sep">&rsaquo;</span><b>MCP server &middot; IT Support</b></div>
+  <div class="crumbs">tpscli 0.2.0<span class="sep">&rsaquo;</span>User Guides<span class="sep">&rsaquo;</span><b>MCP server &middot; IT Support</b></div>
 
   <h2>At a glance</h2>
   <div class="cards">
@@ -230,7 +230,7 @@ tpscli: node C:\Projects\GitHub\tpscli\mcp\dist\server.js --root C:\pos\data - â
       <tr><td><code>--timeout &lt;seconds&gt;</code></td><td>60</td><td>Wall-clock limit for one exe run. Past it the server kills the whole process tree with <code>taskkill /T /F</code> and answers <code>INCOMPLETE</code>; if that kill itself fails the message says the exe may still be running. Maximum 2147483.</td></tr>
     </tbody>
   </table>
-  <p>Startup problems (an unknown flag, a missing exe, a missing root) exit 2 with one <code>tpscli-mcp: ...</code> line on standard error, and the client shows the server as failed. A healthy start prints one ready line, for example <code>tpscli-mcp 0.1.0 ready: exe C:\Projects\GitHub\tpscli\cli\tpscli.exe; roots C:\Projects\GitHub\tpscli\mcp\work; writes disabled; owner none; timeout 60s</code>, then one line per exe run: <code>tpscli-mcp tps_insert 412ms exit 0</code> (with the failure kind appended when there was one). <code>tps_list_files</code> and refusals that stop before the exe do not log. Statements, arguments and the owner string are never logged.</p>
+  <p>Startup problems (an unknown flag, a missing exe, a missing root) exit 2 with one <code>tpscli-mcp: ...</code> line on standard error, and the client shows the server as failed. A healthy start prints one ready line, for example <code>tpscli-mcp 0.2.0 ready: exe C:\Projects\GitHub\tpscli\cli\tpscli.exe; roots C:\Projects\GitHub\tpscli\mcp\work; writes disabled; owner none; timeout 60s</code>, then one line per exe run: <code>tpscli-mcp tps_insert 412ms exit 0</code> (with the failure kind appended when there was one). <code>tps_list_files</code> and refusals that stop before the exe do not log. Statements, arguments and the owner string are never logged.</p>
   <div class="callout warn"><b>Caution</b><code>--root</code> does not limit what the model can reach. Any tool accepts an absolute path, and <code>tps_query</code> uses the path in the statement exactly as written. The server runs with the permissions of the account that started the client; give that account read-only access to folders it should never change, and keep <code>--allow-writes</code> off unless the session needs it.</div>
 
   <h2 id="tools">The nine tools</h2>
@@ -238,7 +238,7 @@ tpscli: node C:\Projects\GitHub\tpscli\mcp\dist\server.js --root C:\pos\data - â
   <table>
     <thead><tr><th>Tool</th><th>Arguments</th><th>What it runs</th><th>Needs</th></tr></thead>
     <tbody>
-      <tr><td><code>tps_version</code></td><td>none</td><td><code>tpscli.exe --version</code>; returns <code>{ "server": "0.1.0", "exe": { ... "version": "0.1.0" ... }, "roots": [...] }</code></td><td>nothing; the quickest health check</td></tr>
+      <tr><td><code>tps_version</code></td><td>none</td><td><code>tpscli.exe --version</code>; returns <code>{ "server": "0.2.0", "exe": { ... "version": "0.1.0" ... }, "roots": [...] }</code></td><td>nothing; the quickest health check</td></tr>
       <tr><td><code>tps_list_files</code></td><td><code>pattern?</code> (default <code>*.TPS</code>), <code>directory?</code></td><td>no exe; lists <code>directory</code> or, without it, the roots, one level deep: <code>name</code>, <code>path</code>, <code>size</code>, <code>modified</code></td><td>a root or directory</td></tr>
       <tr><td><code>tps_set_roots</code></td><td><code>roots</code> (string[])</td><td>no exe; replaces the root set for this session and returns it; <code>[]</code> clears</td><td>existing folders, absolute</td></tr>
       <tr><td><code>tps_describe</code></td><td><code>file</code>, <code>owner?</code></td><td><code>DESCRIBE [file]</code>: record count, <code>encrypted</code>, every column with type and size, every key</td><td>read access</td></tr>
@@ -256,7 +256,7 @@ tpscli: node C:\Projects\GitHub\tpscli\mcp\dist\server.js --root C:\pos\data - â
   <h3>Check the server from the command line</h3>
   <p><code>mcp\tools\call.js</code> starts the server with the flags you give it, calls one tool with a JSON object read from standard input, prints the result and exits 0 (the tool answered), 1 (the tool answered with an error) or 2 (the call never got an answer: no tool name, arguments that are not JSON, or a server that could not start). It needs no client and is the fastest way to reproduce what the model saw. From PowerShell, in <code>mcp\</code>:</p>
   <ol class="steps">
-    <li>Version, no arguments: <code>node tools\call.js tps_version</code> prints <code>{ "server": "0.1.0", "exe": { "ok": true, "op": null, "version": "0.1.0", "complete": true } }</code>.</li>
+    <li>Version, no arguments: <code>node tools\call.js tps_version</code> prints <code>{ "server": "0.2.0", "exe": { "ok": true, "op": null, "version": "0.1.0", "complete": true } }</code>.</li>
     <li>Describe a file inside a root, keeping the JSON in single quotes so PowerShell leaves it alone:
 <pre><code>'{"file":"KEYS.TPS"}' | node tools\call.js tps_describe --root C:\pos\data</code></pre></li>
     <li>Rows as a grid:
@@ -360,6 +360,6 @@ ID  NAME     CODE
 
   <p class="top"><a href="#top">Back to top</a></p>
 </main>
-<footer>tpscli documentation &middot; MCP server &middot; IT Support User Guide &middot; tpscli-mcp 0.1.0 &middot; generated from the creating-feature-docs skill, house branding</footer>
+<footer>tpscli documentation &middot; MCP server &middot; IT Support User Guide &middot; tpscli-mcp 0.2.0 &middot; generated from the creating-feature-docs skill, house branding</footer>
 </body>
 </html>
