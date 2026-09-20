@@ -9,3 +9,4 @@ EXCEPTION*.LOG
 .claude/settings.local.json
 mcp/node_modules/
 mcp/dist/
+mcp/work/

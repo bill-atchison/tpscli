@@ -40,6 +40,19 @@ Claude Desktop (`claude_desktop_config.json`):
 Append `"--allow-writes"` to `args` when the model may change rows. Without it the server is
 read-only.
 
+## Call a tool from the command line
+
+`tools\call.js` starts the server with the flags you give it, calls one tool with a JSON object read
+from stdin, prints the result and exits 0 (answered), 1 (the tool answered with an error) or 2 (the
+server could not start). Useful for support checks and for the test instrument. From PowerShell,
+keep the JSON in single quotes:
+
+```
+'{"file":"KEYS.TPS"}' | node tools\call.js tps_describe --root C:\pos\data
+'{"file":"KEYS.TPS","limit":5,"format":"table"}' | node tools\call.js tps_select --root C:\pos\data
+node tools\call.js tps_version
+```
+
 ## Server flags
 
 | Flag | Default | Meaning |
@@ -99,4 +112,12 @@ src/server.ts    tools, policy, argv, stdio transport
 src/sql.ts       statement builder and literal rules
 src/runner.ts    spawn, timeout, output ceiling, response validation
 test/*.test.js   node --test; fake-tpscli.js stands in for the exe
+tools/call.js    one tool call from the command line
 ```
+
+## Documentation
+
+- `..\docs\Testing\TpscliMcp-Unit-Test-Cases.html`: the interactive unit-test instrument for this
+  server (16 cases driven through `tools\call.js` against copies of the corpus under `work\`).
+- `..\docs\mySuperpower\specs\2026-09-19-tpscli-mcp-design.html`, the plan beside it under `plans\`,
+  and `..\docs\mySuperpower\implementation-notes\2026-09-19-tpscli-mcp.html`.
