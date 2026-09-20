@@ -187,7 +187,7 @@ $run = @{
 'TC-01' = {
     $r = Npm 'run build'; Expect-Exit $r 0; Tick 1
     $r = Call tps_version; $j = Json $r
-    if ($j) { Expect-True ($j.server -eq '0.1.0' -and $j.exe.version -eq '0.1.0' -and $j.exe.ok -eq $true) "expected server 0.1.0 and exe 0.1.0, got $($r.Out)" }
+    if ($j) { Expect-True ($j.server -eq '0.2.0' -and $j.exe.version -eq '0.1.0' -and $j.exe.ok -eq $true) "expected server 0.2.0 and exe 0.1.0, got $($r.Out)" }
     Expect-Exit $r 0; Tick 2
     $r = Call tps_describe '{"file":"OPTIONS.TPS"}' $ro; $j = Json $r
     if ($j -and $j.ok -ne $true) { Block "the exe cannot open OPTIONS.TPS ($($j.error.code): $($j.error.message)); rebuild the CLI from commit 9aab623 or later" }

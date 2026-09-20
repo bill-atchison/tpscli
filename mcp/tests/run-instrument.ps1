@@ -20,6 +20,7 @@ $serverJs = Join-Path $root 'dist\server.js'
 $work = Join-Path $root 'work'
 $absKeys = Join-Path $work 'KEYS.TPS'
 $absKeysJson = $absKeys -replace '\\', '\\'      # backslashes doubled for a JSON string
+$workJson = $work -replace '\\', '\\'
 $node = (Get-Command node).Source
 $cmdExe = $env:ComSpec
 
@@ -164,7 +165,7 @@ $run = @{
     $get = { param($k) $m = $lines | Where-Object { $_ -match "^# $k (\d+)" } | Select-Object -Last 1; if ($m -match "(\d+)$") { [int]$Matches[1] } else { -1 } }
     $tests = & $get 'tests'; $pass = & $get 'pass'; $fail = & $get 'fail'; $skipped = & $get 'skipped'
     Note "> counted tests=$tests pass=$pass fail=$fail skipped=$skipped"
-    Expect-True ($tests -eq 39 -and $pass -eq 39 -and $fail -eq 0 -and $skipped -eq 0) "expected 39/39/0/0"
+    Expect-True ($tests -eq 40 -and $pass -eq 40 -and $fail -eq 0 -and $skipped -eq 0) "expected 40/40/0/0"
     Expect-Exit $r 0; Tick 2
 }
 'TC-03' = {
@@ -174,13 +175,13 @@ $run = @{
     $r = Server @('--exe', 'C:\no\tpscli.exe'); Expect-StderrContains $r 'tpscli-mcp: tpscli.exe not found; tried C:\no\tpscli.exe. Pass --exe <path> or set TPSCLI_EXE.'; Expect-Exit $r 2; Tick 3
     $r = Server @('--timeout', '0'); Expect-StderrContains $r 'tpscli-mcp: --timeout needs a positive whole number of seconds, not 0'; Expect-Exit $r 2; Tick 4
     $r = Server @('--root', 'work')
-    Expect-True ($r.Err -match "^tpscli-mcp 0\.1\.0 ready: exe (.+?); roots (.+?); writes disabled; owner none; timeout 60s") 'ready line missing or different'
+    Expect-True ($r.Err -match "^tpscli-mcp 0\.2\.0 ready: exe (.+?); roots (.+?); writes disabled; owner none; timeout 60s") 'ready line missing or different'
     if ($Matches) { Expect-True ($Matches[1] -eq (Join-Path $repo 'cli\tpscli.exe')) "ready line names exe $($Matches[1])" }
     Expect-Exit $r 0; Tick 5
 }
 'TC-04' = {
     $r = Call tps_version '' @('--root', 'work'); $j = Json $r
-    if ($j) { Expect-True ($j.server -eq '0.1.0') "server version $($j.server)"; Expect-True ($j.exe.version -eq '0.1.0') "exe version $($j.exe.version)"; Expect-True ($j.exe.ok -eq $true -and $j.exe.complete -eq $true) 'exe object not ok/complete' }
+    if ($j) { Expect-True ($j.server -eq '0.2.0') "server version $($j.server)"; Expect-True ($j.exe.version -eq '0.1.0') "exe version $($j.exe.version)"; Expect-True ($j.exe.ok -eq $true -and $j.exe.complete -eq $true) 'exe object not ok/complete'; Expect-True (@($j.roots).Count -eq 1 -and $j.roots[0] -eq $work) "roots $($j.roots -join ';')" }
     Expect-Exit $r 0; Tick 1
 }
 'TC-05' = {
@@ -193,8 +194,13 @@ $run = @{
     Expect-Exit $r 0; Tick 1
     $r = Call tps_list_files '{"pattern":"k*"}' @('--root', 'work'); $j = Json $r
     if ($j) { Expect-True (@($j.files).Count -eq 1 -and $j.files[0].name -eq 'KEYS.TPS') "pattern k* gave $(@($j.files | ForEach-Object name) -join ',')" }; Tick 2
-    $r = Call tps_list_files '' @(); Expect-Error $r 'NO_ROOT' | Out-Null
-    Expect-Contains $r 'without --root folders'; Tick 3
+    $r = Call tps_list_files ('{"directory":"' + $workJson + '"}') @(); $j = Json $r
+    if ($j) { Expect-True (@($j.files).Count -eq 6) "directory listing gave $(@($j.files).Count) files" }; Expect-Exit $r 0; Tick 3
+    $r = Call tps_list_files '' @(); Expect-Error $r 'INVALID_ARGUMENT' 'The server has no root folders; pass directory, or call tps_set_roots first.' | Out-Null; Tick 4
+    $r = Call 'tps_set_roots,tps_list_files' ('[{"roots":["' + $workJson + '"]},{}]') @(); $j = Json $r
+    if ($j) { Expect-True (@($j).Count -eq 2 -and @($j[0].roots).Count -eq 1 -and $j[0].roots[0] -eq $work -and @($j[1].files).Count -eq 6) "sequence gave $($r.Out)" }
+    Expect-StderrContains $r "tpscli-mcp tps_set_roots 1 root(s): $work"; Expect-Exit $r 0; Tick 5
+    $r = Call tps_set_roots '{"roots":["work"]}' @(); Expect-Error $r 'INVALID_ARGUMENT' 'roots[0] "work" must be an absolute path' | Out-Null; Tick 6
 }
 'TC-06' = {
     $check = { param($j)
@@ -253,9 +259,9 @@ $run = @{
     $r = Call tps_describe '{"file":"..\\package.json"}' @('--root', 'work')
     Expect-Error $r 'FILE_NOT_FOUND' "..\package.json not found inside $work" | Out-Null; Expect-NoCallLine $r 'tps_describe'; Tick 2
     $r = Call tps_describe '{"file":"KEYS.TPS"}' @()
-    Expect-Error $r 'FILE_NOT_FOUND' 'KEYS.TPS is not an absolute path and the server was started without --root folders' | Out-Null; Expect-NoCallLine $r 'tps_describe'; Tick 3
+    Expect-Error $r 'FILE_NOT_FOUND' 'KEYS.TPS is not an absolute path and the server currently has no root folders; call tps_set_roots or pass an absolute path' | Out-Null; Expect-NoCallLine $r 'tps_describe'; Tick 3
     $r = Call tps_describe '{"file":"\\data\\KEYS.TPS"}' @()
-    Expect-Error $r 'FILE_NOT_FOUND' '\data\KEYS.TPS is not an absolute path and the server was started without --root folders' | Out-Null; Expect-NoCallLine $r 'tps_describe'; Tick 4
+    Expect-Error $r 'FILE_NOT_FOUND' '\data\KEYS.TPS is not an absolute path and the server currently has no root folders; call tps_set_roots or pass an absolute path' | Out-Null; Expect-NoCallLine $r 'tps_describe'; Tick 4
 }
 'TC-11' = {
     Fresh
