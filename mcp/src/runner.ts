@@ -1,5 +1,7 @@
 // One exe call, one result. Spawns tpscli.exe with no shell, collects its output under a byte
 // ceiling and a wall-clock limit, and decides whether what came back is a response at all.
+// The statement travels on stdin, not argv: Windows serialises argv into one command line that
+// the exe re-splits, which mangles a `"` inside a literal and caps the line at 32 K; flags stay argv.
 import { spawn, type ChildProcess } from 'node:child_process';
 
 export interface RunFailure {
@@ -21,6 +23,7 @@ export interface RunResult {
 export interface RunOptions {
   timeoutMs: number;
   table?: boolean;          // --table output is a grid, never parsed
+  stdin?: string;           // the statement text; absent means stdin stays closed
 }
 
 export type Run = (file: string, args: string[], opts: RunOptions) => Promise<RunResult>;
@@ -94,12 +97,21 @@ export const run: Run = (file, args, opts) => new Promise(resolve => {
   }, opts.timeoutMs);
 
   try {
-    child = spawn(file, args, { windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
+    child = spawn(file, args, {
+      windowsHide: true, shell: false,
+      stdio: [opts.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+    });
   } catch (e) {
     // spawn throws synchronously for an argument it cannot pass at all, e.g. a NUL byte
     failure = { kind: 'spawn', message: (e as Error).message };
     finish(null);
     return;
+  }
+
+  if (opts.stdin !== undefined) {
+    // an exe that exits before reading stdin gives EPIPE on the write; that must not crash the server
+    child.stdin!.on('error', () => {});
+    child.stdin!.end(opts.stdin);
   }
 
   const collect = (sink: Buffer[]) => (chunk: Buffer) => {

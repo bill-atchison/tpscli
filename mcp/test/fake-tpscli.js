@@ -27,6 +27,13 @@ switch (mode) {
   case 'table':
     out('ID  NAME \n--  -----\n 1  Able \n(1 rows)\n');
     break;
+  case 'stdin': {          // echoes back whatever it read from stdin, byte for byte
+    let s = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', d => s += d);
+    process.stdin.on('end', () => out(JSON.stringify({ ok: true, op: 'select', echo: s, complete: true }) + '\n'));
+    break;
+  }
   case 'garbage':
     out('not json at all\n');
     process.stderr.write('boom\n');

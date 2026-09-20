@@ -108,8 +108,7 @@ export function createServer(config: Config, run: Run): McpServer {
     if (o.limitDefault !== undefined) args.push('--limit-default', String(o.limitDefault));
     if (o.parseOnly) args.push('--parse-only');
     if (o.table) args.push('--table');
-    args.push(sql);
-    const r = await run(config.exe, args, { timeoutMs: config.timeoutMs, table: o.table === true });
+    const r = await run(config.exe, args, { timeoutMs: config.timeoutMs, table: o.table === true, stdin: sql });
     // One line per call; never argv, which may hold the owner string.
     process.stderr.write(`tpscli-mcp ${tool} ${r.durationMs}ms exit ${r.exitCode}${r.failure ? ` ${r.failure.kind}` : ''}\n`);
     return toResult(r, op, write, o.table === true);
@@ -134,7 +133,7 @@ export function createServer(config: Config, run: Run): McpServer {
     description: 'Version of this MCP server and of the tpscli.exe it runs.',
   }, async () => {
     const r = await run(config.exe, ['--version'], { timeoutMs: config.timeoutMs });
-    process.stderr.write(`tpscli-mcp tps_version ${r.durationMs}ms exit ${r.exitCode}\n`);
+    process.stderr.write(`tpscli-mcp tps_version ${r.durationMs}ms exit ${r.exitCode}${r.failure ? ` ${r.failure.kind}` : ''}\n`);
     const res = toResult(r, null, false, false);
     return res.isError ? res : body({ server: config.version, exe: r.json! }, false);
   });

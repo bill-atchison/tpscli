@@ -49,6 +49,12 @@ test('table mode keeps stdout and never parses', async () => {
   assert.match(r.stdout, /^ID {2}NAME/);
 });
 
+test('the statement travels on stdin byte for byte', async () => {
+  const stdin = `INSERT INTO [K.TPS] (NAME) VALUES ('12" pizza\\')`;
+  const r = await go('stdin', { stdin });
+  assert.equal(r.json.echo, stdin);
+});
+
 test('garbage, empty and out-of-range exits give no json and keep stderr', async () => {
   const g = await go('garbage');
   assert.equal(g.json, null);

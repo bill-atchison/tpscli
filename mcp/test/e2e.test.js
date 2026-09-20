@@ -90,6 +90,8 @@ test('e2e: writes enabled, owner from the environment, one row round trip', { sk
   const u = ok(await call(client, 'tps_update', { file: 'KEYS.TPS', set: { NAME: 'niner' }, where: 'ID = 9' }));
   assert.deepEqual([u.matched, u.affected], [1, 1]);
   assert.deepEqual(ok(await call(client, 'tps_select', { file: 'KEYS.TPS', columns: ['NAME'], where: 'ID = 9' })).rows, [['niner']]);
+  ok(await call(client, 'tps_update', { file: 'KEYS.TPS', set: { NAME: '12" pizza\\' }, where: 'ID = 9' }));
+  assert.deepEqual(ok(await call(client, 'tps_select', { file: 'KEYS.TPS', columns: ['NAME'], where: 'ID = 9' })).rows, [['12" pizza\\']]);
   err(await call(client, 'tps_query', { sql: `UPDATE [${keys}] SET NAME = 'x'` }), 'WHERE_REQUIRED');
   assert.equal(ok(await call(client, 'tps_delete', { file: 'KEYS.TPS', where: 'ID = 9' })).affected, 1);
   assert.equal(ok(await call(client, 'tps_select', { file: 'KEYS.TPS', where: 'ID = 9' })).row_count, 0);

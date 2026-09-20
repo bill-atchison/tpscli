@@ -54,11 +54,11 @@ test('bare names resolve against the roots in order; absolute paths pass through
   const run = stub();
   const client = await connect(base, run);
   await call(client, 'tps_describe', { file: 'KEYS.TPS' });
-  assert.deepEqual(run.calls[0], { file: base.exe, args: [`DESCRIBE [${path.join(rootA, 'KEYS.TPS')}]`], opts: { timeoutMs: 1234, table: false } });
+  assert.deepEqual(run.calls[0], { file: base.exe, args: [], opts: { timeoutMs: 1234, table: false, stdin: `DESCRIBE [${path.join(rootA, 'KEYS.TPS')}]` } });
   await call(client, 'tps_describe', { file: 'ONLYB.TPS' });
-  assert.equal(run.calls[1].args[0], `DESCRIBE [${path.join(rootB, 'ONLYB.TPS')}]`);
+  assert.equal(run.calls[1].opts.stdin, `DESCRIBE [${path.join(rootB, 'ONLYB.TPS')}]`);
   await call(client, 'tps_describe', { file: 'C:\\somewhere\\else\\X.TPS' });
-  assert.equal(run.calls[2].args[0], 'DESCRIBE [C:\\somewhere\\else\\X.TPS]');
+  assert.equal(run.calls[2].opts.stdin, 'DESCRIBE [C:\\somewhere\\else\\X.TPS]');
 });
 
 test('a name that is missing or escapes the roots is FILE_NOT_FOUND before the exe runs', async () => {
@@ -73,7 +73,7 @@ test('a name that is missing or escapes the roots is FILE_NOT_FOUND before the e
   assert.equal(escape.structuredContent.error.code, 'FILE_NOT_FOUND');
   assert.equal(run.calls.length, 0);
   await call(client, 'tps_describe', { file: '..\\b\\ONLYB.TPS' });      // lands inside another root: allowed
-  assert.equal(run.calls[0].args[0], `DESCRIBE [${path.join(rootB, 'ONLYB.TPS')}]`);
+  assert.equal(run.calls[0].opts.stdin, `DESCRIBE [${path.join(rootB, 'ONLYB.TPS')}]`);
   const noRoots = await connect({ ...base, roots: [] }, run);
   const r = await call(noRoots, 'tps_describe', { file: 'KEYS.TPS' });
   assert.equal(r.structuredContent.error.code, 'FILE_NOT_FOUND');
@@ -82,7 +82,7 @@ test('a name that is missing or escapes the roots is FILE_NOT_FOUND before the e
     assert.equal((await call(noRoots, 'tps_describe', { file: notQualified })).structuredContent.error.code, 'FILE_NOT_FOUND');
   }
   await call(noRoots, 'tps_describe', { file: '\\\\server\\share\\KEYS.TPS' });
-  assert.equal(run.calls.at(-1).args[0], 'DESCRIBE [\\\\server\\share\\KEYS.TPS]');
+  assert.equal(run.calls.at(-1).opts.stdin, 'DESCRIBE [\\\\server\\share\\KEYS.TPS]');
 });
 
 test('owner: server default, per-call override, or none, always its own argv element', async () => {
@@ -94,7 +94,7 @@ test('owner: server default, per-call override, or none, always its own argv ele
   assert.deepEqual(run.calls[1].args.slice(0, 2), ['--owner', 'mine']);
   const plain = await connect(base, run);
   await call(plain, 'tps_describe', { file: 'KEYS.TPS' });
-  assert.equal(run.calls[2].args.length, 1);
+  assert.equal(run.calls[2].args.length, 0);
   const nul = await call(client, 'tps_describe', { file: 'KEYS.TPS', owner: 'SENTINEL\u0000X' });
   assert.equal(nul.structuredContent.error.code, 'INVALID_ARGUMENT');
   assert.ok(!JSON.stringify(nul).includes('SENTINEL'), 'the owner value must not be echoed');
@@ -105,7 +105,8 @@ test('tps_select builds the statement; format table adds --table and returns the
   const run = stub(TABLE);
   const client = await connect(base, run);
   const r = await call(client, 'tps_select', { file: 'KEYS.TPS', columns: ['ID'], where: 'ID > 1', order_by: 'ID DESC', limit: 5, offset: 1, format: 'table' });
-  assert.deepEqual(run.calls[0].args, ['--table', `SELECT ID FROM [${path.join(rootA, 'KEYS.TPS')}] WHERE ID > 1 ORDER BY ID DESC LIMIT 5 OFFSET 1`]);
+  assert.deepEqual(run.calls[0].args, ['--table']);
+  assert.equal(run.calls[0].opts.stdin, `SELECT ID FROM [${path.join(rootA, 'KEYS.TPS')}] WHERE ID > 1 ORDER BY ID DESC LIMIT 5 OFFSET 1`);
   assert.equal(run.calls[0].opts.table, true);
   assert.deepEqual(r.content, [{ type: 'text', text: TABLE.stdout }]);
   assert.equal(r.structuredContent, undefined);
@@ -138,11 +139,14 @@ test('writes are refused with WRITES_DISABLED and outcome none unless allowWrite
   assert.equal(run.calls.length, 0);
   const rw = await connect({ ...base, allowWrites: true }, run);
   await call(rw, 'tps_update', { file: 'KEYS.TPS', set: { NAME: 'x' }, where: 'ID = 1' });
-  assert.deepEqual(run.calls[0].args, [`UPDATE [${path.join(rootA, 'KEYS.TPS')}] SET NAME = 'x' WHERE ID = 1`]);
+  assert.deepEqual(run.calls[0].args, []);
+  assert.equal(run.calls[0].opts.stdin, `UPDATE [${path.join(rootA, 'KEYS.TPS')}] SET NAME = 'x' WHERE ID = 1`);
   await call(rw, 'tps_insert', { file: 'KEYS.TPS', values: { ID: 9, NAME: 'nine' } });
-  assert.deepEqual(run.calls[1].args, [`INSERT INTO [${path.join(rootA, 'KEYS.TPS')}] (ID, NAME) VALUES (9, 'nine')`]);
+  assert.deepEqual(run.calls[1].args, []);
+  assert.equal(run.calls[1].opts.stdin, `INSERT INTO [${path.join(rootA, 'KEYS.TPS')}] (ID, NAME) VALUES (9, 'nine')`);
   await call(rw, 'tps_delete', { file: 'KEYS.TPS', where: 'ID = 9' });
-  assert.deepEqual(run.calls[2].args, [`DELETE FROM [${path.join(rootA, 'KEYS.TPS')}] WHERE ID = 9`]);
+  assert.deepEqual(run.calls[2].args, []);
+  assert.equal(run.calls[2].opts.stdin, `DELETE FROM [${path.join(rootA, 'KEYS.TPS')}] WHERE ID = 9`);
 });
 
 test('handler refusals wear the envelope; schema failures are the SDK\'s', async () => {
@@ -169,21 +173,25 @@ test('tps_query: verbatim SQL, flags, the write gate, parse_only, and no table f
   const run = stub();
   const client = await connect(base, run);
   await call(client, 'tps_query', { sql: 'SELECT ID FROM [C:\\d\\K.TPS]', limit_default: 5 });
-  assert.deepEqual(run.calls[0].args, ['--limit-default', '5', 'SELECT ID FROM [C:\\d\\K.TPS]']);
+  assert.deepEqual(run.calls[0].args, ['--limit-default', '5']);
+  assert.equal(run.calls[0].opts.stdin, 'SELECT ID FROM [C:\\d\\K.TPS]');
   const refused = await call(client, 'tps_query', { sql: '  delete FROM [C:\\d\\K.TPS] WHERE ID = 1' });
   assert.equal(refused.structuredContent.error.code, 'WRITES_DISABLED');
   assert.equal(refused.structuredContent.op, 'delete');
   assert.equal(refused.structuredContent.outcome, 'none');
   await call(client, 'tps_query', { sql: 'DELETE FROM [C:\\d\\K.TPS] WHERE ID = 1', parse_only: true });
-  assert.deepEqual(run.calls[1].args, ['--parse-only', 'DELETE FROM [C:\\d\\K.TPS] WHERE ID = 1']);
+  assert.deepEqual(run.calls[1].args, ['--parse-only']);
+  assert.equal(run.calls[1].opts.stdin, 'DELETE FROM [C:\\d\\K.TPS] WHERE ID = 1');
   const rw = await connect({ ...base, allowWrites: true }, run);
   const tbl = await call(rw, 'tps_query', { sql: 'UPDATE [C:\\d\\K.TPS] SET A = 1 WHERE ID = 1', format: 'table' });
   assert.equal(tbl.structuredContent.error.code, 'INVALID_ARGUMENT');
   assert.match(tbl.structuredContent.error.message, /outcome/);
   await call(rw, 'tps_query', { sql: 'DESCRIBE [C:\\d\\K.TPS]', format: 'table' });
-  assert.deepEqual(run.calls[2].args, ['--table', 'DESCRIBE [C:\\d\\K.TPS]']);
+  assert.deepEqual(run.calls[2].args, ['--table']);
+  assert.equal(run.calls[2].opts.stdin, 'DESCRIBE [C:\\d\\K.TPS]');
   await call(client, 'tps_query', { sql: '[K.TPS]' });      // no keyword: not a write, so the exe decides
-  assert.deepEqual(run.calls[3].args, ['[K.TPS]']);
+  assert.deepEqual(run.calls[3].args, []);
+  assert.equal(run.calls[3].opts.stdin, '[K.TPS]');
   assert.equal(run.calls.length, 4);
 });
 

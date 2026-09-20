@@ -239,7 +239,7 @@ RunResult = { exitCode: number | null, stdout: string, stderr: string,
               failure?: { kind: "spawn" | "timeout" | "output_limit" | "kill_failed",
                           message: string, pid?: number } }</code></pre>
         <ul>
-          <li><code>child_process.spawn(exe, args, { windowsHide: true, shell: false })</code>. The SQL is one argv element; there is no shell and therefore no quoting layer. stdin is closed immediately so the exe never waits for it.</li>
+          <li><code>child_process.spawn(exe, args, { windowsHide: true, shell: false })</code>. The flags are argv elements; the statement itself is written to the exe's stdin and stdin is then closed (the exe reads the statement from stdin when it has no positional argument). Windows serialises argv into one command line that the exe re-splits, which breaks a <code>"</code> inside a literal, and caps the command line at 32 K; stdin has neither problem. Probed 2026-09-20 against a copied fixture.</li>
           <li>stdout and stderr are collected as UTF-8, up to a fixed ceiling of 64 MiB combined. Past the ceiling the process tree is killed and the result is <code>INCOMPLETE</code> ("output exceeded 64 MiB; add a LIMIT"), never a truncated success.</li>
           <li><code>json</code> is the parse of the whole trimmed stdout as one JSON object (the exe writes exactly one object; the parse does not assume it is one line). It counts as a response only when it is an object with <code>complete === true</code> and <code>ok === (exitCode === 0)</code>; anything else, including <code>{}</code>, a partial object, or an <code>ok</code> that disagrees with the exit code, leaves <code>json</code> null and becomes <code>INCOMPLETE</code>. In table mode no parse is attempted and <code>json</code> is null.</li>
           <li>On timeout the process tree is killed with <code>taskkill /PID &lt;pid&gt; /T /F</code>. A Clarion exe that crashes sits behind a modal dialog; a plain <code>child.kill()</code> leaves that dialog on screen and the handle open. The promise settles exactly once: on the child's <code>close</code> (after stdout and stderr have drained, which <code>exit</code> does not guarantee), on a spawn <code>error</code>, or when a kill attempt fails or passes its own 5 s deadline, in which case it settles without waiting for the child. The timer is cleared whichever way it settles.</li>
@@ -286,7 +286,7 @@ server   resolve: KEYS.TPS against roots &rarr; C:\pos\data\KEYS.TPS (exists)
 server   build:  set non-empty, where non-empty, column names well-formed, values spellable
                  (any failure &rarr; INVALID_ARGUMENT envelope with outcome "none")
          &rarr;   UPDATE [C:\pos\data\KEYS.TPS] SET NAME = 'niner' WHERE ID = 9
-server   argv:   [--owner, &lt;default&gt;]? + [&lt;sql&gt;]
+server   argv:   [--owner, &lt;default&gt;]?   stdin: &lt;sql&gt;
 runner   spawn tpscli.exe, 60 s limit, collect stdout
 exe      { "ok": true, "op": "update", "matched": 1, "affected": 1, "complete": true }   exit 0
 server   structuredContent = that object; content = pretty JSON; isError = false

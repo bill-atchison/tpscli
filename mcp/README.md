@@ -51,7 +51,7 @@ read-only.
 | `--timeout <seconds>` | 60 | Wall-clock limit per exe run; the process tree is killed past it. |
 
 Startup problems (bad flag, missing exe, missing root) exit 2 with the reason on stderr. While
-running, one line per call goes to stderr: tool, duration, exit code.
+running, one line per call goes to stderr: tool, duration, exit code, and the failure kind if any.
 
 ## Tools
 
@@ -76,14 +76,16 @@ as text and is not available for writes.
 
 A tool result is the exe's response object, as `structuredContent` and as pretty-printed text.
 `isError` is true for any non-zero exit; the object's `error.code` and `error.message` explain,
-and `outcome` is passed through for writes. Errors the server raises itself use the same shape:
+and `outcome` is passed through for writes. The statement is passed to the exe on stdin, so a "
+inside a value is fine and the only size limit is the exe's own expression limit; flags go on the
+command line. Errors the server raises itself use the same shape:
 
 | Code | When |
 | --- | --- |
 | `WRITES_DISABLED` | A write without `--allow-writes`. `outcome: "none"`. |
 | `NO_ROOT` | `tps_list_files` on a server with no `--root`. |
 | `FILE_NOT_FOUND` | A bare name not found inside the roots, or a path that escapes them. |
-| `INVALID_ARGUMENT` | Empty `set`/`values`, blank `where`, bad column name, `null`, exponent or unsafe number, `offset` without `limit`, `]` in a path, table format on a write. |
+| `INVALID_ARGUMENT` | Empty `set`/`values`, blank `where`, bad column name, `null`, exponent or unsafe number, `offset` without `limit`, `]` in a path, table format on a write, a NUL byte in the owner string. |
 | `INCOMPLETE` | Timeout, spawn failure, output over 64 MiB, exit outside 0-3, or no valid response object. `complete: false`; for a write `outcome: "unknown"`. The write may or may not have happened: check the file, do not retry blindly. |
 
 A malformed argument (wrong type, missing required field) is rejected by the SDK before the
