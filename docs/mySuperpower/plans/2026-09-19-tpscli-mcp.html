@@ -736,6 +736,11 @@ test(&#x27;a name that is missing or escapes the roots is FILE_NOT_FOUND before 
   const r = await call(noRoots, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27; });
   assert.equal(r.structuredContent.error.code, &#x27;FILE_NOT_FOUND&#x27;);
   assert.match(r.structuredContent.error.message, /--root/);
+  for (const notQualified of [&#x27;\\data\\KEYS.TPS&#x27;, &#x27;C:KEYS.TPS&#x27;]) {
+    assert.equal((await call(noRoots, &#x27;tps_describe&#x27;, { file: notQualified })).structuredContent.error.code, &#x27;FILE_NOT_FOUND&#x27;);
+  }
+  await call(noRoots, &#x27;tps_describe&#x27;, { file: &#x27;\\\\server\\share\\KEYS.TPS&#x27; });
+  assert.equal(run.calls.at(-1).args[0], &#x27;DESCRIBE [\\\\server\\share\\KEYS.TPS]&#x27;);
 });
 
 test(&#x27;owner: server default, per-call override, or none, always its own argv element&#x27;, async () =&gt; {
@@ -748,6 +753,10 @@ test(&#x27;owner: server default, per-call override, or none, always its own arg
   const plain = await connect(base, run);
   await call(plain, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27; });
   assert.equal(run.calls[2].args.length, 1);
+  const nul = await call(client, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27;, owner: &#x27;SENTINEL\u0000X&#x27; });
+  assert.equal(nul.structuredContent.error.code, &#x27;INVALID_ARGUMENT&#x27;);
+  assert.ok(!JSON.stringify(nul).includes(&#x27;SENTINEL&#x27;), &#x27;the owner value must not be echoed&#x27;);
+  assert.equal(run.calls.length, 3);
 });
 
 test(&#x27;tps_select builds the statement; format table adds --table and returns the grid as text&#x27;, async () =&gt; {
@@ -963,12 +972,13 @@ const WHERE_ARG = z.string().describe(&#x27;Filter in the tpscli dialect without
 const FORMAT_ARG = z.enum([&#x27;json&#x27;, &#x27;table&#x27;]).optional().describe(&#x27;&quot;json&quot; (default) returns the exe\&#x27;s response object; &quot;table&quot; returns the aligned text grid, easier to read for wide results.&#x27;);
 const INT_ARG = z.number().int().min(0).max(2147483647);
 const STATEMENT_OPS = [&#x27;DESCRIBE&#x27;, &#x27;SELECT&#x27;, &#x27;INSERT&#x27;, &#x27;UPDATE&#x27;, &#x27;DELETE&#x27;];
+const FULLY_QUALIFIED = /^(?:[A-Za-z]:[\\/]|\\\\)/;    // drive letter or UNC; \x and C:x are neither
 
 export function createServer(config: Config, run: Run): McpServer {
   const server = new McpServer({ name: &#x27;tpscli-mcp&#x27;, version: config.version });
 
   const resolveFile = (file: string): string =&gt; {
-    if (path.isAbsolute(file)) return file;
+    if (FULLY_QUALIFIED.test(file)) return file;
     if (config.roots.length === 0) {
       throw new ToolError(&#x27;FILE_NOT_FOUND&#x27;, `${file} is not an absolute path and the server was started without --root folders`);
     }
@@ -990,6 +1000,8 @@ export function createServer(config: Config, run: Run): McpServer {
   ): Promise&lt;ToolResult&gt; =&gt; {
     const args: string[] = [];
     const owner = o.owner ?? config.owner;
+    // spawn cannot pass a NUL byte and its error message would echo the value; the owner is never echoed.
+    if (owner !== undefined &amp;&amp; owner.includes(&#x27;\0&#x27;)) throw new InvalidArgument(&#x27;the owner string contains a NUL character and cannot be passed&#x27;);
     if (owner !== undefined) args.push(&#x27;--owner&#x27;, owner);
     if (o.limitDefault !== undefined) args.push(&#x27;--limit-default&#x27;, String(o.limitDefault));
     if (o.parseOnly) args.push(&#x27;--parse-only&#x27;);
@@ -1126,7 +1138,8 @@ export function createServer(config: Config, run: Run): McpServer {
 
 const VERSION: string = JSON.parse(readFileSync(new URL(&#x27;../package.json&#x27;, import.meta.url), &#x27;utf8&#x27;)).version;
 
-// First hit wins: --exe, TPSCLI_EXE, tpscli.exe beside server.js, ..\..\cli\tpscli.exe (the repo).
+// --exe (or TPSCLI_EXE) is the only candidate when given: a wrong explicit path must fail, not fall
+// through to some other exe. Otherwise: tpscli.exe beside server.js, then ..\..\cli\tpscli.exe (the repo).
 export function discoverExe(explicit: string | undefined, here: string): string {
   const candidates = explicit !== undefined
     ? [explicit]
@@ -1507,6 +1520,7 @@ git commit -m &quot;mcp: README, manual gate recorded, simplify pass&quot;</code
       <ul>
         <li><strong>Spec coverage:</strong> &sect;3 flags and discovery (Task 4 <code>parseArgs</code>, <code>discoverExe</code>), tools and file argument (Task 3); &sect;4 every builder row and the three examples (Task 1 tests quote them); &sect;5 runner, <code>failure</code> channel, ceiling, settle-on-close, kill deadline (Task 2), result precedence and envelopes (Task 3 <code>toResult</code>); &sect;6 write gate, roots, owner, timeout (Task 3), SDK-vs-handler validation (Task 3 asserts the SDK's <code>-32602</code> text); &sect;7 data flow is the Task 3 update test; &sect;8 layout (Tasks 1-4, with <code>args.test.js</code> split out and noted); &sect;9 unit list (Tasks 1-3), e2e list (Task 4), manual gate and docs (Task 5); &sect;10 non-goals: nothing here adds HTTP, prompts, batches, reshaping or recursion.</li>
         <li><strong>Placeholders:</strong> none; every file is given in full, every run step has its expected output.</li>
+        <li><strong>Codex plan review round 2:</strong> 3 findings: an owner string with a NUL byte is refused without being echoed (spawn's own error would have printed it); only drive-letter or UNC paths bypass root resolution (<code>\data\X.TPS</code> and <code>C:X.TPS</code> do not); and the spec's exe discovery wording was tightened to what the code does: an explicit <code>--exe</code>/<code>TPSCLI_EXE</code> is the only candidate, because falling through from a wrong explicit path to another exe would hide a misconfiguration.</li>
         <li><strong>Codex plan review round 1:</strong> 8 findings applied: timer declared before spawn (a NUL byte in an argument made spawn throw before the timer existed), <code>--timeout</code> capped at Node's limit, root resolution accepts a candidate inside any root, a parse-only raw write keeps the write flag for its INCOMPLETE envelope, exe discovery requires a regular file, working directories stated, manual-gate block in PowerShell, and the spec's "every tool description" narrowed to exe-running tools (version and list have no dialect).</li>
         <li><strong>Type consistency:</strong> <code>run(file, args, { timeoutMs, table? })</code> is the same in Task 2's definition, Task 3's stub and <code>invoke</code>, and Task 4's e2e (through the real server). <code>RunResult.failure.kind</code> values match between <code>runner.ts</code>, the fake's modes and <code>toResult</code>. <code>ToolResult</code> and <code>Op</code> are used identically by <code>refusal</code>, <code>toResult</code> and every tool. <code>Config</code> fields match between <code>parseArgs</code>, the test's <code>base</code> and <code>createServer</code>.</li>
         <li><strong>Ablation:</strong> <code>ToolError</code> exists because <code>FILE_NOT_FOUND</code> and <code>NO_ROOT</code> need codes other than <code>INVALID_ARGUMENT</code> and Task 3's <code>attempt</code> is the one catch site. <code>attempt</code> and <code>invoke</code> are each called from six tools; inlining them would repeat the catch and the argv assembly six times. <code>body</code> is called from four places. The fake exe is the only way to test timeout, ceiling and kill without a real hang. <code>Run</code> as an injected function is what lets Task 3 test twelve policies without spawning anything. No config knob, interface or wrapper beyond these.</li>
