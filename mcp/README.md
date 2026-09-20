@@ -26,9 +26,9 @@ claude mcp list          # tpscli: ... - Connected
 ```
 
 Open a new session afterwards (or `/mcp` in a running one); servers attach at startup. Remove
-with `claude mcp remove -s user tpscli`. `--root` is optional: without it every tool needs an
-absolute path and `tps_list_files` has nothing to list (`NO_ROOT`; see
-`..\docs\tickets\2026-09-19-tps-list-files-without-root.md`).
+with `claude mcp remove -s user tpscli`. `--root` is optional: `tps_set_roots` replaces the set while the server runs, and
+`tps_list_files` takes a `directory` for a one-off look at any folder. With neither roots nor
+`directory` it answers `INVALID_ARGUMENT`.
 
 Claude Desktop (`claude_desktop_config.json`):
 
@@ -65,7 +65,7 @@ node tools\call.js tps_version
 | Flag | Default | Meaning |
 | --- | --- | --- |
 | `--exe <path>` | `TPSCLI_EXE`, else `tpscli.exe` beside `server.js`, else `..\..\cli\tpscli.exe` | Path to the exe. Missing exe fails at startup. |
-| `--root <dir>` | none | Repeatable. Bare file names resolve inside these folders, in order; `tps_list_files` lists them. Must exist. |
+| `--root <dir>` | none | Repeatable. Bare file names resolve inside these folders, in order; `tps_list_files` lists them. Must exist. `tps_set_roots` replaces the set for the session. |
 | `--allow-writes` | off | Enables `INSERT`, `UPDATE` and `DELETE`, structured and raw. |
 | `--owner <string>` | `TPSCLI_OWNER`, else none | Owner (encryption) string for every call that does not pass its own. Never printed. |
 | `--timeout <seconds>` | 60 | Wall-clock limit per exe run; the process tree is killed past it. |
@@ -77,8 +77,9 @@ running, one line per call goes to stderr: tool, duration, exit code, and the fa
 
 | Tool | Arguments | Runs |
 | --- | --- | --- |
-| `tps_version` | | `--version`; returns `{ server, exe }` |
-| `tps_list_files` | `pattern?` (`*.TPS`) | no exe; `{ files: [{ name, path, size, modified }] }` from the roots, one level deep |
+| `tps_version` | | `--version`; returns `{ server, exe, roots }` |
+| `tps_list_files` | `pattern?` (`*.TPS`), `directory?` | no exe; `{ files: [{ name, path, size, modified }] }` from `directory` or, without it, the roots, one level deep |
+| `tps_set_roots` | `roots` (string[]) | no exe; replaces the root set for this session, returns `{ roots }`; `[]` clears |
 | `tps_describe` | `file`, `owner?` | `DESCRIBE [file]` |
 | `tps_select` | `file`, `columns?`, `where?`, `order_by?`, `limit?`, `offset?`, `format?`, `owner?` | built `SELECT`; `limit` omitted = exe default 1000, `0` = no cap, `offset` needs `limit` |
 | `tps_insert` | `file`, `values`, `owner?` | built `INSERT` |
@@ -103,9 +104,8 @@ command line. Errors the server raises itself use the same shape:
 | Code | When |
 | --- | --- |
 | `WRITES_DISABLED` | A write without `--allow-writes`. `outcome: "none"`. |
-| `NO_ROOT` | `tps_list_files` on a server with no `--root`. |
-| `FILE_NOT_FOUND` | A bare name not found inside the roots, or a path that escapes them. |
-| `INVALID_ARGUMENT` | Empty `set`/`values`, blank `where`, bad column name, `null`, exponent or unsafe number, `offset` without `limit`, `]` in a path, table format on a write, a NUL byte in the owner string. |
+| `FILE_NOT_FOUND` | A bare name not found inside the current roots (or there are none), or a path that escapes them. |
+| `INVALID_ARGUMENT` | Empty `set`/`values`, blank `where`, bad column name, `null`, exponent or unsafe number, `offset` without `limit`, `]` in a path, table format on a write, a NUL byte in the owner string; a relative or missing folder given to `tps_set_roots` or `directory`; `tps_list_files` with neither roots nor `directory`; a folder that cannot be listed. |
 | `INCOMPLETE` | Timeout, spawn failure, output over 64 MiB, exit outside 0-3, or no valid response object. `complete: false`; for a write `outcome: "unknown"`. The write may or may not have happened: check the file, do not retry blindly. |
 
 A malformed argument (wrong type, missing required field) is rejected by the SDK before the

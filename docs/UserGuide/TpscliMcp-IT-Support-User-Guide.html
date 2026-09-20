@@ -133,7 +133,7 @@ footer{max-width:900px;margin:2.5rem auto 0;padding:1rem 1.5rem 2rem;border-top:
   <div class="cards">
     <div class="card">
       <h5>Purpose</h5>
-      <p>Give an assistant eight well-defined tools (describe, select, insert, update, delete, raw query, list files, version) over <code>.TPS</code> files on the machine that holds them, with writes off unless you switch them on.</p>
+      <p>Give an assistant nine well-defined tools (describe, select, insert, update, delete, raw query, list files, set roots, version) over <code>.TPS</code> files on the machine that holds them, with writes off unless you switch them on.</p>
     </div>
     <div class="card">
       <h5>Audience</h5>
@@ -147,7 +147,7 @@ footer{max-width:900px;margin:2.5rem auto 0;padding:1rem 1.5rem 2rem;border-top:
 
   <p>
     <span class="chip maroon">Feature: tpscli MCP server</span>
-    <span class="chip">Version: 0.1.0</span>
+    <span class="chip">Version: 0.2.0</span>
     <span class="chip">Branch: feature/tpscli-mcp</span>
     <span class="chip">Transport: stdio</span>
     <span class="chip">Read-only by default</span>
@@ -159,7 +159,7 @@ footer{max-width:900px;margin:2.5rem auto 0;padding:1rem 1.5rem 2rem;border-top:
       <li><a href="#overview">Overview</a></li>
       <li><a href="#install">Install and register</a></li>
       <li><a href="#config">Server flags</a></li>
-      <li><a href="#tools">The eight tools</a></li>
+      <li><a href="#tools">The nine tools</a></li>
       <li><a href="#procedures">Procedures</a></li>
       <li><a href="#results">Reading a result</a></li>
       <li><a href="#troubleshooting">Troubleshooting</a></li>
@@ -172,7 +172,7 @@ footer{max-width:900px;margin:2.5rem auto 0;padding:1rem 1.5rem 2rem;border-top:
   <p>Three things decide what the model can do, and all three are set on the server's command line when you register it:</p>
   <ul>
     <li><b>Writes.</b> Off unless the server is started with <code>--allow-writes</code>. Without it, <code>tps_insert</code>, <code>tps_update</code>, <code>tps_delete</code> and any raw write are refused with <code>WRITES_DISABLED</code> before the exe runs.</li>
-    <li><b>Roots.</b> <code>--root &lt;folder&gt;</code> (repeatable) names folders where bare file names such as <code>KEYS.TPS</code> are looked up, and what <code>tps_list_files</code> lists. A root is a convenience, not a fence: every tool also accepts an absolute path anywhere on the machine the server's account can reach.</li>
+    <li><b>Roots.</b> <code>--root &lt;folder&gt;</code> (repeatable) names folders where bare file names such as <code>KEYS.TPS</code> are looked up, and what <code>tps_list_files</code> lists. A root is a convenience, not a fence: every tool also accepts an absolute path anywhere on the machine the server's account can reach. The set can be replaced while the server runs with tps_set_roots (session only; a restart returns to the flags), and tps_list_files lists any folder given as directory.</li>
     <li><b>Owner string.</b> <code>--owner</code> or the <code>TPSCLI_OWNER</code> environment variable supplies the encryption string for every call, so it never has to appear in a conversation. It is never printed.</li>
   </ul>
   <div class="callout note"><b>Scope</b>The server does exactly what the exe does: row-level DESCRIBE, SELECT, INSERT, UPDATE and DELETE on one file per call. It cannot create, alter, pack or rebuild a file, join two files or aggregate. The CLI guide beside this one covers the dialect and the exe in detail; this guide covers installing and operating the server around it.</div>
@@ -183,7 +183,7 @@ footer{max-width:900px;margin:2.5rem auto 0;padding:1rem 1.5rem 2rem;border-top:
     <li>Install Node 20 or later (<code>node --version</code> should print <code>v20</code> or higher; this guide was written on <code>v20.18.1</code>).</li>
     <li>Make sure <code>cli\tpscli.exe</code> exists (build it from <code>cli\</code> as its README describes, or copy a built exe into <code>cli\</code>). The server looks for the exe first at <code>--exe</code> / <code>TPSCLI_EXE</code>, then beside <code>dist\server.js</code>, then at <code>..\..\cli\tpscli.exe</code>.</li>
     <li>From <code>mcp\</code> run <code>npm install</code>, then <code>npm run build</code>. The build writes <code>dist\server.js</code>, the file every client entry points at.</li>
-    <li>Optionally run <code>npm test</code>: 39 tests, including two that drive the real exe against copies of the test corpus.</li>
+    <li>Optionally run <code>npm test</code>: 40 tests, including two that drive the real exe against copies of the test corpus.</li>
   </ol>
 
   <h3>Register in Claude Code</h3>
@@ -195,7 +195,7 @@ footer{max-width:900px;margin:2.5rem auto 0;padding:1rem 1.5rem 2rem;border-top:
 <pre><code>&gt; claude mcp list
 ...
 tpscli: node C:\Projects\GitHub\tpscli\mcp\dist\server.js --root C:\pos\data - âˆš Connected</code></pre></li>
-    <li>Servers attach when a session starts. Open a new <code>claude</code> session (or type <code>/mcp</code> in a running one) and ask <em>what tpscli tools do you have?</em>; the assistant lists the eight tools below.</li>
+    <li>Servers attach when a session starts. Open a new <code>claude</code> session (or type <code>/mcp</code> in a running one) and ask <em>what tpscli tools do you have?</em>; the assistant lists the nine tools below.</li>
     <li>To change the flags later, remove and add again: <code>claude mcp remove -s user tpscli</code>, then the <code>add</code> command with the new flags. The registration lives in <code>%USERPROFILE%\.claude.json</code>.</li>
   </ol>
 
@@ -224,7 +224,7 @@ tpscli: node C:\Projects\GitHub\tpscli\mcp\dist\server.js --root C:\pos\data - â
     </thead>
     <tbody>
       <tr><td><code>--exe &lt;path&gt;</code></td><td><code>TPSCLI_EXE</code>, else <code>tpscli.exe</code> beside <code>server.js</code>, else <code>..\..\cli\tpscli.exe</code></td><td>Path to the exe. When <code>--exe</code> or <code>TPSCLI_EXE</code> is given it is the only place looked at. A missing exe stops the server at startup: <code>tpscli-mcp: tpscli.exe not found; tried C:\nope.exe. Pass --exe &lt;path&gt; or set TPSCLI_EXE.</code></td></tr>
-      <tr><td><code>--root &lt;dir&gt;</code></td><td>none</td><td>Repeatable. Bare file names resolve inside these folders in order; <code>tps_list_files</code> lists them one level deep. Each must exist: <code>tpscli-mcp: --root C:\nope is not a folder</code> exits 2. Absolute paths are accepted whether or not they are inside a root.</td></tr>
+      <tr><td><code>--root &lt;dir&gt;</code></td><td>none</td><td>Repeatable. Bare file names resolve inside these folders in order; <code>tps_list_files</code> lists them one level deep. Each must exist: <code>tpscli-mcp: --root C:\nope is not a folder</code> exits 2. Absolute paths are accepted whether or not they are inside a root. <code>tps_set_roots</code> replaces the set for the session.</td></tr>
       <tr><td><code>--allow-writes</code></td><td>off</td><td>Enables <code>tps_insert</code>, <code>tps_update</code>, <code>tps_delete</code> and raw writes through <code>tps_query</code>. Without it they are refused with <code>WRITES_DISABLED</code>; <code>parse_only</code> raw statements are always allowed.</td></tr>
       <tr><td><code>--owner &lt;string&gt;</code></td><td><code>TPSCLI_OWNER</code>, else none</td><td>Owner (encryption) string used for every call that does not pass its own <code>owner</code> argument. Never printed, not in the ready line, not in errors. A call may override it with its own <code>owner</code>, but prefer the server-wide setting so the secret stays out of the conversation.</td></tr>
       <tr><td><code>--timeout &lt;seconds&gt;</code></td><td>60</td><td>Wall-clock limit for one exe run. Past it the server kills the whole process tree with <code>taskkill /T /F</code> and answers <code>INCOMPLETE</code>; if that kill itself fails the message says the exe may still be running. Maximum 2147483.</td></tr>
@@ -233,13 +233,14 @@ tpscli: node C:\Projects\GitHub\tpscli\mcp\dist\server.js --root C:\pos\data - â
   <p>Startup problems (an unknown flag, a missing exe, a missing root) exit 2 with one <code>tpscli-mcp: ...</code> line on standard error, and the client shows the server as failed. A healthy start prints one ready line, for example <code>tpscli-mcp 0.1.0 ready: exe C:\Projects\GitHub\tpscli\cli\tpscli.exe; roots C:\Projects\GitHub\tpscli\mcp\work; writes disabled; owner none; timeout 60s</code>, then one line per exe run: <code>tpscli-mcp tps_insert 412ms exit 0</code> (with the failure kind appended when there was one). <code>tps_list_files</code> and refusals that stop before the exe do not log. Statements, arguments and the owner string are never logged.</p>
   <div class="callout warn"><b>Caution</b><code>--root</code> does not limit what the model can reach. Any tool accepts an absolute path, and <code>tps_query</code> uses the path in the statement exactly as written. The server runs with the permissions of the account that started the client; give that account read-only access to folders it should never change, and keep <code>--allow-writes</code> off unless the session needs it.</div>
 
-  <h2 id="tools">The eight tools</h2>
+  <h2 id="tools">The nine tools</h2>
   <p>The model chooses the tool and fills in the arguments from what you ask it in plain words; you rarely type these names yourself. Knowing them tells you what the assistant can and cannot do, and what the entries in its tool log mean.</p>
   <table>
     <thead><tr><th>Tool</th><th>Arguments</th><th>What it runs</th><th>Needs</th></tr></thead>
     <tbody>
-      <tr><td><code>tps_version</code></td><td>none</td><td><code>tpscli.exe --version</code>; returns <code>{ "server": "0.1.0", "exe": { ... "version": "0.1.0" ... } }</code></td><td>nothing; the quickest health check</td></tr>
-      <tr><td><code>tps_list_files</code></td><td><code>pattern?</code> (default <code>*.TPS</code>)</td><td>no exe; lists the roots one level deep: <code>name</code>, <code>path</code>, <code>size</code>, <code>modified</code></td><td>at least one <code>--root</code> (see <a href="#troubleshooting">NO_ROOT</a>)</td></tr>
+      <tr><td><code>tps_version</code></td><td>none</td><td><code>tpscli.exe --version</code>; returns <code>{ "server": "0.1.0", "exe": { ... "version": "0.1.0" ... }, "roots": [...] }</code></td><td>nothing; the quickest health check</td></tr>
+      <tr><td><code>tps_list_files</code></td><td><code>pattern?</code> (default <code>*.TPS</code>), <code>directory?</code></td><td>no exe; lists <code>directory</code> or, without it, the roots, one level deep: <code>name</code>, <code>path</code>, <code>size</code>, <code>modified</code></td><td>a root or directory</td></tr>
+      <tr><td><code>tps_set_roots</code></td><td><code>roots</code> (string[])</td><td>no exe; replaces the root set for this session and returns it; <code>[]</code> clears</td><td>existing folders, absolute</td></tr>
       <tr><td><code>tps_describe</code></td><td><code>file</code>, <code>owner?</code></td><td><code>DESCRIBE [file]</code>: record count, <code>encrypted</code>, every column with type and size, every key</td><td>read access</td></tr>
       <tr><td><code>tps_select</code></td><td><code>file</code>, <code>columns?</code>, <code>where?</code>, <code>order_by?</code>, <code>limit?</code>, <code>offset?</code>, <code>format?</code>, <code>owner?</code></td><td>a built <code>SELECT</code>; no <code>limit</code> = exe default 1000 rows, <code>0</code> = no cap, <code>offset</code> needs <code>limit</code>; <code>format: "table"</code> returns the text grid</td><td>read access</td></tr>
       <tr><td><code>tps_insert</code></td><td><code>file</code>, <code>values</code>, <code>owner?</code></td><td>a built <code>INSERT</code> of one row; <code>values</code> maps column to value</td><td><code>--allow-writes</code></td></tr>
@@ -274,6 +275,13 @@ ID  NAME     CODE
     <li>Ask in plain words: <em>describe C:\pos\data\ITEMS.TPS</em>, or with a root configured, <em>describe ITEMS.TPS</em>. The assistant calls <code>tps_describe</code> and summarises the columns, keys and record count.</li>
     <li>Ask for rows: <em>show the first ten rows ordered by SKU</em>, <em>find the rows whose DESC starts with "b"</em>, <em>show that as a table</em>. Each becomes a <code>tps_select</code>; you can expand the tool call in the client to see the exact arguments and the raw response.</li>
     <li><code>where</code> and <code>order_by</code> take whole fragments (<code>"CODE IN ('A','E') AND AMOUNT &gt; 5"</code>, <code>"AMOUNT DESC, ID"</code>), so most requests stay in <code>tps_select</code>. When the assistant wants a statement written out in full, or a dry run with <code>parse_only</code>, it uses <code>tps_query</code>. The <code>[file]</code> in that statement is used exactly as written, with no root lookup, so it should be a full path.</li>
+  </ol>
+
+  <h3>Change the working folder without restarting</h3>
+  <ol class="steps">
+    <li>Ask: <em>work in C:\pos\data from now on</em>. The assistant calls <code>tps_set_roots</code> with that folder; the result lists the roots now in force. Bare names such as <code>ITEMS.TPS</code> resolve there and <code>tps_list_files</code> lists it.</li>
+    <li>For a one-off look at another folder ask <em>list the TPS files in D:\backup</em>; that is <code>tps_list_files</code> with <code>directory</code> and leaves the roots alone.</li>
+    <li>The change lasts for the session. A new session starts from the registration's <code>--root</code> flags again; <code>tps_version</code> shows the current set at any time.</li>
   </ol>
 
   <h3>Enable writes for a session, safely</h3>
@@ -316,7 +324,7 @@ ID  NAME     CODE
       <tr><td>Bad arguments</td><td><code>MCP error -32602: Input validation error: Invalid arguments for tool tps_select: Expected number, received string at limit</code></td><td>The protocol layer rejected the call (wrong type, missing required field) before the server's handler ran. The model normally corrects itself and calls again.</td></tr>
     </tbody>
   </table>
-  <p>The server's own codes: <code>WRITES_DISABLED</code>, <code>NO_ROOT</code>, <code>FILE_NOT_FOUND</code> (a bare name not in any root, or a relative path that escapes the roots), <code>INVALID_ARGUMENT</code> (empty <code>set</code> or <code>values</code>, blank <code>where</code>, bad column name, <code>null</code>, exponent or unsafe number, <code>offset</code> without <code>limit</code>, <code>]</code> in a path, table format on a write, a NUL byte in the owner string) and <code>INCOMPLETE</code>. Everything else comes from the exe.</p>
+  <p>The server's own codes: <code>WRITES_DISABLED</code>, <code>FILE_NOT_FOUND</code> (a bare name not in any current root, or a relative path that escapes the roots), <code>INVALID_ARGUMENT</code> (empty <code>set</code> or <code>values</code>, blank <code>where</code>, bad column name, <code>null</code>, exponent or unsafe number, <code>offset</code> without <code>limit</code>, <code>]</code> in a path, table format on a write, a NUL byte in the owner string, a relative or missing folder for <code>tps_set_roots</code> or <code>directory</code>, <code>tps_list_files</code> with neither roots nor <code>directory</code>) and <code>INCOMPLETE</code>. Everything else comes from the exe.</p>
 
   <h2 id="troubleshooting">Troubleshooting</h2>
   <table>
@@ -328,8 +336,8 @@ ID  NAME     CODE
       <tr><td><code>claude mcp list</code> shows the server failed; stderr says <code>tpscli-mcp: tpscli.exe not found; tried C:\nope.exe. Pass --exe &lt;path&gt; or set TPSCLI_EXE.</code></td><td>The exe is not where the server looks.</td><td>Build or copy <code>cli\tpscli.exe</code>, put the exe beside <code>dist\server.js</code>, or pass <code>--exe</code>. Reproduce with <code>node tools\call.js tps_version</code>, which prints the line.</td></tr>
       <tr><td><code>tpscli-mcp: --root C:\nope is not a folder</code>, exit 2</td><td>A root in the registration does not exist (or the client quoted it oddly).</td><td>Fix the path; every root must exist when the server starts. Quote paths with spaces.</td></tr>
       <tr><td><code>tpscli-mcp: unknown option --bogus</code>, exit 2</td><td>A misspelt flag in the registration.</td><td>Only the five flags in <a href="#config">Server flags</a> are accepted.</td></tr>
-      <tr><td><code>"code": "NO_ROOT", "message": "The server was started without --root folders, so there is nothing to list; pass absolute paths to the other tools."</code></td><td><code>tps_list_files</code> on a server registered without <code>--root</code>.</td><td>Re-register with <code>--root &lt;folder&gt;</code>, or ask for files by absolute path. Letting <code>tps_list_files</code> take a folder argument instead is open ticket <code>docs\tickets\2026-09-19-tps-list-files-without-root.md</code>.</td></tr>
-      <tr><td><code>"code": "FILE_NOT_FOUND", "message": "NOPE.TPS not found inside C:\pos\data"</code></td><td>A bare name that is in none of the roots, or a relative path.</td><td>Check the spelling against <code>tps_list_files</code>, or give the absolute path. The message names every root that was searched.</td></tr>
+      <tr><td><code>"code": "INVALID_ARGUMENT", "message": "The server has no root folders; pass directory, or call tps_set_roots first."</code></td><td><code>tps_list_files</code> without <code>directory</code> on a server with no roots.</td><td>Ask for the folder by name (<code>directory</code>) or have the assistant set it as a root; re-registering with <code>--root</code> is no longer needed.</td></tr>
+      <tr><td><code>"code": "FILE_NOT_FOUND", "message": "NOPE.TPS not found inside C:\pos\data"</code></td><td>A bare name that is in none of the roots, or a relative path.</td><td>Check the spelling against <code>tps_list_files</code>, or give the absolute path, or set the folder with <code>tps_set_roots</code>. The message names every root that was searched.</td></tr>
       <tr><td><code>"code": "WRITES_DISABLED"</code>, <code>"outcome": "none"</code></td><td>A write on a read-only server. Nothing ran.</td><td>Intended. Re-register with <code>--allow-writes</code> only for the session that needs it (see the procedure above).</td></tr>
       <tr><td><code>"code": "INVALID_ARGUMENT", "message": "format \"table\" is not available for a write: the grid drops the outcome field"</code></td><td>The model asked for a grid on an insert, update or delete.</td><td>Nothing to fix; the model retries without <code>format</code>. Writes always come back as JSON.</td></tr>
       <tr><td><code>"code": "OWNER_REQUIRED"</code> or <code>"code": "OWNER_WRONG"</code>, exit 2</td><td>Encrypted file with no or the wrong owner string.</td><td>Set <code>TPSCLI_OWNER</code> / <code>--owner</code> in the registration. The server will not show you the string it used.</td></tr>
@@ -346,7 +354,7 @@ ID  NAME     CODE
     <li><a href="Tpscli-IT-Support-User-Guide.html">Tpscli-IT-Support-User-Guide.html</a> &mdash; the CLI guide: the dialect, the exe's options, its response contract and exit codes.</li>
     <li><a href="../Testing/TpscliMcp-Unit-Test-Cases.html">docs/Testing/TpscliMcp-Unit-Test-Cases.html</a> &mdash; the interactive unit-test instrument for the server (16 cases). It opens showing the recorded 2026-09-19 run: 16 PASS.</li>
     <li><a href="../Testing/TpscliMcp-Unit-Test-Report-2026-09-19.pdf">TpscliMcp-Unit-Test-Report-2026-09-19.pdf</a> and <a href="../Testing/TpscliMcp-Unit-Test-Results.json">TpscliMcp-Unit-Test-Results.json</a> &mdash; the printed report and the raw command output for that run; <code>mcp\tests\run-instrument.ps1</code> reruns it.</li>
-    <li><a href="../tickets/2026-09-19-tps-list-files-without-root.md">docs/tickets/2026-09-19-tps-list-files-without-root.md</a> &mdash; open: <code>tps_list_files</code> with or without <code>--root</code>.</li>
+    <li><a href="../tickets/2026-09-19-tps-list-files-without-root.md">docs/tickets/2026-09-19-tps-list-files-without-root.md</a> &mdash; closed 2026-09-20 by <code>tps_set_roots</code> and the <code>directory</code> argument.</li>
     <li><a href="../mySuperpower/specs/2026-09-19-tpscli-mcp-design.html">Design spec</a>, <a href="../mySuperpower/plans/2026-09-19-tpscli-mcp.html">implementation plan</a> and <a href="../mySuperpower/implementation-notes/2026-09-19-tpscli-mcp.html">implementation notes</a>.</li>
   </ul>
 

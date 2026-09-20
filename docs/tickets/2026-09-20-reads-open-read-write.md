@@ -3,7 +3,7 @@
 - Opened: 2026-09-20
 - Component: `cli/` (tpscli.exe 0.1.0), surfaces through the MCP server too
 - Priority: normal
-- Status: open
+- Status: closed 2026-09-20 (spec docs/mySuperpower/specs/2026-09-20-tpscli-mcp-roots-and-readonly-design.html; commits in feature/tpscli-mcp)
 
 ## Problem
 

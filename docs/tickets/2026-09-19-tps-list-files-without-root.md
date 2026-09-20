@@ -3,7 +3,7 @@
 - Opened: 2026-09-19
 - Component: `mcp/` (tpscli-mcp 0.1.0)
 - Priority: high
-- Status: open
+- Status: closed 2026-09-20 (spec docs/mySuperpower/specs/2026-09-20-tpscli-mcp-roots-and-readonly-design.html; commits in feature/tpscli-mcp)
 
 ## Problem
 
@@ -27,6 +27,9 @@ tool could not, a plain directory listing had to stand in.
 - `tps_list_files({})` with no roots and no `directory`: `INVALID_ARGUMENT` telling the caller to
   pass `directory` (replaces `NO_ROOT`, which then disappears).
 - `pattern` keeps working in both modes.
+- Changed at implementation (spec section 2): a `directory` outside the roots is listed, not refused; the
+  file tools accept any absolute path and the listing follows the same rule. `tps_set_roots` (same spec)
+  replaces the roots at runtime.
 
 ## Touches
 
