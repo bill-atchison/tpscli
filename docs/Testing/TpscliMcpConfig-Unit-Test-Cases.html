@@ -44,6 +44,17 @@
 .escaped{white-space:pre-wrap;}
 .stepcount{font-family:var(--mono);font-size:.72rem;color:var(--label);margin-left:.5rem;}
 .stepcount.full{color:var(--ok);}
+/* CONFIG suite: bigger reading surfaces. The Results box carries the tool-call JSON. */
+.case .ro{font-size:.98rem;line-height:1.55;}
+.case .ro .escaped{display:block;margin-top:.15rem;}
+.case .ro.expected{background:#fbf7ec;border:1px solid var(--rule);border-radius:8px;padding:.6rem .8rem;margin:.6rem 0;}
+.case .steplist li{font-size:.95rem;line-height:1.5;padding:.15rem 0;}
+.case .steplist li label{white-space:pre-wrap;word-break:break-word;}
+.case .talabel{display:block;font-family:var(--mono);font-size:.72rem;text-transform:uppercase;color:var(--label);margin-top:.7rem;}
+.case textarea{font-size:.9rem;line-height:1.45;resize:vertical;}
+.case textarea.notes-ta{min-height:5.5rem;}
+.case textarea.evid-ta{min-height:16rem;white-space:pre;overflow:auto;}
+#report .ev{display:block;white-space:pre-wrap;font-family:Consolas,monospace;font-size:10px;line-height:1.35;margin-top:4px;}
 .runhdr{background:var(--soft);border:1px solid var(--rule);border-radius:10px;padding:1rem;margin:1rem 0;}
 .hgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.6rem;}
 .hf{display:flex;flex-direction:column;font-family:var(--mono);font-size:.72rem;color:var(--label);}
@@ -197,7 +208,7 @@ details.pre summary{cursor:pointer;font-weight:700;}
 </style></head><body><div class="wrap">
   <!-- >>> CUSTOMIZE: title + one-line subtitle <<< -->
   <h1>tpscli MCP server 0.1.0 — dtpos CONFIG files — Test Cases</h1>
-  <p class="sub">The eight tools against the real dtpos 4.04 CONFIG folder, OPTIONS.TPS first; every write read back with a select · tick steps, record verdicts, print a PDF report.</p>
+  <p class="sub">The eight tools driven from a Claude Code session against the real dtpos 4.04 CONFIG folder, OPTIONS.TPS first; every write read back with a select · tick steps, paste the JSON results, record verdicts, print a PDF report.</p>
   <div id="loadNotice"></div>
   <div id="preamble"></div>
   <div id="runHeader"></div>
@@ -213,13 +224,13 @@ details.pre summary{cursor:pointer;font-weight:700;}
 var SCHEMA_VERSION = "v1";          // bump ONLY on a breaking change to the CASES shape
 var SUITE_ID = "tpscli-mcp-config-0-1-0";  // stable lowercase slug — keys localStorage
 var STORAGE_KEY = "uts:" + SUITE_ID + ":" + SCHEMA_VERSION;
-var SUITE_TITLE = "tpscli MCP server 0.1.0 — dtpos CONFIG files (OPTIONS.TPS)";   // heading on the printed report
+var SUITE_TITLE = "tpscli MCP server 0.1.0 — dtpos CONFIG files (OPTIONS.TPS) from a Claude Code session";   // heading on the printed report
 
 // Sections drive the filter dropdown. One key per logical group of cases.
 var SECTIONS = [
-  {"key": "setup", "label": "Build and work copy"},
-  {"key": "read", "label": "Reads on the real CONFIG folder (read-only server)"},
-  {"key": "gate", "label": "Write gate on the real folder"},
+  {"key": "setup", "label": "Registration and work copy"},
+  {"key": "read", "label": "Reads on the real CONFIG folder"},
+  {"key": "gate", "label": "Dry run against the real folder (nothing written)"},
   {"key": "write", "label": "Writes on the copy, each verified by a select"},
   {"key": "raw", "label": "Raw statements (tps_query) on the copy"}
 ];
@@ -231,14 +242,14 @@ var CASES = [
       "id": "TC-01",
       "section": "setup",
       "priority": "CORE",
-      "title": "Server is built and the exe is the one with the compressed-page fix",
-      "pre": "Node 20 or later on PATH. Repository at branch feature/tpscli-mcp, commit 9aab623 or later (cli: DeRle stops at the page's uncompressed length). PowerShell open in the mcp folder (CP-1). ..\\cli\\tpscli.exe built from that commit.",
+      "title": "The registered server is connected and the session sees its eight tools",
+      "pre": "Node 20 or later. Repository at branch feature/tpscli-mcp, commit 9aab623 or later, mcp built (npm run build in mcp) and ..\\cli\\tpscli.exe built from that commit. The dtpos data repository checked out with Git LFS. The server registered at user scope as in CP-1 (tpscli, --allow-writes, no --root).",
       "steps": [
-          "Run: npm run build ; $LASTEXITCODE",
-          "Run: node tools\\call.js tps_version",
-          "Run: '{\"file\":\"OPTIONS.TPS\"}' | node tools\\call.js tps_describe --root $cfg  (CP-2; $cfg is set in CP-1)"
+          "PowerShell: claude mcp list",
+          "Start a new Claude Code session (or type /mcp in a running one) and ask: \"what tpscli tools do you have?\"",
+          "Ask: \"call tps_version\"  ->  Tool call: tps_version {}"
       ],
-      "expected": "Step 1 prints nothing but 0. Step 2 prints server 0.1.0 and exe.version 0.1.0 with exe.ok true. Step 3 answers ok true (records 407). If step 3 instead answers DEFINITION_UNREADABLE 'bad RLE data in page at 1536; run TPSFix', the exe predates commit 9aab623: rebuild the CLI from cli\\ and record BLOCKED with the message until it is."
+      "expected": "Step 1 shows 'tpscli: node C:\\Projects\\GitHub\\tpscli\\mcp\\dist\\server.js --allow-writes - Connected'. Step 2: the assistant lists tps_version, tps_list_files, tps_describe, tps_select, tps_insert, tps_update, tps_delete and tps_query. Step 3: {\"server\":\"0.1.0\",\"exe\":{\"ok\":true,\"op\":null,\"version\":\"0.1.0\",\"complete\":true}}. A server shown as failed: the reason is on its stderr (tpscli.exe not found); fix and run claude mcp list again."
   },
 
   {
@@ -246,26 +257,25 @@ var CASES = [
       "section": "setup",
       "priority": "CORE",
       "title": "Fresh work copy of the CONFIG folder",
-      "pre": "TC-01 passed. The real folder C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG holds 64 .TPS files.",
+      "pre": "TC-01 passed. The real folder holds 64 .TPS files. Every write in this suite goes to the copy made here; the real folder is only ever read.",
       "steps": [
-          "Run: New-Item -ItemType Directory -Force work\\config | Out-Null ; Copy-Item $cfg\\*.TPS work\\config\\ -Force  (CP-3)",
-          "Run: (Get-ChildItem work\\config\\*.TPS).Count",
-          "Run: node tools\\call.js tps_list_files --root work\\config"
+          "PowerShell (CP-3): New-Item -ItemType Directory -Force 'C:\\Projects\\GitHub\\tpscli\\mcp\\work\\config' | Out-Null ; Copy-Item 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\*.TPS' 'C:\\Projects\\GitHub\\tpscli\\mcp\\work\\config\\' -Force ; (Get-ChildItem 'C:\\Projects\\GitHub\\tpscli\\mcp\\work\\config\\*.TPS').Count",
+          "Ask: \"describe the copy of OPTIONS.TPS under mcp\\work\\config\"  ->  Tool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\"}"
       ],
-      "expected": "Step 2 prints 64. Step 3 lists 64 files whose path starts with the mcp\\work\\config folder, among them OPTIONS.TPS with size 118016. If the count differs, the real folder has changed since this instrument was written: record the count in Notes and continue (later cases name their own expected values)."
+      "expected": "Step 1 prints 64. Step 2: ok true, records 407, file C:\\Projects\\GitHub\\tpscli\\mcp\\work\\config\\OPTIONS.TPS. If step 2 answers DEFINITION_UNREADABLE 'bad RLE data in page at 1536; run TPSFix', the exe predates commit 9aab623: rebuild the CLI and record BLOCKED with the message."
   },
 
   {
       "id": "TC-03",
       "section": "read",
       "priority": "CORE",
-      "title": "List the real CONFIG folder",
-      "pre": "TC-01 passed. Nothing in this section starts the server with --allow-writes.",
+      "title": "Listing needs a root: tps_list_files answers NO_ROOT on this registration",
+      "pre": "TC-01 passed. The server was registered without --root, so it has nothing to list (open ticket docs\\tickets\\2026-09-19-tps-list-files-without-root.md).",
       "steps": [
-          "Run: node tools\\call.js tps_list_files --root $cfg",
-          "Run: '{\"pattern\":\"OPT*\"}' | node tools\\call.js tps_list_files --root $cfg"
+          "Ask: \"list the TPS files\"  ->  Tool call: tps_list_files {}",
+          "PowerShell: (Get-ChildItem 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\*.TPS').Count ; (Get-Item 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS').Length"
       ],
-      "expected": "Step 1 lists 64 files with name, path (starting with $cfg), size and modified; the OPTIONS.TPS entry has size 118016. Step 2 lists exactly two entries, options.SCN and OPTIONS.TPS (the pattern is a file-name glob, not a .TPS filter, and is case-insensitive). No stderr call line appears for either step: tps_list_files never runs the exe."
+      "expected": "Step 1: the tool result is an error: ok false, error.code NO_ROOT, message 'The server was started without --root folders, so there is nothing to list; pass absolute paths to the other tools.'; the assistant explains it cannot list and needs full paths. Step 2 prints 64 and 118016. When the ticket is done, step 1 becomes tps_list_files {\"directory\": \"...\\CONFIG\"} returning 64 entries; until then this outcome is PASS."
   },
 
   {
@@ -275,10 +285,10 @@ var CASES = [
       "title": "Describe OPTIONS.TPS",
       "pre": "TC-01 passed.",
       "steps": [
-          "Run: '{\"file\":\"OPTIONS.TPS\"}' | node tools\\call.js tps_describe --root $cfg",
-          "Read the columns and keys arrays."
+          "Ask: \"describe OPTIONS.TPS in the real CONFIG folder\"  ->  Tool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\"}",
+          "Expand the tool result and read the columns and keys arrays."
       ],
-      "expected": "ok true, op describe, file ending \\CONFIG\\OPTIONS.TPS, encrypted false, records 407. Seven columns, all STRING, in this order and size: CUSTOMER 32, MODULE 32, VARIABLE 32, VALUE 64, ENTRYPICTURE 20, DESCRIPTION 50, COMMENTS 1024. Two keys, neither primary: OPTKEY unique true, nocase true, components CUSTOMER, MODULE, VARIABLE (all asc); DESCRIPTKEY unique false, nocase true, components CUSTOMER, MODULE, DESCRIPTION. Stderr shows one line tpscli-mcp tps_describe <n>ms exit 0."
+      "expected": "ok true, op describe, file ending \\CONFIG\\OPTIONS.TPS, encrypted false, records 407. Seven columns, all STRING, in this order and size: CUSTOMER 32, MODULE 32, VARIABLE 32, VALUE 64, ENTRYPICTURE 20, DESCRIPTION 50, COMMENTS 1024. Two keys, neither primary: OPTKEY unique true, nocase true, components CUSTOMER, MODULE, VARIABLE (all asc); DESCRIPTKEY unique false, nocase true, optional true, components CUSTOMER, MODULE, DESCRIPTION."
   },
 
   {
@@ -288,11 +298,11 @@ var CASES = [
       "title": "Select option rows by module and by full key",
       "pre": "TC-04 passed.",
       "steps": [
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"columns\":[\"CUSTOMER\",\"VARIABLE\",\"VALUE\"],\"where\":\"MODULE = ''Tenders''\"}' | node tools\\call.js tps_select --root $cfg",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VARIABLE\",\"VALUE\"],\"where\":\"CUSTOMER = ''DLT'' AND MODULE = ''BOPIS''\",\"order_by\":\"VARIABLE\"}' | node tools\\call.js tps_select --root $cfg",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VALUE\"],\"where\":\"CUSTOMER = ''DLT'' AND MODULE = ''Tenders'' AND VARIABLE = ''QuickCashMode''\"}' | node tools\\call.js tps_select --root $cfg"
+          "Ask: \"in the real CONFIG folder, show CUSTOMER, VARIABLE and VALUE of the OPTIONS.TPS rows whose MODULE is Tenders\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\", \"VARIABLE\", \"VALUE\"], \"where\": \"MODULE = 'Tenders'\"}",
+          "Ask: \"show VARIABLE and VALUE for CUSTOMER DLT, MODULE BOPIS, ordered by VARIABLE\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"VARIABLE\", \"VALUE\"], \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'BOPIS'\", \"order_by\": \"VARIABLE\"}",
+          "Ask: \"what is the VALUE of DLT / Tenders / QuickCashMode?\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\"], \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\"}"
       ],
-      "expected": "Step 1: row_count 6, truncated false; the rows are JDA/Accept All Manual Credit Cards/N, JDA/EBT Default Expiration/1249, DLT/EnableQuickCash/N, DLT/QuickCashMode/I, DLT/AmountOKThreshold/999.99, DLT/AmountOKCashBack/N. Step 2: row_count 6 in this order: CheckInterval 10, Enabled N, Path C:\\JDA\\BOPIS\\JSON, UnprocessedPath C:\\JDA\\BOPIS\\Unprocessed, ValidTypes 1,2,3, WarningThreshold 20. Step 3: exactly one row, [\"I\"]. Any other value in step 3 means the real folder has been changed since this instrument was written: record the value in Notes and FAIL only if steps 1 and 2 also differ."
+      "expected": "Step 1: row_count 6, truncated false, rows [\"JDA\",\"Accept All Manual Credit Cards\",\"N\"], [\"JDA\",\"EBT Default Expiration\",\"1249\"], [\"DLT\",\"EnableQuickCash\",\"N\"], [\"DLT\",\"QuickCashMode\",\"I\"], [\"DLT\",\"AmountOKThreshold\",\"999.99\"], [\"DLT\",\"AmountOKCashBack\",\"N\"]. Step 2: row_count 6 in this order: CheckInterval 10, Enabled N, Path C:\\JDA\\BOPIS\\JSON, UnprocessedPath C:\\JDA\\BOPIS\\Unprocessed, ValidTypes 1,2,3, WarningThreshold 20. Step 3: rows [[\"I\"]], row_count 1. A different value in step 3 means the real folder changed since 2026-09-20: note it and FAIL only if steps 1 and 2 also differ."
   },
 
   {
@@ -302,12 +312,12 @@ var CASES = [
       "title": "Order, page and cap the 407 option rows, and read them as a table",
       "pre": "TC-04 passed.",
       "steps": [
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"columns\":[\"CUSTOMER\",\"MODULE\",\"VARIABLE\",\"VALUE\"],\"order_by\":\"CUSTOMER, MODULE, VARIABLE\",\"limit\":12}' | node tools\\call.js tps_select --root $cfg",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"columns\":[\"CUSTOMER\",\"MODULE\",\"VARIABLE\",\"VALUE\"],\"order_by\":\"CUSTOMER, MODULE, VARIABLE\",\"limit\":12,\"offset\":12}' | node tools\\call.js tps_select --root $cfg",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"columns\":[\"CUSTOMER\"],\"limit\":0}' | node tools\\call.js tps_select --root $cfg",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"columns\":[\"CUSTOMER\",\"MODULE\",\"VARIABLE\"],\"order_by\":\"CUSTOMER, MODULE, VARIABLE\",\"limit\":3,\"format\":\"table\"}' | node tools\\call.js tps_select --root $cfg"
+          "Ask: \"show the first 12 OPTIONS.TPS rows ordered by CUSTOMER, MODULE, VARIABLE (CUSTOMER, MODULE, VARIABLE, VALUE)\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\", \"MODULE\", \"VARIABLE\", \"VALUE\"], \"order_by\": \"CUSTOMER, MODULE, VARIABLE\", \"limit\": 12}",
+          "Ask: \"now the next 12\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\", \"MODULE\", \"VARIABLE\", \"VALUE\"], \"order_by\": \"CUSTOMER, MODULE, VARIABLE\", \"limit\": 12, \"offset\": 12}",
+          "Ask: \"how many rows does OPTIONS.TPS have? select CUSTOMER with no cap\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\"], \"limit\": 0}",
+          "Ask: \"show the first 3 (CUSTOMER, MODULE, VARIABLE) as a table\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\", \"MODULE\", \"VARIABLE\"], \"order_by\": \"CUSTOMER, MODULE, VARIABLE\", \"limit\": 3, \"format\": \"table\"}"
       ],
-      "expected": "Step 1: row_count 12, truncated true, first row DLT, AssociateSale, DefaultAllowPurchase, Y. Step 2: row_count 12, truncated true, first row DLT, Device, Serial Secondary Scanner Port, COM7 and last row DLT, GiftCard, GiftCardType, 00950 (the 13th to 24th rows of the same order). Step 3: row_count 407, truncated false (limit 0 lifts the 1000-row default). Step 4 prints the text grid with header CUSTOMER MODULE VARIABLE, rows DLT AssociateSale DefaultAllowPurchase / DLT AssociateSale ReportDayofWeek / DLT BOPIS CheckInterval, and the last line (3 rows, truncated by LIMIT)."
+      "expected": "Step 1: row_count 12, truncated true, first row [\"DLT\",\"AssociateSale\",\"DefaultAllowPurchase\",\"Y\"]. Step 2: row_count 12, truncated true, first row [\"DLT\",\"Device\",\"Serial Secondary Scanner Port\",\"COM7\"], last row [\"DLT\",\"GiftCard\",\"GiftCardType\",\"00950\"]. Step 3: row_count 407, truncated false (limit 0 lifts the 1000-row default). Step 4: the result is text, not JSON: header CUSTOMER MODULE VARIABLE, rows DLT AssociateSale DefaultAllowPurchase / DLT AssociateSale ReportDayofWeek / DLT BOPIS CheckInterval, last line (3 rows, truncated by LIMIT)."
   },
 
   {
@@ -317,10 +327,10 @@ var CASES = [
       "title": "Every CONFIG file with compressed pages describes (regression for the DeRle fix)",
       "pre": "TC-01 passed. Before commit 9aab623 these ten files failed with DEFINITION_UNREADABLE 'bad RLE data in page at N; run TPSFix'.",
       "steps": [
-          "Run: foreach ($n in 'CACODE','COMNDMST','CRPCMCFG','EODMNT','ERRORMSG','INCOMMCC','keybrdrv','OPTIONS','PMINTHDR','RPTDEF') { $r = \"{`\"file`\":`\"$n.TPS`\"}\" | node tools\\call.js tps_describe --root $cfg 2>$null | ConvertFrom-Json; \"$n ok=$($r.ok) records=$($r.records) cols=$($r.columns.Count)\" }",
-          "Run: '{\"file\":\"SCRFIELD.TPS\"}' | node tools\\call.js tps_describe --root $cfg"
+          "Ask: \"describe, in the real CONFIG folder, each of CACODE.TPS, COMNDMST.TPS, CRPCMCFG.TPS, EODMNT.TPS, ERRORMSG.TPS, INCOMMCC.TPS, keybrdrv.TPS, OPTIONS.TPS, PMINTHDR.TPS and RPTDEF.TPS and give me records and column count for each\"  ->  ten tool calls: tps_describe {\"file\":\"C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\NAME.TPS\"}",
+          "Ask: \"describe SCRFIELD.TPS in the real CONFIG folder\"  ->  Tool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\SCRFIELD.TPS\"}"
       ],
-      "expected": "Step 1 prints ten lines, every one ok=True, with these records/cols: CACODE 107/7, COMNDMST 97/50, CRPCMCFG 42/4, EODMNT 133/10, ERRORMSG 247/3, INCOMMCC 56/8, keybrdrv 67/7, OPTIONS 407/7, PMINTHDR 137/8, RPTDEF 12/14. Any ok=False line: record FAIL and paste it into Notes. Step 2 is the documented limit, not a defect: ok false, DEFINITION_UNREADABLE, message 'File holds more than one table (1 and 17669); multi-table TPS files are not supported', exit 1."
+      "expected": "Step 1: every result ok true, with records/columns CACODE 107/7, COMNDMST 97/50, CRPCMCFG 42/4, EODMNT 133/10, ERRORMSG 247/3, INCOMMCC 56/8, keybrdrv 67/7, OPTIONS 407/7, PMINTHDR 137/8, RPTDEF 12/14. Any ok false: record FAIL and paste that result into Notes. Step 2 is the documented limit, not a defect: ok false, error.code DEFINITION_UNREADABLE, message 'File holds more than one table (1 and 17669); multi-table TPS files are not supported'."
   },
 
   {
@@ -328,13 +338,13 @@ var CASES = [
       "section": "read",
       "priority": "MED",
       "title": "Encrypted CONFIG files need the owner string from the environment",
-      "pre": "TC-01 passed. ACCESS.TPS, DOOR.TPS and INCOMSEC.TPS are the three CONFIG files that are not plain TopSpeed files. The owner string, if the site has one, is set through CP-4 and never typed into a call.",
+      "pre": "TC-01 passed. ACCESS.TPS, DOOR.TPS and INCOMSEC.TPS are the three CONFIG files that are not plain TopSpeed files. The owner string, if the site has one, reaches the server through CP-4 and is never typed into the conversation.",
       "steps": [
-          "Run: '{\"file\":\"ACCESS.TPS\"}' | node tools\\call.js tps_describe --root $cfg",
-          "Set the owner string for this window (CP-4), then run step 1 again.",
-          "Run: Remove-Item Env:TPSCLI_OWNER"
+          "Ask: \"describe ACCESS.TPS in the real CONFIG folder\"  ->  Tool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\ACCESS.TPS\"}",
+          "Give the server the owner string (CP-4), start a new session, and repeat step 1.",
+          "Undo CP-4 (remove the variable or the --owner flag) so later sessions run without it."
       ],
-      "expected": "Step 1: ok false, error.code OWNER_REQUIRED, message 'Not a plain TopSpeed file; if it is encrypted pass --owner', exit 1. Step 2: ok true with encrypted true and the file's columns; the owner string appears nowhere in the output or on stderr (the ready line says owner set). If no owner string is available for these files, record BLOCKED with 'owner string not available' and leave steps 2 and 3 unticked; that is the expected outcome on a machine without the site secret."
+      "expected": "Step 1: ok false, error.code OWNER_REQUIRED, message 'Not a plain TopSpeed file; if it is encrypted pass --owner'. Step 2: ok true, encrypted true, the file's columns and keys; the owner string appears nowhere in the tool result. If no owner string is available for these files, record BLOCKED with 'owner string not available' and leave steps 2 and 3 unticked: that is the expected outcome on a machine without the site secret."
   },
 
   {
@@ -342,27 +352,28 @@ var CASES = [
       "section": "read",
       "priority": "HIGH",
       "title": "Reading the real OPTIONS.TPS leaves its content unchanged",
-      "pre": "TC-04 passed. The TopSpeed driver opens files read/write, so a read updates the file's modified time; this case proves the bytes do not change.",
+      "pre": "TC-04 passed. The TopSpeed driver opens files read/write, so a read moves the file's modified time; this case proves the bytes do not change.",
       "steps": [
-          "Run: $h1 = (Get-FileHash $cfg\\OPTIONS.TPS).Hash",
-          "Run: '{\"file\":\"OPTIONS.TPS\"}' | node tools\\call.js tps_describe --root $cfg | Out-Null ; '{\"file\":\"OPTIONS.TPS\",\"limit\":0}' | node tools\\call.js tps_select --root $cfg | Out-Null",
-          "Run: $h2 = (Get-FileHash $cfg\\OPTIONS.TPS).Hash ; $h1 -eq $h2"
+          "PowerShell: $h1 = (Get-FileHash 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS').Hash ; $h1",
+          "Ask: \"describe, in the real CONFIG folder, OPTIONS.TPS and then select every CUSTOMER with no cap\"  ->  Tool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\"}  and  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\"], \"limit\": 0}",
+          "PowerShell: $h2 = (Get-FileHash 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS').Hash ; $h1 -eq $h2"
       ],
-      "expected": "Step 3 prints True: the SHA-256 of the real file is identical before and after a describe and a full select. (Get-Item $cfg\\OPTIONS.TPS).LastWriteTime will have moved to now; that is the driver's open, not a content change (see docs\\tickets\\2026-09-20-reads-open-read-write.md). False: record FAIL and keep both hashes in Notes."
+      "expected": "Step 3 prints True: the SHA-256 of the real file is identical before and after the describe and the full select (paste both hashes into Results). (Get-Item ...\\OPTIONS.TPS).LastWriteTime will have moved to now; that is the driver's open, not a content change (docs\\tickets\\2026-09-20-reads-open-read-write.md). False: record FAIL with both hashes."
   },
 
   {
       "id": "TC-10",
       "section": "gate",
       "priority": "CORE",
-      "title": "Read-only server refuses a write on the real OPTIONS.TPS and the row is untouched",
-      "pre": "TC-05 passed. The server started for this case has no --allow-writes.",
+      "title": "Dry run an UPDATE against the real OPTIONS.TPS: validated, nothing written",
+      "pre": "TC-05 and TC-09 passed. This registration has --allow-writes, so nothing stops a real write on the real folder except the request itself: this case only asks for parse_only and proves by hash that the file did not change.",
       "steps": [
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"set\":{\"VALUE\":\"C\"},\"where\":\"CUSTOMER = ''DLT'' AND MODULE = ''Tenders'' AND VARIABLE = ''QuickCashMode''\"}' | node tools\\call.js tps_update --root $cfg",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"where\":\"CUSTOMER = ''UTS''\"}' | node tools\\call.js tps_delete --root $cfg",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VALUE\"],\"where\":\"CUSTOMER = ''DLT'' AND MODULE = ''Tenders'' AND VARIABLE = ''QuickCashMode''\"}' | node tools\\call.js tps_select --root $cfg"
+          "PowerShell: $h1 = (Get-FileHash 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS').Hash ; $h1",
+          "Ask: \"dry-run (parse only, do not execute) this statement: UPDATE [C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS] SET VALUE = 'C' WHERE CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\"  ->  Tool call: tps_query {\"sql\": \"UPDATE [C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS] SET VALUE = 'C' WHERE CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\", \"parse_only\": true}",
+          "Ask: \"what is the VALUE of DLT / Tenders / QuickCashMode in the real OPTIONS.TPS now?\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\"], \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\"}",
+          "PowerShell: $h2 = (Get-FileHash 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS').Hash ; $h1 -eq $h2"
       ],
-      "expected": "Steps 1 and 2: ok false, error.code WRITES_DISABLED, message 'This server was started without --allow-writes, so INSERT, UPDATE and DELETE are refused. Restart it with --allow-writes to enable them.', outcome none, exit 1, and no tpscli-mcp tps_update / tps_delete call line on stderr (the exe never ran). Step 3: one row, [\"I\"], exactly as in TC-05 step 3. Any WRITES_DISABLED answer that is followed by a changed value is a FAIL of the highest order: record it and stop."
+      "expected": "Step 2: ok true, op update, parse_only true, no matched or affected (the statement was checked against the file's columns and nothing ran). Step 3: rows [[\"I\"]], as in TC-05. Step 4 prints True. If the assistant ran the UPDATE without parse_only (matched 1 in the result), record FAIL, restore the value with the same UPDATE and 'I', and stop: the real folder has been written to."
   },
 
   {
@@ -370,13 +381,13 @@ var CASES = [
       "section": "write",
       "priority": "CORE",
       "title": "Insert an option row into the copy and read it back",
-      "pre": "TC-02 passed (fresh copy). Every case in this section uses --root work\\config --allow-writes and never names the real folder.",
+      "pre": "TC-02 passed (fresh copy). Every case in this section names the copy C:\\Projects\\GitHub\\tpscli\\mcp\\work\\config\\OPTIONS.TPS; the real folder is never named in a write.",
       "steps": [
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"values\":{\"CUSTOMER\":\"UTS\",\"MODULE\":\"Test\",\"VARIABLE\":\"InsertedByMcp\",\"VALUE\":\"yes\",\"ENTRYPICTURE\":\"@s64\",\"DESCRIPTION\":\"Inserted by the unit-test instrument\",\"COMMENTS\":\"TC-11\"}}' | node tools\\call.js tps_insert --root work\\config --allow-writes",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"where\":\"CUSTOMER = ''UTS''\"}' | node tools\\call.js tps_select --root work\\config",
-          "Run: '{\"file\":\"OPTIONS.TPS\"}' | node tools\\call.js tps_describe --root work\\config"
+          "Ask: \"in the copy under mcp\\work\\config insert into OPTIONS.TPS: CUSTOMER UTS, MODULE Test, VARIABLE InsertedByMcp, VALUE yes, ENTRYPICTURE @s64, DESCRIPTION 'Inserted by the unit-test instrument', COMMENTS TC-11\"  ->  Tool call: tps_insert {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"values\": {\"CUSTOMER\": \"UTS\", \"MODULE\": \"Test\", \"VARIABLE\": \"InsertedByMcp\", \"VALUE\": \"yes\", \"ENTRYPICTURE\": \"@s64\", \"DESCRIPTION\": \"Inserted by the unit-test instrument\", \"COMMENTS\": \"TC-11\"}}",
+          "Ask: \"show the OPTIONS.TPS rows where CUSTOMER is UTS\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"where\": \"CUSTOMER = 'UTS'\"}",
+          "Ask: \"describe OPTIONS.TPS in the copy\"  ->  Tool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\"}"
       ],
-      "expected": "Step 1: ok true, op insert, affected 1, exit 0. Step 2: row_count 1 and the single row is exactly [\"UTS\",\"Test\",\"InsertedByMcp\",\"yes\",\"@s64\",\"Inserted by the unit-test instrument\",\"TC-11\"] (seven values in column order, no padding). Step 3: records 408."
+      "expected": "Step 1: ok true, op insert, affected 1. Step 2: row_count 1 and the row is exactly [\"UTS\",\"Test\",\"InsertedByMcp\",\"yes\",\"@s64\",\"Inserted by the unit-test instrument\",\"TC-11\"] (seven values in column order, no padding). Step 3: records 408."
   },
 
   {
@@ -386,11 +397,11 @@ var CASES = [
       "title": "Duplicate key is refused, in any letter case, and the select still shows one row",
       "pre": "TC-11 passed (the UTS row exists in the copy).",
       "steps": [
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"values\":{\"CUSTOMER\":\"UTS\",\"MODULE\":\"Test\",\"VARIABLE\":\"InsertedByMcp\",\"VALUE\":\"again\"}}' | node tools\\call.js tps_insert --root work\\config --allow-writes",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"values\":{\"CUSTOMER\":\"uts\",\"MODULE\":\"test\",\"VARIABLE\":\"insertedbymcp\",\"VALUE\":\"again\"}}' | node tools\\call.js tps_insert --root work\\config --allow-writes",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VALUE\"],\"where\":\"CUSTOMER = ''UTS''\"}' | node tools\\call.js tps_select --root work\\config"
+          "Ask: \"in the copy under mcp\\work\\config insert the same row again: UTS / Test / InsertedByMcp with VALUE again\"  ->  Tool call: tps_insert {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"values\": {\"CUSTOMER\": \"UTS\", \"MODULE\": \"Test\", \"VARIABLE\": \"InsertedByMcp\", \"VALUE\": \"again\"}}",
+          "Ask: \"insert it in lower case: uts / test / insertedbymcp with VALUE again\"  ->  Tool call: tps_insert {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"values\": {\"CUSTOMER\": \"uts\", \"MODULE\": \"test\", \"VARIABLE\": \"insertedbymcp\", \"VALUE\": \"again\"}}",
+          "Ask: \"show VALUE of the rows where CUSTOMER is UTS\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\"], \"where\": \"CUSTOMER = 'UTS'\"}"
       ],
-      "expected": "Steps 1 and 2: ok false, error.code DUPLICATE_KEY, message 'Duplicate value for key OPTKEY', error.key OPTKEY, outcome none, exit 1 (OPTKEY is nocase, so the lower-case row collides too). Step 3: row_count 1 and the value is still [\"yes\"]; a second row or a changed value is a FAIL."
+      "expected": "Steps 1 and 2: ok false, error.code DUPLICATE_KEY, message 'Duplicate value for key OPTKEY', error.key OPTKEY, outcome none (OPTKEY is nocase, so the lower-case row collides too). Step 3: row_count 1, rows [[\"yes\"]]; a second row or a changed value is a FAIL."
   },
 
   {
@@ -400,8 +411,8 @@ var CASES = [
       "title": "Update the inserted row and read it back",
       "pre": "TC-12 passed.",
       "steps": [
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"set\":{\"VALUE\":\"no\",\"COMMENTS\":\"TC-13 updated\"},\"where\":\"CUSTOMER = ''UTS'' AND VARIABLE = ''InsertedByMcp''\"}' | node tools\\call.js tps_update --root work\\config --allow-writes",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VALUE\",\"COMMENTS\",\"DESCRIPTION\"],\"where\":\"CUSTOMER = ''UTS''\"}' | node tools\\call.js tps_select --root work\\config"
+          "Ask: \"in the copy set VALUE to no and COMMENTS to 'TC-13 updated' where CUSTOMER is UTS and VARIABLE is InsertedByMcp\"  ->  Tool call: tps_update {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"set\": {\"VALUE\": \"no\", \"COMMENTS\": \"TC-13 updated\"}, \"where\": \"CUSTOMER = 'UTS' AND VARIABLE = 'InsertedByMcp'\"}",
+          "Ask: \"show VALUE, COMMENTS and DESCRIPTION of the rows where CUSTOMER is UTS\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\", \"COMMENTS\", \"DESCRIPTION\"], \"where\": \"CUSTOMER = 'UTS'\"}"
       ],
       "expected": "Step 1: ok true, op update, matched 1, affected 1. Step 2: one row [\"no\",\"TC-13 updated\",\"Inserted by the unit-test instrument\"]: the two set columns changed, DESCRIPTION did not."
   },
@@ -413,13 +424,13 @@ var CASES = [
       "title": "Change a real option value on the copy, verify it, restore it, verify again",
       "pre": "TC-02 passed. QuickCashMode is DLT / Tenders / QuickCashMode with VALUE I.",
       "steps": [
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"set\":{\"VALUE\":\"C\"},\"where\":\"CUSTOMER = ''DLT'' AND MODULE = ''Tenders'' AND VARIABLE = ''QuickCashMode''\"}' | node tools\\call.js tps_update --root work\\config --allow-writes",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VALUE\"],\"where\":\"CUSTOMER = ''DLT'' AND MODULE = ''Tenders'' AND VARIABLE = ''QuickCashMode''\"}' | node tools\\call.js tps_select --root work\\config",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"columns\":[\"CUSTOMER\",\"VARIABLE\",\"VALUE\"],\"where\":\"MODULE = ''Tenders''\"}' | node tools\\call.js tps_select --root work\\config",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"set\":{\"VALUE\":\"I\"},\"where\":\"CUSTOMER = ''DLT'' AND MODULE = ''Tenders'' AND VARIABLE = ''QuickCashMode''\"}' | node tools\\call.js tps_update --root work\\config --allow-writes",
-          "Run step 2 again."
+          "Ask: \"in the copy set VALUE to C for DLT / Tenders / QuickCashMode\"  ->  Tool call: tps_update {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"set\": {\"VALUE\": \"C\"}, \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\"}",
+          "Ask: \"what is its VALUE now?\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\"], \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\"}",
+          "Ask: \"show CUSTOMER, VARIABLE, VALUE of all Tenders rows\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\", \"VARIABLE\", \"VALUE\"], \"where\": \"MODULE = 'Tenders'\"}",
+          "Ask: \"set it back to I\"  ->  Tool call: tps_update {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"set\": {\"VALUE\": \"I\"}, \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\"}",
+          "Ask: \"and its VALUE now?\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\"], \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\"}"
       ],
-      "expected": "Step 1: matched 1, affected 1. Step 2: one row [\"C\"]. Step 3: still row_count 6 and the QuickCashMode row now reads DLT, QuickCashMode, C while the other five rows are unchanged from TC-05. Step 4: matched 1, affected 1. Step 5: one row [\"I\"]."
+      "expected": "Step 1: matched 1, affected 1. Step 2: rows [[\"C\"]]. Step 3: still row_count 6, the QuickCashMode row reads [\"DLT\",\"QuickCashMode\",\"C\"] and the other five rows are unchanged from TC-05. Step 4: matched 1, affected 1. Step 5: rows [[\"I\"]]."
   },
 
   {
@@ -429,10 +440,10 @@ var CASES = [
       "title": "An over-length value is stored truncated with a warning, and the select shows the stored text",
       "pre": "TC-13 passed (the UTS row exists). VALUE is STRING(64).",
       "steps": [
-          "Run: $long = '0123456789' * 7 ; \"{`\"file`\":`\"OPTIONS.TPS`\",`\"set`\":{`\"VALUE`\":`\"$long`\"},`\"where`\":`\"CUSTOMER = 'UTS'`\"}\" | node tools\\call.js tps_update --root work\\config --allow-writes",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VALUE\"],\"where\":\"CUSTOMER = ''UTS''\"}' | node tools\\call.js tps_select --root work\\config"
+          "Ask: \"in the copy set VALUE to the 70-character string 0123456789 repeated seven times where CUSTOMER is UTS\"  ->  Tool call: tps_update {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"set\": {\"VALUE\": \"0123456789012345678901234567890123456789012345678901234567890123456789\"}, \"where\": \"CUSTOMER = 'UTS'\"}",
+          "Ask: \"show VALUE where CUSTOMER is UTS\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\"], \"where\": \"CUSTOMER = 'UTS'\"}"
       ],
-      "expected": "Step 1: ok true, matched 1, affected 1, plus a warnings array with one entry: code STRING_TRUNCATED, column VALUE, message 'Value truncated to 64 characters'; exit 0 (a warning is not an error). Step 2: the single value is the first 64 characters, 0123456789012345678901234567890123456789012345678901234567890123 (ends in ...0123, 64 characters long)."
+      "expected": "Step 1: ok true, matched 1, affected 1, plus warnings [{code STRING_TRUNCATED, column VALUE, message 'Value truncated to 64 characters'}]; a warning is not an error. Step 2: the single value is the first 64 characters, 0123456789012345678901234567890123456789012345678901234567890123 (ends in ...0123)."
   },
 
   {
@@ -442,9 +453,9 @@ var CASES = [
       "title": "Delete the inserted row, verified by select and record count",
       "pre": "TC-11 passed (the UTS row exists).",
       "steps": [
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"where\":\"CUSTOMER = ''UTS''\"}' | node tools\\call.js tps_delete --root work\\config --allow-writes",
-          "Run: '{\"file\":\"OPTIONS.TPS\",\"where\":\"CUSTOMER = ''UTS''\"}' | node tools\\call.js tps_select --root work\\config",
-          "Run: '{\"file\":\"OPTIONS.TPS\"}' | node tools\\call.js tps_describe --root work\\config"
+          "Ask: \"in the copy delete the OPTIONS.TPS rows where CUSTOMER is UTS\"  ->  Tool call: tps_delete {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"where\": \"CUSTOMER = 'UTS'\"}",
+          "Ask: \"show the rows where CUSTOMER is UTS\"  ->  Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"where\": \"CUSTOMER = 'UTS'\"}",
+          "Ask: \"describe OPTIONS.TPS in the copy\"  ->  Tool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\"}"
       ],
       "expected": "Step 1: ok true, op delete, matched 1, affected 1. Step 2: row_count 0, rows []. Step 3: records 407, the count the copy started with."
   },
@@ -454,16 +465,16 @@ var CASES = [
       "section": "raw",
       "priority": "HIGH",
       "title": "Raw statement on the copy: dry run, then update, verify and restore",
-      "pre": "TC-02 passed. tps_query uses the path in the statement as written, so the copy is named by its full path.",
+      "pre": "TC-02 passed. tps_query uses the path in the statement as written (no root lookup), so the copy is named by its full path.",
       "steps": [
-          "Run: '{\"sql\":\"UPDATE [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] SET VALUE = ''15'' WHERE CUSTOMER = ''DLT'' AND MODULE = ''BOPIS'' AND VARIABLE = ''CheckInterval''\",\"parse_only\":true}' | node tools\\call.js tps_query",
-          "Run: '{\"sql\":\"SELECT VALUE FROM [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] WHERE CUSTOMER = ''DLT'' AND MODULE = ''BOPIS'' AND VARIABLE = ''CheckInterval''\"}' | node tools\\call.js tps_query",
-          "Run: '{\"sql\":\"UPDATE [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] SET VALUE = ''15'' WHERE CUSTOMER = ''DLT'' AND MODULE = ''BOPIS'' AND VARIABLE = ''CheckInterval''\"}' | node tools\\call.js tps_query --allow-writes",
-          "Run step 2 again.",
-          "Run: '{\"sql\":\"UPDATE [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] SET VALUE = ''10'' WHERE CUSTOMER = ''DLT'' AND MODULE = ''BOPIS'' AND VARIABLE = ''CheckInterval''\"}' | node tools\\call.js tps_query --allow-writes",
-          "Run step 2 again."
+          "Ask: \"dry-run this statement: UPDATE [C:\\Projects\\GitHub\\tpscli\\mcp\\work\\config\\OPTIONS.TPS] SET VALUE = '15' WHERE CUSTOMER = 'DLT' AND MODULE = 'BOPIS' AND VARIABLE = 'CheckInterval'\"  ->  Tool call: tps_query {\"sql\": \"UPDATE [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] SET VALUE = '15' WHERE CUSTOMER = 'DLT' AND MODULE = 'BOPIS' AND VARIABLE = 'CheckInterval'\", \"parse_only\": true}",
+          "Ask: \"run: SELECT VALUE FROM [C:\\Projects\\GitHub\\tpscli\\mcp\\work\\config\\OPTIONS.TPS] WHERE CUSTOMER = 'DLT' AND MODULE = 'BOPIS' AND VARIABLE = 'CheckInterval'\"  ->  Tool call: tps_query {\"sql\": \"SELECT VALUE FROM [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] WHERE CUSTOMER = 'DLT' AND MODULE = 'BOPIS' AND VARIABLE = 'CheckInterval'\"}",
+          "Ask: \"now run the UPDATE for real\"  ->  Tool call: tps_query {\"sql\": \"UPDATE [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] SET VALUE = '15' WHERE CUSTOMER = 'DLT' AND MODULE = 'BOPIS' AND VARIABLE = 'CheckInterval'\"}",
+          "Repeat step 2.",
+          "Ask: \"set it back to 10 with the same UPDATE\"  ->  Tool call: tps_query {\"sql\": \"UPDATE [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] SET VALUE = '10' WHERE CUSTOMER = 'DLT' AND MODULE = 'BOPIS' AND VARIABLE = 'CheckInterval'\"}",
+          "Repeat step 2."
       ],
-      "expected": "Step 1 (server without --allow-writes): ok true, op update, parse_only true, no matched or affected. Step 2: one row [\"10\"] (the dry run changed nothing). Step 3: matched 1, affected 1. Step 4: one row [\"15\"]. Step 5: matched 1, affected 1. Step 6: one row [\"10\"]."
+      "expected": "Step 1: ok true, op update, parse_only true, no matched or affected. Step 2: rows [[\"10\"]] (the dry run changed nothing). Step 3: matched 1, affected 1. Step 4: rows [[\"15\"]]. Step 5: matched 1, affected 1. Step 6: rows [[\"10\"]]."
   },
 
   {
@@ -473,9 +484,9 @@ var CASES = [
       "title": "Larger and wider CONFIG files read completely",
       "pre": "TC-01 passed.",
       "steps": [
-          "Run: foreach ($n in 'PMINTDTL','PDCONFIG','CPSTATE','REFSMTBL') { $d = \"{`\"file`\":`\"$n.TPS`\"}\" | node tools\\call.js tps_describe --root $cfg 2>$null | ConvertFrom-Json; $s = \"{`\"file`\":`\"$n.TPS`\",`\"limit`\":0}\" | node tools\\call.js tps_select --root $cfg 2>$null | ConvertFrom-Json; \"$n records=$($d.records) cols=$($d.columns.Count) rows=$($s.row_count) truncated=$($s.truncated)\" }"
+          "Ask: \"in the real CONFIG folder, for PMINTDTL.TPS, PDCONFIG.TPS, CPSTATE.TPS and REFSMTBL.TPS give me records and column count from describe, and row_count and truncated from a select with no cap\"  ->  per file: tps_describe {\"file\":\"C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\NAME.TPS\"} and tps_select {\"file\":\"...\\CONFIG\\NAME.TPS\",\"limit\":0}"
       ],
-      "expected": "Four lines: PMINTDTL records=926 cols=4 rows=926 truncated=False; PDCONFIG records=1 cols=43 rows=1 truncated=False; CPSTATE records=68 cols=3 rows=68 truncated=False; REFSMTBL records=268 cols=3 rows=268 truncated=False. rows must equal records on every line."
+      "expected": "PMINTDTL records 926, 4 columns, row_count 926, truncated false; PDCONFIG 1 / 43 / 1 / false; CPSTATE 68 / 3 / 68 / false; REFSMTBL 268 / 3 / 268 / false. row_count must equal records for every file."
   }
 ];
 
@@ -510,21 +521,22 @@ function freshState(){
 function renderPreamble(){
   document.getElementById("preamble").innerHTML =
     '<details class="pre" open><summary>Scope, prerequisites &amp; environment (read first)</summary>'+
-    '<p><b>Scope.</b> The tpscli MCP server 0.1.0 (<code>mcp\\dist\\server.js</code>, eight tools over stdio) against the real dtpos 4.04 configuration files in <code>C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG</code> (64 <code>.TPS</code> files), concentrating on <code>OPTIONS.TPS</code>: 407 rows of CUSTOMER / MODULE / VARIABLE / VALUE. Reads and the write gate run against the real folder through a server started <em>without</em> <code>--allow-writes</code>; every insert, update and delete runs against a copy under <code>mcp\\work\\config</code> and is followed by a select that reads the row back. The suite also regresses the compressed-page fix (commit 9aab623) without which ten of these files could not be opened.</p>'+
-    '<p><b>Prerequisites.</b> Windows with Node 20 or later; the repository (branch feature/tpscli-mcp, commit 9aab623 or later) checked out; the CLI built from that commit (<code>..\\cli\\tpscli.exe</code>); the MCP server built (<code>npm run build</code> in <code>mcp</code>); the dtpos data repository checked out with Git LFS so the <code>.TPS</code> files are real files, not pointers; a PowerShell 5 or 7 window opened in the <code>mcp</code> folder. Exit codes of <code>tools\\call.js</code>: 0 the tool answered without error, 1 the tool answered with an error (the exe\'s or the server\'s), 2 the call never got an answer (no tool name, arguments that are not JSON, or a server that could not start).</p>'+
+    '<p><b>Scope.</b> The tpscli MCP server 0.1.0 used the way a Claude Code session uses it: the tester types requests in plain words, the assistant calls the server\'s tools (tps_version, tps_list_files, tps_describe, tps_select, tps_insert, tps_update, tps_delete, tps_query) and the tool-call blocks in the transcript show the arguments and the JSON result. The data is the real dtpos 4.04 configuration folder <code>C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG</code> (64 <code>.TPS</code> files), concentrating on <code>OPTIONS.TPS</code>: 407 rows of CUSTOMER / MODULE / VARIABLE / VALUE. One server is registered, <code>tpscli</code>, started with <code>--allow-writes</code> and no <code>--root</code>, so every request names a full path: reads name the real folder, and every insert, update and delete names the copy under <code>mcp\\work\\config</code> and is followed by a select that reads the row back. The real folder is proven untouched by SHA-256 (TC-09, TC-10). The suite also regresses the compressed-page fix (commit 9aab623) without which ten of these files could not be opened.</p>'+
+    '<p><b>Prerequisites.</b> Windows with Node 20 or later and Claude Code; the repository (branch feature/tpscli-mcp, commit 9aab623 or later) checked out, the CLI built from that commit (<code>cli\\tpscli.exe</code>) and the MCP server built (<code>npm run build</code> in <code>mcp</code>); the dtpos data repository checked out with Git LFS so the <code>.TPS</code> files are real files, not pointers; a PowerShell window for the few non-MCP steps (CP-1, CP-3, the hashes in TC-09).</p>'+
+    '<p><b>Recording a case.</b> Each step is one request to the assistant, written as Ask: "..." followed by the tool call it should produce (tool {arguments}). Tick the step when the assistant made that call with those arguments; the Expected text names the values the JSON result must show. Paste the JSON result of every call in the case into the <b>Results</b> box, so the document carries the evidence itself. Write anything that differed, and why, in <b>Notes</b>. The assistant may word the answer as it likes; the JSON is what is judged.</p>'+
     '<p><b>Known watch-points.</b> The TopSpeed driver opens a file read/write even for a read, so a describe or select moves the file\'s LastWriteTime; TC-09 proves the bytes do not change. <code>tps_list_files</code> lists every file matching the pattern, so <code>options.SCN</code> shows up beside <code>OPTIONS.TPS</code>. Three CONFIG files (ACCESS, DOOR, INCOMSEC) are not plain TopSpeed files and need an owner string; <code>SCRFIELD.TPS</code> holds more than one table and is not supported. The expected values in the read cases were taken from the folder as committed to the dtpos data repository on 2026-09-20; if the folder has since been changed by running the POS, note the difference rather than failing the case.</p>'+
     '<h4>Common procedures</h4>'+
-    '<p><b>CP-1 MCP folder and the config path.</b> Open PowerShell and run <code>Set-Location C:\\Projects\\GitHub\\tpscli\\mcp</code>, then <code>$cfg = \'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\'</code>. Every command in this suite is typed at that prompt and uses <code>$cfg</code> for the real folder. Read the exit code of the last native command with <code>$LASTEXITCODE</code>.</p>'+
-    '<p><b>CP-2 Call one tool.</b> The arguments are a JSON object piped in, the tool name and the server flags follow: <code>\'{"file":"OPTIONS.TPS"}\' | node tools\\call.js tps_describe --root $cfg</code>. Keep the JSON in single quotes so PowerShell passes it through unchanged; a single quote inside the JSON (the SQL string literals) is written doubled (<code>\'\'</code>). A read-only server is one started without <code>--allow-writes</code>; the write cases add <code>--allow-writes</code> and point <code>--root</code> at <code>work\\config</code>. A tool with no arguments (tps_version, tps_list_files) is called without the pipe. The result prints as indented JSON, or as the exe\'s text grid for <code>"format":"table"</code>; the server\'s two stderr lines (ready line, one <code>tpscli-mcp &lt;tool&gt; &lt;n&gt;ms exit &lt;code&gt;</code> line per exe run) print above it.</p>'+
-    '<p><b>CP-3 Fresh copy of CONFIG.</b> Writes never touch the real folder. Run <code>New-Item -ItemType Directory -Force work\\config | Out-Null</code> once, then <code>Copy-Item $cfg\\*.TPS work\\config\\ -Force</code>. TC-02 does this; the write cases build on each other in order (TC-11 inserts the row that TC-12, TC-13, TC-15 and TC-16 use). To start the write section over, repeat CP-3.</p>'+
-    '<p><b>CP-4 Owner from the environment.</b> Set the site\'s owner string for the current PowerShell window with <code>$env:TPSCLI_OWNER = \'&lt;the string&gt;\'</code>; every server started from that window then passes it to the exe. Clear it with <code>Remove-Item Env:TPSCLI_OWNER</code>. The string is never typed into a call\'s JSON and never appears in any output.</p>'+
+    '<p><b>CP-1 The registration.</b> In PowerShell: <code>claude mcp add -s user tpscli -- node "C:\\Projects\\GitHub\\tpscli\\mcp\\dist\\server.js" --allow-writes</code>; check with <code>claude mcp list</code>. Servers attach when a session starts: open a new <code>claude</code> session (or type <code>/mcp</code>) after a change. Without <code>--root</code> every file is named by its full path, and <code>tps_list_files</code> has nothing to list (TC-03). Writes are enabled for every path this account can reach, so a write request must name the copy, never the real folder.</p>'+
+    '<p><b>CP-2 One tool call.</b> Ask in plain words, or name the tool and arguments directly ("call tps_describe in the real CONFIG folder, with file OPTIONS.TPS"); either way, expand the tool-call block in the transcript to see the arguments the assistant used and the JSON result. Say "the real CONFIG folder" or "the copy under mcp\\work\\config" in the request so the assistant fills in the right path; the step shows the exact file argument expected. That JSON is the evidence for the case. A tool result with <code>ok: false</code> also carries <code>error.code</code> and <code>error.message</code>; for a write it carries <code>outcome</code>.</p>'+
+    '<p><b>CP-3 Fresh copy of CONFIG.</b> Writes never touch the real folder. In PowerShell: <code>New-Item -ItemType Directory -Force \'C:\\Projects\\GitHub\\tpscli\\mcp\\work\\config\' | Out-Null</code>, then <code>Copy-Item \'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\*.TPS\' \'C:\\Projects\\GitHub\\tpscli\\mcp\\work\\config\\\' -Force</code>. TC-02 does this; the write cases build on each other in order (TC-11 inserts the row that TC-12, TC-13, TC-15 and TC-16 use). To start the write section over, repeat CP-3.</p>'+
+    '<p><b>CP-4 Owner string for encrypted files.</b> Either set <code>$env:TPSCLI_OWNER = \'&lt;the string&gt;\'</code> in the PowerShell window before starting <code>claude</code> (the server inherits it), or re-register tpscli with <code>--owner &lt;the string&gt;</code> appended (remove first with <code>claude mcp remove -s user tpscli</code>). The string is never typed into the conversation and never appears in a tool result.</p>'+
     '</details>';
 }
 // Recorded run, embedded so the document shows its results wherever it is opened. Produced by
-// mcp\tests\run-config-instrument.ps1 + mcp\tests\record-config-instrument.cjs: the exact state the engine saved
+// a Claude Code session run recorded with mcp\tests\record-config-instrument.cjs: the exact state the engine saved
 // under STORAGE_KEY. Used only when this browser has no saved run; "New run" clears it for this
 // browser (a saved run that was never touched also shows it). Set to null to ship a blank instrument.
-var SEED_STATE = {"header":{"tester":"automated (tests\\run-config-instrument.ps1)","lead":"","date":"2026-09-20","build":"9aab623","env":"WINVMB40B / Microsoft Windows NT 10.0.26200.0 / PowerShell 5.1.26100.9457 / node v20.18.1","component":"mcp\\dist\\server.js + tools\\call.js","ref":"feature/tpscli-mcp"},"signoff":{"tester":{"name":"","date":"","result":""},"lead":{"name":"","date":"","result":""},"owner":{"name":"","date":"","result":""}},"cases":{"TC-01":{"steps":[true,true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"npm run build (exit 0)\nnode tools\\call.js tps_version (exit 0)\n'{\"file\":\"OPTIONS.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-02":{"steps":[true,true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"(CP-3) Copy-Item $cfg\\*.TPS work\\config\\ -Force\n(Get-ChildItem work\\config\\*.TPS).Count\nnode tools\\call.js tps_list_files --root work\\config (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-03":{"steps":[true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"node tools\\call.js tps_list_files --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG (exit 0)\n'{\"pattern\":\"OPT*\"}' | node tools\\call.js tps_list_files --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-04":{"steps":[true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"'{\"file\":\"OPTIONS.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-05":{"steps":[true,true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"CUSTOMER\",\"VARIABLE\",\"VALUE\"],\"where\":\"MODULE = 'Tenders'\"}' | node tool... (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VARIABLE\",\"VALUE\"],\"where\":\"CUSTOMER = 'DLT' AND MODULE = 'BOPIS'\",\"orde... (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VALUE\"],\"where\":\"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = ... (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-06":{"steps":[true,true,true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"CUSTOMER\",\"MODULE\",\"VARIABLE\",\"VALUE\"],\"order_by\":\"CUSTOMER, MODULE, VAR... (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"CUSTOMER\",\"MODULE\",\"VARIABLE\",\"VALUE\"],\"order_by\":\"CUSTOMER, MODULE, VAR... (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"CUSTOMER\"],\"limit\":0}' | node tools\\call.js tps_select --root C:\\Project... (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"CUSTOMER\",\"MODULE\",\"VARIABLE\"],\"order_by\":\"CUSTOMER, MODULE, VARIABLE\",\"... (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-07":{"steps":[true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"'{\"file\":\"CACODE.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG (exit 0)\n'{\"file\":\"COMNDMST.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CO... (exit 0)\n'{\"file\":\"CRPCMCFG.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CO... (exit 0)\n'{\"file\":\"EODMNT.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG (exit 0)\n'{\"file\":\"ERRORMSG.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CO... (exit 0)\n'{\"file\":\"INCOMMCC.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CO... (exit 0)\n'{\"file\":\"keybrdrv.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CO... (exit 0)\n'{\"file\":\"OPTIONS.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG (exit 0)\n'{\"file\":\"PMINTHDR.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CO... (exit 0)\n'{\"file\":\"RPTDEF.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG (exit 0)\n'{\"file\":\"SCRFIELD.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CO... (exit 1)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-08":{"steps":[true,false,false],"verdict":"BLOCKED","notes":"Automated run 2026-09-20 00:43: owner string not available in TPSCLI_OWNER; steps 2 and 3 not run","evidence":"'{\"file\":\"ACCESS.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG (exit 1)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-09":{"steps":[true,true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"$h1 = (Get-FileHash $cfg\\OPTIONS.TPS).Hash\n'{\"file\":\"OPTIONS.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"limit\":0}' | node tools\\call.js tps_select --root C:\\Projects\\GitLab\\POS\\dtpos_404_... (exit 0)\n$h2 = (Get-FileHash $cfg\\OPTIONS.TPS).Hash ; $h1 -eq $h2\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-10":{"steps":[true,true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"'{\"file\":\"OPTIONS.TPS\",\"set\":{\"VALUE\":\"C\"},\"where\":\"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = ... (exit 1)\n'{\"file\":\"OPTIONS.TPS\",\"where\":\"CUSTOMER = 'UTS'\"}' | node tools\\call.js tps_delete --root C:\\Projects\\GitL... (exit 1)\n'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VALUE\"],\"where\":\"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = ... (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-11":{"steps":[true,true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"'{\"file\":\"OPTIONS.TPS\",\"values\":{\"CUSTOMER\":\"UTS\",\"MODULE\":\"Test\",\"VARIABLE\":\"InsertedByMcp\",\"VALUE\":\"yes\",... (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"where\":\"CUSTOMER = 'UTS'\"}' | node tools\\call.js tps_select --root work\\config (exit 0)\n'{\"file\":\"OPTIONS.TPS\"}' | node tools\\call.js tps_describe --root work\\config (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-12":{"steps":[true,true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"'{\"file\":\"OPTIONS.TPS\",\"values\":{\"CUSTOMER\":\"UTS\",\"MODULE\":\"Test\",\"VARIABLE\":\"InsertedByMcp\",\"VALUE\":\"again... (exit 1)\n'{\"file\":\"OPTIONS.TPS\",\"values\":{\"CUSTOMER\":\"uts\",\"MODULE\":\"test\",\"VARIABLE\":\"insertedbymcp\",\"VALUE\":\"again... (exit 1)\n'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VALUE\"],\"where\":\"CUSTOMER = 'UTS'\"}' | node tools\\call.js tps_select --r... (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-13":{"steps":[true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"'{\"file\":\"OPTIONS.TPS\",\"set\":{\"VALUE\":\"no\",\"COMMENTS\":\"TC-13 updated\"},\"where\":\"CUSTOMER = 'UTS' AND VARIAB... (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VALUE\",\"COMMENTS\",\"DESCRIPTION\"],\"where\":\"CUSTOMER = 'UTS'\"}' | node too... (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-14":{"steps":[true,true,true,true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"'{\"file\":\"OPTIONS.TPS\",\"set\":{\"VALUE\":\"C\"},\"where\":\"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = ... (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VALUE\"],\"where\":\"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = ... (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"CUSTOMER\",\"VARIABLE\",\"VALUE\"],\"where\":\"MODULE = 'Tenders'\"}' | node tool... (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"set\":{\"VALUE\":\"I\"},\"where\":\"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = ... (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VALUE\"],\"where\":\"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = ... (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-15":{"steps":[true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"$long = '0123456789' * 7\n'{\"file\":\"OPTIONS.TPS\",\"set\":{\"VALUE\":\"01234567890123456789012345678901234567890123456789012345678901234567... (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"columns\":[\"VALUE\"],\"where\":\"CUSTOMER = 'UTS'\"}' | node tools\\call.js tps_select --r... (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-16":{"steps":[true,true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"'{\"file\":\"OPTIONS.TPS\",\"where\":\"CUSTOMER = 'UTS'\"}' | node tools\\call.js tps_delete --root work\\config --al... (exit 0)\n'{\"file\":\"OPTIONS.TPS\",\"where\":\"CUSTOMER = 'UTS'\"}' | node tools\\call.js tps_select --root work\\config (exit 0)\n'{\"file\":\"OPTIONS.TPS\"}' | node tools\\call.js tps_describe --root work\\config (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-17":{"steps":[true,true,true,true,true,true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"'{\"sql\":\"UPDATE [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] SET VALUE = '15' WHERE CUSTO... (exit 0)\n'{\"sql\":\"SELECT VALUE FROM [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] WHERE CUSTOMER = ... (exit 0)\n'{\"sql\":\"UPDATE [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] SET VALUE = '15' WHERE CUSTO... (exit 0)\n'{\"sql\":\"SELECT VALUE FROM [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] WHERE CUSTOMER = ... (exit 0)\n'{\"sql\":\"UPDATE [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] SET VALUE = '10' WHERE CUSTO... (exit 0)\n'{\"sql\":\"SELECT VALUE FROM [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] WHERE CUSTOMER = ... (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"},"TC-18":{"steps":[true],"verdict":"PASS","notes":"Automated run 2026-09-20 00:43: every check passed.","evidence":"'{\"file\":\"PMINTDTL.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CO... (exit 0)\n'{\"file\":\"PMINTDTL.TPS\",\"limit\":0}' | node tools\\call.js tps_select --root C:\\Projects\\GitLab\\POS\\dtpos_404... (exit 0)\n'{\"file\":\"PDCONFIG.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CO... (exit 0)\n'{\"file\":\"PDCONFIG.TPS\",\"limit\":0}' | node tools\\call.js tps_select --root C:\\Projects\\GitLab\\POS\\dtpos_404... (exit 0)\n'{\"file\":\"CPSTATE.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG (exit 0)\n'{\"file\":\"CPSTATE.TPS\",\"limit\":0}' | node tools\\call.js tps_select --root C:\\Projects\\GitLab\\POS\\dtpos_404_... (exit 0)\n'{\"file\":\"REFSMTBL.TPS\"}' | node tools\\call.js tps_describe --root C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CO... (exit 0)\n'{\"file\":\"REFSMTBL.TPS\",\"limit\":0}' | node tools\\call.js tps_select --root C:\\Projects\\GitLab\\POS\\dtpos_404... (exit 0)\nFull output: TpscliMcpConfig-Unit-Test-Results.json"}},"resumed":false};
+var SEED_STATE = null;
 /* ============================= CUSTOMIZE END ============================= */
 
 
@@ -671,10 +683,12 @@ function renderCase(c){
      '<div class="body-collapsible">'+
        '<div class="ro"><b>Pre</b> <span class="escaped">'+esc(c.pre)+'</span></div>'+
        '<div class="ro"><b>Steps</b><ul class="steplist">'+stepsHtml+'</ul></div>'+
-       '<div class="ro"><b>Expected</b> <span class="escaped">'+esc(c.expected)+'</span></div>'+
+       '<div class="ro expected"><b>Expected</b> <span class="escaped">'+esc(c.expected)+'</span></div>'+
        '<div class="verdict">'+verdictHtml+'</div>'+
-       '<textarea rows="2" class="notes-ta" data-id="'+c.id+'" placeholder="Notes">'+esc(st.notes)+'</textarea>'+
-       '<textarea rows="2" class="evid-ta" data-id="'+c.id+'" placeholder="Evidence (log line / count / screenshot file)">'+esc(st.evidence)+'</textarea>'+
+       '<span class="talabel">Notes</span>'+
+       '<textarea rows="4" class="notes-ta" data-id="'+c.id+'" placeholder="What differed, and why">'+esc(st.notes)+'</textarea>'+
+       '<span class="talabel">Results (tool-call JSON)</span>'+
+       '<textarea rows="12" class="evid-ta" data-id="'+c.id+'" placeholder="Paste the JSON result of every tool call in this case">'+esc(st.evidence)+'</textarea>'+
      '</div></div>';
 }
 
@@ -853,7 +867,7 @@ function buildReport(){
   var rows = CASES.map(function(c){
     var st = state.cases[c.id];
     var note = esc(st.notes);
-    if(st.evidence.trim()) note += (note?' &middot; ':'')+'<i>Ev:</i> '+esc(st.evidence);
+    if(st.evidence.trim()) note += '<span class="ev">'+esc(st.evidence)+'</span>';
     return '<tr><td>'+c.id+'</td><td>'+c.priority+'</td><td>'+badgeCell(st.verdict)+'</td>'+
       '<td>'+esc(c.title)+'</td><td>'+(note||'—')+'</td></tr>';
   }).join("");

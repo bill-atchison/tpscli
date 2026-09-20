@@ -26,9 +26,11 @@ if (!chrome) { console.error('no Chrome or Edge found'); process.exit(2); }
 if (typeof WebSocket === 'undefined') { console.error('run with: node --experimental-websocket'); process.exit(2); }
 
 const results = JSON.parse(fs.readFileSync(resultsFile, 'utf8'));
-// The page's evidence field is printed in the report, so it gets the command list with exit
-// codes; the full captured output stays in the results JSON.
+// A session-driven run (results.runner names the client) already holds the tool-call JSON as
+// evidence: it goes into the page's Results box verbatim. A call.js run gets the command list
+// with exit codes; its full captured output stays in the results JSON.
 function evidenceSummary(text) {
+  if (!/^> /m.test(text)) return text;
   const out = []; let cmd = null;
   for (const line of text.split('\n')) {
     if (line.startsWith('> ')) { if (cmd) out.push(cmd); cmd = line.slice(2); if (cmd.length > 110) cmd = cmd.slice(0, 107) + '...'; }
@@ -38,7 +40,7 @@ function evidenceSummary(text) {
   return out.join('\n') + (out.length ? '\nFull output: ' + path.basename(resultsFile) : '');
 }
 const header = {
-  tester: 'automated (tests\\run-config-instrument.ps1)', lead: '', date: results.started.slice(0, 10),
+  tester: results.runner || 'automated (tests\\run-config-instrument.ps1)', lead: '', date: results.started.slice(0, 10),
   build: results.build, env: results.env, component: 'mcp\\dist\\server.js + tools\\call.js', ref: results.ref
 };
 const cases = results.cases.map(c => ({ id: c.id, steps: c.steps, verdict: c.verdict, notes: c.notes, evidence: evidenceSummary(c.evidence) }));
