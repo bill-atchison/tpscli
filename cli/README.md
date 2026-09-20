@@ -123,8 +123,9 @@ unknown. It proves neither commit nor rollback, and the caller must not assume `
 retry on its own.
 
 Value formatting: `DATE` as `YYYY-MM-DD`, `TIME` as `HH:MM:SS.hh`, `DECIMAL` as an exact
-string, `BLOB` as base64. The file is opened with `SHARE()`; records are taken with
-`HOLD(file, 1)` and there are no retries.
+string, `BLOB` as base64. `DESCRIBE` and `SELECT` open the file ReadOnly and shared (`OPEN(file, 40h)`), so a read leaves its
+modified time alone and works in a folder the account can only read; `INSERT`, `UPDATE` and
+`DELETE` open it with `SHARE()`. Records are taken with `HOLD(file, 1)` and there are no retries.
 
 ### Examples
 

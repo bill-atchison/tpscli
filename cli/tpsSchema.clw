@@ -662,14 +662,21 @@ lbl  STRING(64)
   SELF.F &= SELF.Dyn.GetFileRef()
   RETURN 0
 
-tpsSchema.Open PROCEDURE()
+tpsSchema.Open PROCEDURE(BYTE writing)
 rec   &GROUP
 n     LONG
 i     LONG
 j     LONG
 full  STRING(80)
   CODE
-  SHARE(SELF.F)
+  ! Reads open ReadOnly + DenyNone (40h) so a DESCRIBE or SELECT leaves the file's modified
+  ! time alone and works on a folder the account can only read; writes keep SHARE (ReadWrite +
+  ! DenyNone, 42h). Ticket docs\tickets\2026-09-20-reads-open-read-write.md.
+  IF writing
+    SHARE(SELF.F)
+  ELSE
+    OPEN(SELF.F, 40h)
+  END
   CASE ERRORCODE()
   OF 0
   OF 47

@@ -206,7 +206,7 @@ DELETE FROM [file] WHERE &lt;expr&gt;</code></pre>
     <li>Run <code>tpscli.exe --version</code>. You should see <code>{ "ok": true, "op": null, "version": "0.1.0", "complete": true }</code>.</li>
     <li>Optionally add the folder to the machine's <code>PATH</code> so the exe can be run from any directory. Relative file paths in a statement resolve against the current directory, not the exe's folder.</li>
   </ol>
-  <div class="callout tip"><b>Tip</b>tpscli opens the data file in shared mode, so it can be run while the owning application has the file open. A row that application is holding at that moment is reported as <code>RECORD_HELD</code>; rerun after the hold clears.</div>
+  <div class="callout tip"><b>Tip</b>tpscli opens the data file in shared mode, so it can be run while the owning application has the file open: reads (DESCRIBE, SELECT) open it read-only and leave its modified time alone, writes open it read/write. A row that application is holding at that moment is reported as <code>RECORD_HELD</code>; rerun after the hold clears.</div>
 
   <h3>Inspect a file's layout</h3>
   <ol class="steps">

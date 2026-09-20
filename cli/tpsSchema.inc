@@ -95,7 +95,7 @@ SchemaDumpJson PROCEDURE(tpsOut o),STRING    ! oracle vocabulary, hidden --dump-
 DescribeJson PROCEDURE(tpsOut o, LONG records),STRING   ! public DESCRIBE shape, spec §4
 FindField    PROCEDURE(STRING label),LONG    ! case-insensitive, 0 = not found
 Build        PROCEDURE(FILE driver),LONG     ! builds SELF.F through DynFile from Fields/Keys/Comps/Memos
-Open         PROCEDURE(),LONG                ! SHARE(SELF.F), maps field numbers to WHAT() indexes into Who
+Open         PROCEDURE(BYTE writing),LONG    ! 0: OPEN(F,40h) ReadOnly+DenyNone; 1: SHARE(F). Maps field numbers to WHAT() indexes into Who
 FieldRef     PROCEDURE(LONG fieldNbr, LONG elem),*?   ! null ANY for a bad field number
 MemoRef      PROCEDURE(LONG memoNbr),STRING           ! memo/blob content by value; no addressable reference exists
 KeyRef       PROCEDURE(LONG keyNbr),*KEY

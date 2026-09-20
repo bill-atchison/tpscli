@@ -186,7 +186,7 @@ errJs     StringTheory
       HALT(0)
     END
     rc = Sc.Build(TpsDrv)
-    IF rc = 0 THEN rc = Sc.Open().
+    IF rc = 0 THEN rc = Sc.Open(0).
     IF rc <> 0
       IF Opt.Table
         Out.Line(CLIP(Sc.Err) & ': ' & CLIP(Sc.ErrMsg))
@@ -221,7 +221,7 @@ errJs     StringTheory
   END
 
   rc = Sc.Build(TpsDrv)
-  IF rc = 0 THEN rc = Sc.Open().
+  IF rc = 0 THEN rc = Sc.Open(CHOOSE(Stmt.Op = OP:Select, 0, 1)).
   IF rc <> 0
     IF Opt.Table
       Out.Line(CLIP(Sc.Err) & ': ' & CLIP(Sc.ErrMsg))

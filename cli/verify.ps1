@@ -361,7 +361,7 @@ function Step1-Build {
 # ================================================================================
 
 function Step2-Tests {
-    foreach ($t in @('describe','parser','select','insert','update')) {
+    foreach ($t in @('describe','parser','select','insert','update','readonly')) {
         $name = "step 2 tests\$t.ps1"
         $script = Join-Path $root "tests\$t.ps1"
         if (-not (Test-Path $script)) { Step-Fail $name 'script is missing'; continue }
