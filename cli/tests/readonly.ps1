@@ -13,6 +13,11 @@ $roDir = Join-Path $workDir 'ro'
 New-Item -ItemType Directory -Force -Path $roDir | Out-Null
 $copy = Join-Path $workDir 'KEYS_RO.TPS'
 $locked = Join-Path $roDir 'KEYS.TPS'
+$who = "$env:USERDOMAIN\$env:USERNAME"
+if (Test-Path $locked) {
+    icacls $locked /remove:d $who | Out-Null    # best-effort: heal a deny ACE left by a run that died before its finally
+    Remove-Item $locked -Force -ErrorAction SilentlyContinue
+}
 Copy-Item (Join-Path $root 'testdata\KEYS.TPS') $copy -Force
 Copy-Item (Join-Path $root 'testdata\KEYS.TPS') $locked -Force
 
@@ -46,7 +51,6 @@ Check ((Stamp $copy) -ne $t0) 'LastWriteTime moved after UPDATE (so the unchange
 # ---- 2. a read works on a file the account cannot write; the UPDATE control proves the ACE took ----
 # (W) is generic write and bundles SYNCHRONIZE, which every synchronous CreateFile requests, so it
 # would block reads too; deny only the specific write rights instead.
-$who = "$env:USERDOMAIN\$env:USERNAME"
 $hadDeny = $false
 try {
     icacls $locked /deny "${who}:(WD,AD,WA,WEA)" | Out-Null

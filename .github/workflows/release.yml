@@ -11,6 +11,7 @@ concurrency: release-${{ github.ref_name }}
 jobs:
   release:
     runs-on: [self-hosted, windows, clarion]
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Build, qualify and pack

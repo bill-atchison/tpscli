@@ -257,7 +257,7 @@ tpscli: node C:\Projects\GitHub\tpscli\mcp\dist\server.js --root C:\pos\data - â
   <h3>Check the server from the command line</h3>
   <p><code>mcp\tools\call.js</code> starts the server with the flags you give it, calls one tool with a JSON object read from standard input, prints the result and exits 0 (the tool answered), 1 (the tool answered with an error) or 2 (the call never got an answer: no tool name, arguments that are not JSON, or a server that could not start). It needs no client and is the fastest way to reproduce what the model saw. From PowerShell, in <code>mcp\</code>:</p>
   <ol class="steps">
-    <li>Version, no arguments: <code>node tools\call.js tps_version</code> prints <code>{ "server": "0.2.0", "exe": { "ok": true, "op": null, "version": "0.1.0", "complete": true } }</code>.</li>
+    <li>Version, no arguments: <code>node tools\call.js tps_version</code> prints <code>{ "server": "0.2.0", "exe": { "ok": true, "op": null, "version": "0.1.0", "complete": true }, "roots": [] }</code>.</li>
     <li>Describe a file inside a root, keeping the JSON in single quotes so PowerShell leaves it alone:
 <pre><code>'{"file":"KEYS.TPS"}' | node tools\call.js tps_describe --root C:\pos\data</code></pre></li>
     <li>Rows as a grid:
@@ -308,7 +308,7 @@ ID  NAME     CODE
 
   <h3>Move the server to another machine</h3>
   <ol class="steps">
-    <li>Copy the whole <code>mcp\dist\</code> folder (<code>server.js</code> imports <code>runner.js</code> and <code>sql.js</code> beside it) together with <code>mcp\package.json</code> and <code>mcp\node_modules\</code> (after <code>npm ci --omit=dev</code> in <code>mcp\</code>), keeping the same layout: <code>package.json</code> and <code>node_modules\</code> in the parent of <code>dist\</code>. Put <code>tpscli.exe</code> <em>inside</em> <code>dist\</code>, beside <code>server.js</code>; that location is second in the exe search order, so no <code>--exe</code> flag is needed, or simply copy the release zip and unzip it there.</li>
+    <li>Copy the whole <code>mcp\dist\</code> folder (<code>server.js</code> imports <code>runner.js</code> and <code>sql.js</code> beside it) together with <code>mcp\package.json</code> and <code>mcp\node_modules\</code> (after <code>npm ci --omit=dev</code> in <code>mcp\</code>), keeping the same layout: <code>package.json</code> and <code>node_modules\</code> in the parent of <code>dist\</code>. Put <code>tpscli.exe</code> <em>inside</em> <code>dist\</code>, beside <code>server.js</code>; that location is first in the exe search order, so no <code>--exe</code> flag is needed, or simply copy the release zip and unzip it there.</li>
     <li>Install Node 20+ on the target and register the server as above with the new path. <code>npm publish</code> is not part of the workflow: the package is marked private and is useless without the Windows exe.</li>
   </ol>
 

@@ -34,6 +34,9 @@ function Run([string]$Label, [string]$Dir, [scriptblock]$Body) {
     Write-Host "release.ps1: $Label"
     Push-Location $Dir
     try {
+        $ErrorActionPreference = 'Continue'    # scoped to this function; a native command's stderr line
+                                                # (npm warn/notice) must not become a terminating error under
+                                                # the script-level Stop -- only $LASTEXITCODE decides failure
         $global:LASTEXITCODE = 0
         $output = & $Body 2>&1 | ForEach-Object { "$_" }
         $output | Write-Host
@@ -60,12 +63,12 @@ $exe = Join-Path $repo 'cli\tpscli.exe'
 $v = Invoke-Tpscli_Bounded -FilePath $exe -ArgumentList @('--version') -WorkingDirectory (Join-Path $repo 'cli') -TimeoutMs 20000
 if ($v.TimedOut -or $v.ExitCode -ne 0) { throw "release.ps1: tpscli.exe --version failed (timed out $($v.TimedOut), exit $($v.ExitCode)): $($v.StdOut)$($v.StdErr)" }
 $exeVersion = ($v.StdOut | ConvertFrom-Json).version
-Run 'npm ci' (Join-Path $repo 'mcp') { npm ci }
-Run 'npm run build' (Join-Path $repo 'mcp') { npm run build }
-if (-not $SkipVerify) { Run 'npm test' (Join-Path $repo 'mcp') { npm test } }
+Run 'npm ci' (Join-Path $repo 'mcp') { npm ci } | Out-Null
+Run 'npm run build' (Join-Path $repo 'mcp') { npm run build } | Out-Null
+if (-not $SkipVerify) { Run 'npm test' (Join-Path $repo 'mcp') { npm test } | Out-Null }
 
 # ---- stage: the layout the MCP guide's "Move the server" describes; the exe inside dist\ is
-# second in the server's search order, so no --exe flag is needed ----
+# first in the server's search order, so no --exe flag is needed ----
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force -Path (Join-Path $stage 'dist'), (Join-Path $stage 'tools'), (Join-Path $stage 'docs') | Out-Null
 Copy-Item (Join-Path $repo 'mcp\dist\*.js') (Join-Path $stage 'dist')
@@ -76,7 +79,7 @@ Copy-Item (Join-Path $repo 'mcp\tools\call.js') (Join-Path $stage 'tools')
 Copy-Item (Join-Path $repo 'mcp\README.md') (Join-Path $stage 'README.md')
 Copy-Item (Join-Path $repo 'cli\README.md') (Join-Path $stage 'docs\tpscli-cli-README.md')
 Copy-Item (Join-Path $repo 'docs\UserGuide\*.html') (Join-Path $stage 'docs')
-Run 'npm ci --omit=dev (production node_modules in the stage)' $stage { npm ci --omit=dev --ignore-scripts }
+Run 'npm ci --omit=dev (production node_modules in the stage)' $stage { npm ci --omit=dev --ignore-scripts } | Out-Null
 Remove-Item (Join-Path $stage 'package-lock.json')    # served its purpose; the zip needs no npm
 
 # ---- zip, checksum, notes ----
@@ -86,7 +89,7 @@ if (Test-Path $zip) { Remove-Item $zip }
 Compress-Archive -Path $stage -DestinationPath $zip
 $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
 "$hash  $name.zip" | Set-Content (Join-Path $out "$name.zip.sha256") -Encoding ASCII
-@"
+$notes = @"
 tpscli ${ver}: tpscli.exe $exeVersion and tpscli-mcp $ver, Windows x64, Node 20 or later.
 
 Unzip anywhere, then register the server (Claude Code shown; Claude Desktop takes the same command):
@@ -97,5 +100,6 @@ The exe is inside dist\ beside server.js, so no --exe flag is needed. tools\call
 from the command line (node tools\call.js tps_version). README.md and docs\ hold the guides.
 
 SHA-256 $hash  $name.zip
-"@ | Set-Content (Join-Path $out 'notes.md') -Encoding UTF8
+"@
+[IO.File]::WriteAllText((Join-Path $out 'notes.md'), $notes, (New-Object System.Text.UTF8Encoding($false)))
 Write-Host ("release.ps1: {0} ({1:N1} MB) sha256 {2}" -f $zip, ((Get-Item $zip).Length / 1MB), $hash)
