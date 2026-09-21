@@ -406,7 +406,7 @@ foreach ($c in $suite.cases) {
 $tally = @{ PASS = 0; FAIL = 0; BLOCKED = 0; NA = 0 }
 $results | ForEach-Object { $tally[$_.verdict]++ }
 $doc = [ordered]@{
-    suite = 'tpscli-mcp-config-0-1-0'; storage_key = $suite.storageKey; runner = 'tests\run-config-instrument.ps1'
+    suite = 'tpscli-mcp-config-0-2-0'; storage_key = $suite.storageKey; runner = 'tests\run-config-instrument.ps1'
     build = (git -C $root rev-parse --short HEAD); ref = (git -C $root rev-parse --abbrev-ref HEAD)
     env = "$env:COMPUTERNAME / $([Environment]::OSVersion.VersionString) / PowerShell $($PSVersionTable.PSVersion) / node $(& $node --version)"
     started = $started.ToString('s'); finished = (Get-Date).ToString('s'); tally = $tally; cases = $results
