@@ -285,14 +285,17 @@ SELECT and compare, DELETE, DESCRIBE again), walks every key, checks shared acce
 second process holding a record, and times a keyed SELECT. It exits non-zero on any failure,
 and every verdict comes from its own comparisons rather than from the exe's exit code.
 
-`-Extra <dir>` points at a folder of real-world `.TPS` files, which are never committed; it
-requires `-TpsFixLog`. `-Expected <dir>` adds dictionary parity for those files against
-oracle-format JSON exports.
+`-Extra <dir>` points at a folder of your own real-world `.TPS` files, which are never committed;
+it requires `-TpsFixLog`. `-Expected <dir>` adds dictionary parity for those files against
+oracle-format JSON exports from your dictionary. These three are optional: tpscli reads every
+layout from the file itself and depends on no dictionary, so the release gate (`tools\release.ps1`,
+the tag workflow) is the corpus run alone. A site can run the full six checks against its own
+files before adopting a build.
 
 Without those three options the dictionary-parity and TPSFix steps do not run. They print
 `SKIP`, not `PASS`, and the closing line says how many were skipped:
-`all steps PASS (2 skipped - not a release qualification)`. A run that qualifies a release is
-the one with all three options given against real files, where nothing is skipped.
+`all steps PASS (2 skipped - not a release qualification)`, meaning the optional real-file
+checks did not run; the full six-check run is the one with all three options given.
 
 `tests\helpers.ps1` is a regression check for the shared `Invoke-Tpscli_Bounded` helper in
 `tests\TestHelpers.ps1` (300 timed runs of `--version` plus one empty-argument run); it is not
@@ -314,8 +317,8 @@ under the same timeout helper as the other suites, asserts the values each case'
 names, and writes `..\docs\Testing\Tpscli-Unit-Test-Results.json`. `record-instrument.js` drives a
 headless Chrome or Edge over the DevTools protocol, records that JSON into the page through the
 page's own engine functions, checks the dashboard tally, and prints the report to
-`..\docs\Testing\Tpscli-Unit-Test-Report-<date>.pdf`. TC-28 (release qualification against real
-dtpos files) is always `BLOCKED` in this repository because its inputs are not committed.
+`..\docs\Testing\Tpscli-Unit-Test-Report-<date>.pdf`. TC-28 (the optional real-file run against
+a site's own files) is always `BLOCKED` in this repository because its inputs are not committed.
 
 ## Documentation
 

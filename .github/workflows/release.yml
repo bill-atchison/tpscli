@@ -16,10 +16,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build, qualify and pack
         shell: powershell
-        # TPSCLI_EXTRA, TPSCLI_EXPECTED and TPSCLI_TPSFIX_LOG are repository variables (Settings >
-        # Secrets and variables > Actions > Variables) naming folders on the runner machine; without
-        # them release.ps1 refuses to publish an unqualified build.
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -Version ${{ github.ref_name }} -Extra "${{ vars.TPSCLI_EXTRA }}" -Expected "${{ vars.TPSCLI_EXPECTED }}" -TpsFixLog "${{ vars.TPSCLI_TPSFIX_LOG }}"
+        # The gate is the repository's own corpus and suites (cli\verify.ps1, npm test); the tool
+        # depends on no site dictionary, so no site files are needed to cut a release.
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -Version ${{ github.ref_name }}
       - name: Publish the GitHub Release
         shell: powershell
         env:

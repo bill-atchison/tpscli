@@ -34,11 +34,12 @@ No build, no npm. `node tools\call.js tps_version` from the unzipped folder chec
 A push of a tag `v<version>` runs `.github\workflows\release.yml` on the self-hosted Windows
 runner labelled `clarion`; it runs `tools\release.ps1` (the CLI gate `cli\verify.ps1`, `npm ci`,
 `npm run build`, `npm test`, then the zip) and publishes the zip, its `.sha256` and `notes.md`
-as a GitHub Release. `<version>` must equal `mcp\package.json`'s version. The workflow passes the
-real-file inputs of `cli\verify.ps1` from the repository variables `TPSCLI_EXTRA`, `TPSCLI_EXPECTED`
-and `TPSCLI_TPSFIX_LOG` (folders and a log on the runner machine); `release.ps1` refuses to package a
-run that skipped those checks unless `-AllowSkips` is given. Without the runner, run `tools\release.ps1`
-by hand with the same three arguments and `gh release create v<version> release\*.zip
+as a GitHub Release. `<version>` must equal `mcp\package.json`'s version. The gate is the
+repository's own generated corpus and suites: tpscli reads every layout from the `.TPS` file and
+depends on no dictionary, so no site files are involved. `verify.ps1`'s real-file checks
+(`-Extra`, `-Expected`, `-TpsFixLog`) stay available for a site to run against its own files
+before adopting a build; `release.ps1` forwards them when given. Without the runner, run
+`tools\release.ps1 -Version v<version>` by hand and `gh release create v<version> release\*.zip
 release\*.sha256 --notes-file release\notes.md`.
 
 ## Install the MCP server

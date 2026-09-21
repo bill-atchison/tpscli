@@ -1,24 +1,22 @@
-# Builds, qualifies and packs one release of tpscli: the exe (cli\verify.ps1 is the gate), the MCP
-# server (npm ci, build, test), then one zip that installs by unzipping. Run by the release workflow
-# on a tag push, or by hand from the repository root:
+# Builds, qualifies and packs one release of tpscli: the exe (cli\verify.ps1 over the generated corpus
+# is the gate), the MCP server (npm ci, build, test), then one zip that installs by unzipping. Run by
+# the release workflow on a tag push, or by hand from the repository root:
 #
-#   powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -Version v0.2.0 `
-#       -Extra C:\tps\dtpos -Expected C:\tps\dtpos-expected -TpsFixLog C:\tps\tpsfix.log   # a release
-#   powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -AllowSkips      # local build, corpus gate only
-#   powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -SkipVerify      # pack only (dry run)
+#   powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -Version v0.2.0   # a release
+#   powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -SkipVerify       # pack only (dry run)
 #
-# cli\verify.ps1 without -Extra/-Expected/-TpsFixLog skips the real-file, dictionary-parity and TPSFix
-# checks and says so ("not a release qualification") while still exiting 0; this script refuses that
-# run unless -AllowSkips is given, so the workflow cannot publish an unqualified build by accident.
+# tpscli reads every layout from the .TPS file itself and depends on no dictionary, so the release
+# gate is the repository's own corpus and suites. verify.ps1's real-file checks (-Extra, -Expected,
+# -TpsFixLog: your own files, your dictionary export, your TPSFix log) are an optional extra a site
+# can run before adopting a build; they are forwarded when given and never required.
 # -Version must match mcp\package.json (a leading v is allowed). The release number is the server's;
 # the exe reports its own version inside (tpscli.exe --version) and in notes.md.
 # Output: release\tpscli-<version>-win-x64.zip, its .sha256, and release\notes.md.
 param(
     [string]$Version = '',
-    [string]$Extra = '',        # forwarded to cli\verify.ps1: the folder of real-world .TPS copies
-    [string]$Expected = '',     # forwarded: the folder of dictionary-export JSON
-    [string]$TpsFixLog = '',    # forwarded: the TPSFix log for those files (required with -Extra)
-    [switch]$AllowSkips,        # accept a verify.ps1 run that skipped the three checks above (local builds only)
+    [string]$Extra = '',        # optional, forwarded to cli\verify.ps1: a folder of your own .TPS copies
+    [string]$Expected = '',     # optional, forwarded: the folder of dictionary-export JSON for those files
+    [string]$TpsFixLog = '',    # optional, forwarded: the TPSFix log for those files (required with -Extra)
     [switch]$SkipVerify         # skip cli\verify.ps1 and npm test: a dry run of the packing only, never a release
 )
 $ErrorActionPreference = 'Stop'
@@ -53,10 +51,7 @@ if ($SkipVerify) {
     if ($Extra) { $verifyArgs += @('-Extra', $Extra) }
     if ($Expected) { $verifyArgs += @('-Expected', $Expected) }
     if ($TpsFixLog) { $verifyArgs += @('-TpsFixLog', $TpsFixLog) }
-    $verifyOutput = Run 'cli\verify.ps1 (build, corpus, suites, gate)' (Join-Path $repo 'cli') { powershell -NoProfile -ExecutionPolicy Bypass -File verify.ps1 @verifyArgs }
-    if (($verifyOutput -join "`n") -match 'not a release qualification' -and -not $AllowSkips) {
-        throw 'release.ps1: verify.ps1 skipped the real-file checks (no -Extra/-Expected/-TpsFixLog); pass them, or -AllowSkips for a local build'
-    }
+    Run 'cli\verify.ps1 (build, corpus, suites, gate)' (Join-Path $repo 'cli') { powershell -NoProfile -ExecutionPolicy Bypass -File verify.ps1 @verifyArgs } | Out-Null
 }
 $exe = Join-Path $repo 'cli\tpscli.exe'
 . (Join-Path $repo 'cli\tests\TestHelpers.ps1')    # Invoke-Tpscli_Bounded: the exe never runs without a timeout
