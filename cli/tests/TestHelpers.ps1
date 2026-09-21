@@ -4,6 +4,13 @@
 # see task-7-report.md) never blocks a test run for hours instead of seconds. On timeout the
 # process is killed and the caller gets TimedOut=$true instead of hanging forever.
 #
+# Windows PowerShell that inherited PowerShell 7's PSModulePath (a shell, or the Actions runner,
+# launched from pwsh) autoloads the PS7 copy of Microsoft.PowerShell.Utility and loses the script
+# functions in the 5.1 one: Get-FileHash is "not recognized" (seen on the first release run).
+# Every suite, verify.ps1 and release.ps1 dot-source this file, so the 5.1 module path is put back
+# here, once, for the process and its children.
+if ($PSVersionTable.PSEdition -ne 'Core') { $env:PSModulePath = "$env:ProgramFiles\WindowsPowerShell\Modules;$PSHOME\Modules" }
+#
 # Start-Process -ArgumentList, given a string ARRAY, does not quote elements containing spaces
 # (each element is passed through as its own raw command-line word) - confirmed by a failing
 # probe run before this helper existed. Build one correctly quoted command-line STRING instead.
