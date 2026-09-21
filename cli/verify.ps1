@@ -17,7 +17,9 @@ param(
     [string]$Corpus = 'testdata',
     [string]$Extra = '',
     [string]$Expected = '',
-    [string]$TpsFixLog = ''
+    [string]$TpsFixLog = '',
+    [int]$PerfBudgetMs = 250    # step 7: spec section 7's budget on the reference machine; a shared or
+                                # emulating runner passes a looser one (tools\release.ps1 does)
 )
 
 $ErrorActionPreference = 'Stop'
@@ -777,8 +779,8 @@ function Step7-Performance {
         $times += $r.ElapsedMs
     }
     $median = (@($times | Sort-Object))[2]
-    if ($median -gt 250) {
-        Step-Fail $name ("median {0:N0} ms over 250 ms on {1} ({2})" -f $median, $largest.Label, $sql)
+    if ($median -gt $PerfBudgetMs) {
+        Step-Fail $name ("median {0:N0} ms over {3} ms on {1} ({2})" -f $median, $largest.Label, $sql, $PerfBudgetMs)
     } else {
         Step-Pass $name ("median {0:N0} ms on {1} (key {2}); runs {3}" -f $median, $largest.Label, $k.Name, ((@($times | ForEach-Object { '{0:N0}' -f $_ })) -join '/'))
     }

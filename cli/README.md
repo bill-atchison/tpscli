@@ -285,6 +285,10 @@ SELECT and compare, DELETE, DESCRIBE again), walks every key, checks shared acce
 second process holding a record, and times a keyed SELECT. It exits non-zero on any failure,
 and every verdict comes from its own comparisons rather than from the exe's exit code.
 
+`-PerfBudgetMs <n>` (default 250) is step 7's budget on the exe's process lifetime, spec section 7's
+number for the reference machine; `tools\release.ps1` passes 1000 because a shared or emulating
+runner is slower and a release should only fail a gross regression (the median is printed either way).
+
 `-Extra <dir>` points at a folder of your own real-world `.TPS` files, which are never committed;
 it requires `-TpsFixLog`. `-Expected <dir>` adds dictionary parity for those files against
 oracle-format JSON exports from your dictionary. These three are optional: tpscli reads every
