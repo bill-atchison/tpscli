@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<!--
+  IMPLEMENTATION NOTES / REVIEW DOC — a LIVE doc with TWO regions, both updated in REAL
+  TIME as work happens:
+    1. TASK STATUS table — one task-row per plan task with its TDD SUBTASK rows beneath.
+       Flip each pill pending -> in progress -> done (done rows show commit short-SHA),
+       in sync with the TodoWrite list.
+    2. IMPLEMENTATION LOG · BY TASK — everything for each task together, in task order.
+       The log OPENS with a "PRE-IMPL · CONTEXT" card when the run needs process context
+       (adapted workflow, environment constraints). Then, per task, append a GROUP:
+         a. an <h3 class="tglabel"> task-group heading — task number + title, with a
+            <span class="st-mini"> status/sha annotation ("· abc1234" or "(no code)");
+         b. one dd-card per substantive item (off-spec decision, plan deviation, important
+            fix, cross-task interaction, tradeoff — NOT routine progress). Each card has a
+            maroon tag ("TASK N · DONE · <sha>", "PRE-IMPL · CONTEXT", …), a bold title,
+            and prose/bullets with inline <code> chips;
+         c. one .cc CODE-CHANGE card per applied edit — heading, mono .loc location line,
+            then labelled BEFORE (red) / AFTER (green) <pre> blocks. Keep excerpts minimal:
+            the changed lines plus just enough context; elide unchanged runs with "...".
+       Append new groups at the TASK_LOG comment marker so decisions and code stay co-located.
+
+  FIXED MASTHEAD + PALETTE (per owner spec): header, palette, table, card, and code-block
+  styles are FIXED — reproduce as-is so this doc shares the editorial identity of the spec
+  (Spec · Design) and plan (Plan · Implementation). Stay on-palette.
+
+  HARD RULES: one self-contained .html; ALL CSS inline; web-safe/system fonts only;
+  NO external fonts/CDN/images/<link>/external <script>; renders from file:// offline.
+  An inline <meta refresh> is allowed for the live phase.
+
+  LIVE-VIEW: the <meta refresh> only fires when the tab is the ACTIVE/visible tab
+  (browsers throttle background tabs) — tell the owner to keep the notes tab visible.
+  At completion: flip Status pill to "Implementation — Complete" and REMOVE the <meta refresh>.
+
+  WHO UPDATES WHAT (the controller/agent owns ALL writes; implementer subagents stay report-only):
+    - subagent-driven-development: the CONTROLLER renders the table at setup (all rows
+      pending), flips each task's row to in-progress before dispatch and to done·<sha> after
+      review (filling its subtask rows from the implementer's report), and appends the task's
+      log group (tglabel heading, dd-cards, .cc code cards) from the implementer's report.
+      Implementer subagents never write this file.
+    - executing-plans: the agent renders, flips rows, and appends log groups itself, live.
+
+  PLACEHOLDERS: tpscli MCP server: implementation notes Decisions, deviations and code changes while building mcp/ from the 2026-09-19 plan. 2026-09-19 feature/tpscli-mcp docs/mySuperpower/specs/2026-09-19-tpscli-mcp-design.html docs/mySuperpower/plans/2026-09-19-tpscli-mcp.html
+    {{TASK_ROWS}}   -> task-row + sub rows per plan task (START all "pending")
+    {{LOG_ENTRIES}} -> Implementation Log groups, appended as tasks complete (may start
+                       empty, or with a single PRE-IMPL · CONTEXT card)
+  Eyebrow FIXED "Notes · Implementation". Status pill starts "Implementation — In Progress".
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tpscli MCP server: implementation notes</title>
+<style>
+  :root{
+    --paper:#f4efe1; --ink:#221f18; --maroon:#8a2b27; --meta-bg:#e9e1cd;
+    --label:#6d5f4e; --value:#2b2820; --amber:#a8762b; --olive:#7a6a2e;
+    --rule:#ddd3bc; --subrule:#ece4d0; --green:#3f7d3f; --card:#faf7ef;
+    --code-bg:#2b2820; --code-ink:#f4efe1; --add:#3f7d3f; --del:#8a2b27;
+    --serif:Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);padding:3.5rem 2rem;}
+  .wrap{max-width:1040px;margin:0 auto;}
+  .eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.35em;
+           font-size:.8rem;font-weight:700;color:var(--maroon);margin:0 0 1.1rem;}
+  h1{font-family:var(--serif);font-weight:700;font-size:clamp(2.6rem,6vw,4rem);
+     line-height:1.04;letter-spacing:-.01em;margin:0 0 .9rem;}
+  .subtitle{font-family:var(--serif);font-style:italic;font-weight:700;
+            font-size:clamp(1.25rem,2.4vw,1.7rem);line-height:1.3;margin:0 0 1.9rem;max-width:48ch;}
+  .meta-card{display:grid;grid-template-columns:max-content 1fr;column-gap:1.75rem;row-gap:.55rem;
+             align-items:baseline;background:var(--meta-bg);border-radius:14px;
+             border-left:6px solid var(--maroon);padding:1.4rem 1.85rem;}
+  .meta-card dt{font-family:var(--mono);color:var(--label);font-size:.95rem;font-weight:400;}
+  .meta-card dd{font-family:var(--mono);color:var(--value);font-size:.95rem;margin:0;word-break:break-word;}
+  .status-pill{display:inline-block;border:1px solid var(--amber);color:var(--amber);border-radius:999px;
+               padding:.12rem .75rem;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;
+               line-height:1.45;background:transparent;}
+  .section-label{font-family:var(--mono);text-transform:uppercase;letter-spacing:.2em;font-size:.95rem;
+                 font-weight:700;color:var(--ink);border-bottom:2px solid var(--ink);
+                 padding-bottom:.5rem;margin:2.6rem 0 1.4rem;}
+  table.tasks{width:100%;border-collapse:collapse;}
+  table.tasks th{font-family:var(--mono);text-transform:uppercase;letter-spacing:.12em;font-size:.72rem;
+                 color:var(--label);text-align:left;font-weight:400;padding:.4rem .75rem;}
+  table.tasks td{padding:.6rem .75rem;vertical-align:middle;}
+  td.num{font-family:var(--mono);color:var(--label);width:3rem;}
+  td.st{width:1%;white-space:nowrap;text-align:right;}
+  tr.task-row td{border-top:2px solid var(--ink);font-size:1.05rem;}
+  tr.task-row td.desc{font-weight:700;}
+  tr.sub td{border-top:1px solid var(--subrule);}
+  td.subtask{padding-left:2.1rem;color:var(--label);font-size:.95rem;}
+  .tstatus{font-family:var(--mono);font-size:.78rem;padding:.22rem .65rem;border-radius:7px;white-space:nowrap;}
+  .tstatus.done{background:#d6e8cf;color:var(--green);}
+  .tstatus.inprogress{background:#ecdcbf;color:#9a6a1f;}
+  .tstatus.pending{background:#e7dfca;color:var(--label);}
+  .tglabel{font-family:var(--serif);font-weight:700;font-size:1.55rem;color:var(--maroon);margin:2.8rem 0 .2rem;padding-bottom:.3rem;border-bottom:2px solid var(--rule);}
+  .tglabel .st-mini{font-family:var(--mono);font-size:.72rem;font-weight:400;color:var(--label);letter-spacing:.05em;}
+  .cc{margin:1.7rem 0;}
+  .cc h3{font-family:var(--serif);font-weight:700;font-size:1.25rem;margin:.3rem 0 .3rem;color:var(--maroon);}
+  .cc .loc{font-family:var(--mono);font-size:.8rem;color:var(--label);margin:0 0 .6rem;}
+  .cc .ba{display:grid;grid-template-columns:1fr;gap:.5rem;}
+  .cc .lbl{font-family:var(--mono);text-transform:uppercase;letter-spacing:.1em;font-size:.68rem;font-weight:700;margin:.2rem 0 -.2rem;}
+  .cc .lbl.before{color:var(--del);}
+  .cc .lbl.after{color:var(--add);}
+  pre{font-family:var(--mono);font-size:.8rem;line-height:1.5;background:var(--code-bg);color:var(--code-ink);
+      border-radius:10px;padding:1rem 1.2rem;overflow-x:auto;margin:.3rem 0;}
+  pre.before{border-left:4px solid var(--del);}
+  pre.after{border-left:4px solid var(--add);}
+  pre code{background:none;padding:0;font-size:1em;color:inherit;border:none;}
+  .pending-note{font-family:var(--mono);font-size:.85rem;color:var(--label);font-style:italic;}
+  .dd-card{position:relative;background:var(--card);border:1px solid var(--rule);border-radius:14px;
+           padding:1.7rem 1.85rem 1.4rem;margin:1.7rem 0;}
+  .dd-tag{position:absolute;top:-0.75rem;left:1.5rem;background:var(--maroon);color:var(--paper);
+          font-family:var(--mono);text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;
+          font-weight:700;padding:.28rem .7rem;border-radius:6px;}
+  .dd-card h3{font-family:var(--serif);font-weight:700;font-size:1.3rem;margin:.3rem 0 .8rem;}
+  .dd-card p{font-size:1.05rem;line-height:1.55;margin:.5rem 0;}
+  .dd-card ul{margin:.6rem 0;padding-left:1.4rem;}
+  .dd-card li{margin:.5rem 0;line-height:1.55;}
+  code{font-family:var(--mono);background:var(--meta-bg);border:1px solid var(--rule);
+       padding:.05em .35em;border-radius:5px;font-size:.85em;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <p class="eyebrow">Notes &middot; Implementation</p>
+      <h1>tpscli MCP server: implementation notes</h1>
+      <p class="subtitle">Decisions, deviations and code changes while building mcp/ from the 2026-09-19 plan.</p>
+      <dl class="meta-card">
+        <dt>Started</dt><dd>2026-09-19</dd>
+        <dt>Branch</dt><dd>feature/tpscli-mcp</dd>
+        <dt>Spec</dt><dd>docs/mySuperpower/specs/2026-09-19-tpscli-mcp-design.html</dd>
+        <dt>Plan</dt><dd>docs/mySuperpower/plans/2026-09-19-tpscli-mcp.html</dd>
+        <dt>Status</dt><dd><span class="status-pill">Implementation &mdash; Complete</span></dd>
+      </dl>
+    </header>
+
+    <section class="task-status">
+      <h2 class="section-label">Task Status</h2>
+      <table class="tasks">
+        <thead><tr><th>Task</th><th>Description</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr class="task-row" data-task="1"><td class="num">1</td><td class="desc">project scaffold and the SQL builder</td><td class="st"><span class="tstatus done">&check; done &middot; 4ce4597</span></td></tr>
+          <tr class="sub" data-task="1"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub" data-task="1"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub" data-task="1"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="task-row" data-task="2"><td class="num">2</td><td class="desc">runner: spawn, timeout, ceiling, response validation</td><td class="st"><span class="tstatus done">&check; done &middot; 390a988</span></td></tr>
+          <tr class="sub" data-task="2"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub" data-task="2"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub" data-task="2"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="task-row" data-task="3"><td class="num">3</td><td class="desc">server: the eight tools, policy and result shaping</td><td class="st"><span class="tstatus done">&check; done &middot; fa89189</span></td></tr>
+          <tr class="sub" data-task="3"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub" data-task="3"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub" data-task="3"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="task-row" data-task="4"><td class="num">4</td><td class="desc">command line, startup, and the end-to-end run</td><td class="st"><span class="tstatus done">&check; done &middot; bff487f</span></td></tr>
+          <tr class="sub" data-task="4"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub" data-task="4"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub" data-task="4"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="task-row" data-task="5"><td class="num">5</td><td class="desc">README, manual gate from a real client, simplify, final commit</td><td class="st"><span class="tstatus done">&check; done &middot; 843aa07</span></td></tr>
+          <tr class="sub" data-task="5"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub" data-task="5"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub" data-task="5"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <!-- One task-row per plan task + its subtask rows. START all "pending"; flip live:
+          <tr class="task-row"><td class="num">1</td><td class="desc">Task title</td><td class="st"><span class="tstatus done">&check; done &middot; abc1234</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus inprogress">in progress</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          -->
+        </tbody>
+      </table>
+    </section>
+
+    <section class="log">
+      <h2 class="section-label">Implementation Log &middot; By Task</h2>
+      <p class="pending-note">Everything for each task together &mdash; decisions/deviations and the before&rarr;after code.</p>
+
+      <!-- Append one GROUP per task as it completes: an h3.tglabel heading, then that task's
+           dd-card decision/deviation cards (substantive items only — off-spec decisions, plan
+           deviations, important fixes, cross-task interactions, tradeoffs; NOT routine
+           progress), then one .cc card per applied code change (BEFORE/AFTER excerpts, elide
+           unchanged runs with "..."). A run may open with a PRE-IMPL · CONTEXT dd-card
+           (no tglabel) for process context. Example group:
+
+      <h3 class="tglabel">Task 1 &mdash; Short task title <span class="st-mini">&middot; abc1234</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 1 &middot; Done &middot; abc1234</span>
+        <h3>Short decision title</h3>
+        <p><strong>Decision (off-spec).</strong> What was decided and why; use inline <code>code</code> chips.</p>
+        <ul><li><strong>Rationale:</strong> …</li><li><strong>Interaction for Task N:</strong> …</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 1 &middot; Change 1 &mdash; short change title</h3>
+        <p class="loc"><code>path/to/file.ext</code> &mdash; where in the file. Committed <code>abc1234</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>old lines (minimal excerpt; "..." for elided runs)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>new lines</code></pre>
+        </div>
+      </div>
+      -->
+            <h3 class="tglabel">Task 1 &mdash; Project scaffold and the SQL builder <span class="st-mini">&middot; 4ce4597</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 1 &middot; Done &middot; 4ce4597</span>
+        <h3>Tests are JavaScript importing the built <code>dist/</code></h3>
+        <p><strong>Decision (spec &sect;8, plan Task 1).</strong> Node 20 runs neither <code>.ts</code> files nor <code>--test</code> directory globs, so every test is plain ESM <code>.js</code> under <code>mcp/test/</code>, named one by one in the <code>test</code> script, and <code>tsconfig</code> compiles <code>src/</code> only. Each later task appends its own file to the script.</p>
+        <ul><li><strong>Builder scope:</strong> <code>sql.ts</code> is pure and owns only what the exe accepts as text (bracketed paths, identifier paths, quoting, plain-decimal numbers, <code>1</code>/<code>0</code> booleans, no null, <code>offset</code> needs <code>limit</code>); whether a column exists or a value fits stays the exe's (<code>UNKNOWN_COLUMN</code>, <code>VALUE_OUT_OF_RANGE</code>).</li>
+        <li><strong>Plan miscount:</strong> the plan expects "11 pass"; the specified test file has 10 <code>test()</code> blocks and 10 pass. No gap.</li>
+        <li><strong>Process:</strong> this notes file is controller-owned; the plan's "create/append the notes" steps were redirected into the implementers' report files.</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 1 &middot; Change 1 &mdash; <code>mcp/src/sql.ts</code>: the literal rules the exe cannot explain itself</h3>
+        <p class="loc"><code>mcp/src/sql.ts</code> &mdash; <code>literal()</code>. Committed <code>4ce4597</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>(new file)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>if (typeof value === 'number') {
+  const text = String(value);
+  if (!Number.isFinite(value)) throw new InvalidArgument(`${col}: ${text} is not finite`);
+  if (/e/i.test(text)) throw new InvalidArgument(`${col}: ${text} has no plain decimal form; the dialect has no exponent literal`);
+  if (Number.isInteger(value) &amp;&amp; !Number.isSafeInteger(value)) { ... would be rounded`); }
+  return text;
+}
+if (value === null) throw new InvalidArgument(`${col}: null is not a value (TopSpeed has no NULL); omit the column instead`);</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 1 &middot; Change 2 &mdash; <code>.gitignore</code>: keep npm output out of the tree</h3>
+        <p class="loc"><code>.gitignore</code> &mdash; end of file. Committed <code>4ce4597</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>cli/testdata/*.TPS
+cli/testdata/work/</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>cli/testdata/*.TPS
+cli/testdata/work/
+mcp/node_modules/
+mcp/dist/</code></pre>
+        </div>
+      </div>
+            <h3 class="tglabel">Task 2 &mdash; Runner: spawn, timeout, ceiling, response validation <span class="st-mini">&middot; 390a988</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 2 &middot; Done &middot; 390a988</span>
+        <h3>The fake exe is a real process, and the hang test proves the kill</h3>
+        <p><strong>Decision (spec &sect;5, &sect;9).</strong> <code>test/fake-tpscli.js</code> is launched as <code>node fake-tpscli.js &lt;mode&gt;</code>, so the runner is exercised with a genuine child process, pipes and exit codes; no shell and no <code>.cmd</code> wrapper (Node refuses to spawn a <code>.cmd</code> without a shell). The <code>hang</code> mode prints its pid first, so the test can ask <code>tasklist</code> afterwards and prove the tree kill really happened.</p>
+        <ul><li><strong>Two spawn-failure paths, both tested:</strong> Node throws synchronously for an argument it cannot pass at all (a NUL byte) and emits <code>error</code> asynchronously for ENOENT; the timer is created before <code>spawn()</code> so the synchronous path settles cleanly.</li>
+        <li><strong>Settle once:</strong> every path (close, spawn error, kill failure, kill deadline) goes through one <code>finish()</code> behind a <code>settled</code> flag; a timeout racing a normal close, or <code>taskkill</code> exiting non-zero after the child already closed, cannot double-resolve.</li>
+        <li><strong>Reviewer's minor, deferred:</strong> the <code>kill_failed</code> path has no test (plan-mandated test file); verified by reading only.</li>
+        <li><strong>Real exe probe:</strong> <code>run(&lt;cli\tpscli.exe&gt;, ['--version'])</code> &rarr; exit 0, <code>{ ok:true, op:null, version:"0.1.0", complete:true }</code>, no failure.</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 2 &middot; Change 1 &mdash; <code>mcp/src/runner.ts</code>: what counts as a response</h3>
+        <p class="loc"><code>mcp/src/runner.ts</code> &mdash; <code>parseResponse()</code> and the <code>json</code> field of <code>finish()</code>. Committed <code>390a988</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>(new file)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>export function parseResponse(stdout, exitCode) {
+  let value; try { value = JSON.parse(stdout.trim()); } catch { return null; }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  if (obj.complete !== true || obj.ok !== (exitCode === 0)) return null;
+  return obj;
+}
+...
+const normal = failure === undefined &amp;&amp; exitCode !== null &amp;&amp; exitCode &gt;= 0 &amp;&amp; exitCode &lt;= 3;
+json: normal &amp;&amp; !opts.table ? parseResponse(stdout, exitCode) : null,</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 2 &middot; Change 2 &mdash; <code>mcp/src/runner.ts</code>: kill the tree, and settle even when the kill fails</h3>
+        <p class="loc"><code>mcp/src/runner.ts</code> &mdash; <code>kill()</code>. Committed <code>390a988</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>(new file)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>const tk = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+killTimer = setTimeout(() =&gt; killFailed(`taskkill did not return within ${KILL_DEADLINE_MS} ms`), KILL_DEADLINE_MS);
+tk.on('error', e =&gt; killFailed(`taskkill failed: ${e.message}`));
+tk.on('exit', code =&gt; { if (code !== 0) killFailed(`taskkill exited ${code}`); });
+// On success the child's own close event finishes, with failure already set.</code></pre>
+        </div>
+      </div>
+            <h3 class="tglabel">Task 3 &mdash; Server: the eight tools, policy and result shaping <span class="st-mini">&middot; fa89189</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 3 &middot; Done &middot; fa89189</span>
+        <h3>Gate before resolution; one catch site; the SDK answers schema failures itself</h3>
+        <p><strong>Decisions (spec &sect;3, &sect;6).</strong> The write gate runs before file resolution, so a read-only server never reveals whether a file exists. <code>tps_list_files</code> returns bare <code>{ files }</code> (nothing ran, so no <code>ok</code>/<code>complete</code>). Every handler refusal (bad column, null value, empty <code>set</code>, blank <code>where</code>, unresolvable file, NUL in the owner) is thrown as <code>InvalidArgument</code> or <code>ToolError</code> and converted to the exe-shaped envelope at one place, <code>attempt()</code>; anything else propagates as a bug.</p>
+        <ul><li><strong>SDK behaviour, verified by running 1.30.0:</strong> a zod failure (missing <code>where</code>, <code>limit: -1</code>) is answered by <code>registerTool</code> as an <code>isError</code> text result beginning <code>MCP error -32602: Input validation error</code>, with no <code>structuredContent</code>; the handler never runs. The spec was corrected to say so during planning.</li>
+        <li><strong>Ruling on the reviewer's plan-mandated finding:</strong> the per-call stderr line is <code>tool duration exit</code> plus the runner failure kind when there is one; the spec's "tool name, duration, exit code" sentence exists to keep argv (the owner) out of logs, which this line does. Code stands; the spec sentence gains "and the failure kind, if any".</li>
+        <li><strong>Reviewer's minors, deferred:</strong> the roots-present + drive-relative name (<code>C:X.TPS</code>) branch is covered only by reasoning (the post-resolve membership check); <code>bracket</code>/<code>column</code>/<code>literal</code> are reached through the builders, not imported directly.</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 3 &middot; Change 1 &mdash; <code>mcp/src/server.ts</code>: result precedence in one function</h3>
+        <p class="loc"><code>mcp/src/server.ts</code> &mdash; <code>toResult()</code>. Committed <code>fa89189</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>(new file)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>const badExit = r.exitCode === null || r.exitCode &lt; 0 || r.exitCode &gt; 3;
+if (r.failure || badExit || (!table &amp;&amp; r.json === null)) {
+  ... return body({ ok: false, complete: false, op, error: { code: 'INCOMPLETE', message },
+        exit_code: r.exitCode, timed_out: r.timedOut, stderr: r.stderr, ...(write ? { outcome: 'unknown' } : {}) }, true);
+}
+if (table) return { content: [{ type: 'text', text: r.stdout }], isError: r.exitCode !== 0 };
+return body(r.json!, r.exitCode !== 0);</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 3 &middot; Change 2 &mdash; <code>mcp/src/server.ts</code>: bare names stay inside the roots</h3>
+        <p class="loc"><code>mcp/src/server.ts</code> &mdash; <code>resolveFile()</code>. Committed <code>fa89189</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>(new file)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>const FULLY_QUALIFIED = /^(?:[A-Za-z]:[\\/]|\\\\)/;    // drive letter or UNC; \x and C:x are neither
+...
+if (FULLY_QUALIFIED.test(file)) return file;
+...
+for (const root of config.roots) {
+  const candidate = path.resolve(root, file);
+  if (!config.roots.some(r =&gt; inside(r, candidate))) continue;   // escaped every root
+  if (existsSync(candidate)) return candidate;
+}
+throw new ToolError('FILE_NOT_FOUND', `${file} not found inside ${config.roots.join('; ')}`);</code></pre>
+        </div>
+      </div>
+            <h3 class="tglabel">Task 4 &mdash; Command line, startup, and the end-to-end run <span class="st-mini">&middot; bff487f</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 4 &middot; Done &middot; bff487f</span>
+        <h3>Everything that can be wrong at startup fails at startup</h3>
+        <p><strong>Decisions (spec &sect;3).</strong> <code>parseArgs</code> rejects an unknown flag, a flag without a value, a non-positive or over-limit <code>--timeout</code> (Node's timer ceiling is 2147483 s) and a <code>--root</code> that is not a folder; <code>discoverExe</code> requires a regular file and treats an explicit <code>--exe</code>/<code>TPSCLI_EXE</code> as the only candidate, so a wrong explicit path fails rather than silently running some other exe. All of it runs in <code>main()</code> before the transport connects; exit 2 with the reason on stderr.</p>
+        <ul><li><strong>Entry guard:</strong> <code>main()</code> runs only when <code>process.argv[1]</code> is this module's own path (compared lower-cased), so the tests import <code>dist/server.js</code> without starting a server.</li>
+        <li><strong>e2e cost:</strong> both end-to-end tests (real server process, real exe, six copied fixtures) take about 2.7 s, so they stay inside <code>npm test</code>; the suite skips itself with the missing path when the exe or a fixture is absent (proved by renaming the exe once).</li>
+        <li><strong>PowerShell note:</strong> <code>&lt;</code> is reserved, so the hand start with stdin closed used <code>cmd /c "node dist\server.js --root ..\cli\testdata &lt; NUL"</code>; it printed <code>tpscli-mcp 0.1.0 ready: exe C:\Projects\GitHub\tpscli\cli\tpscli.exe; roots ...\cli\testdata; writes disabled; owner none; timeout 60s</code>.</li>
+        <li><strong>Reviewer's minor, deferred:</strong> the e2e relies on the SDK's <code>StdioClientTransport.close()</code> to end the spawned server; a hard crash mid-test could leave a <code>node</code> process behind.</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 4 &middot; Change 1 &mdash; <code>mcp/src/server.ts</code>: explicit exe is authoritative</h3>
+        <p class="loc"><code>mcp/src/server.ts</code> &mdash; <code>discoverExe()</code>, appended after <code>createServer</code>. Committed <code>bff487f</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>(file ended at the closing brace of createServer)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>const candidates = explicit !== undefined
+  ? [explicit]
+  : [path.join(here, 'tpscli.exe'), path.resolve(here, '..', '..', 'cli', 'tpscli.exe')];
+const hit = candidates.find(c =&gt; existsSync(c) &amp;&amp; statSync(c).isFile());
+if (hit === undefined) {
+  throw new Error(`tpscli.exe not found; tried ${candidates.join(', ')}. Pass --exe &lt;path&gt; or set TPSCLI_EXE.`);
+}</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 4 &middot; Change 2 &mdash; <code>mcp/test/e2e.test.js</code>: fixtures copied, owner env isolated</h3>
+        <p class="loc"><code>mcp/test/e2e.test.js</code> &mdash; <code>corpus()</code> and <code>start()</code>. Committed <code>bff487f</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>(new file)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>const work = mkdtempSync(path.join(os.tmpdir(), 'tpscli-e2e-'));
+for (const n of NAMES) copyFileSync(path.join(fixtures, `${n}.TPS`), path.join(work, `${n}.TPS`));
+...
+const transport = new StdioClientTransport({
+  command: process.execPath,
+  args: [serverJs, '--exe', exe, '--root', work, ...extraArgs],
+  env: { ...process.env, TPSCLI_OWNER: '', ...env },   // an inherited owner would defeat the no-owner checks
+  stderr: 'pipe',
+});</code></pre>
+        </div>
+      </div>
+            <h3 class="tglabel">Task 5 &mdash; README, manual gate prepared, spec wording <span class="st-mini">&middot; 843aa07</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 5 &middot; Done &middot; 843aa07</span>
+        <h3>The owner registers the server; the implementer only prepares the ground</h3>
+        <p><strong>Decision (process).</strong> <code>claude mcp add</code> edits the owner's Claude Code configuration, a side effect outside the worktree, so the implementer did not run it (the reviewer confirmed live with <code>claude mcp list</code>). It copied the six fixtures to <code>%TEMP%\tpscli-manual</code> and wrote the exact command into its report. The plan's <code>/simplify</code> step, a slash command a subagent cannot invoke, was replaced by the controller's ablation pass and the whole-branch review.</p>
+        <ul><li><strong>README verified by running it:</strong> <code>npm run build</code>, <code>npm test</code> (38 pass) and a hand start (<code>ready</code> line) before commit; every flag, tool, argument and error code checked against <code>server.ts</code> by the reviewer.</li>
+        <li><strong>Spec &sect;5 sentence:</strong> the per-call stderr line is now described as "tool name, duration, exit code, and the failure kind if any", matching the code (Task 3 ruling).</li>
+        <li><strong>Deferred to the final review:</strong> <code>mcp/README.md</code> still says "tool, duration, exit code" and its <code>INVALID_ARGUMENT</code> row omits the NUL-owner case (both inherited from the plan's listing).</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 5 &middot; Change 1 &mdash; root <code>README.md</code>: the <code>mcp/</code> row</h3>
+        <p class="loc"><code>README.md</code> &mdash; folder table and last paragraph. Committed <code>843aa07</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>| `mcp/` | The MCP server that wraps `tpscli.exe` (not started yet). | `mcp/README.md` when it exists |
+...
+Build and test the CLI from `cli/`; see `cli/README.md` for the MSBuild line and `verify.ps1`.</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>| `mcp/` | The MCP server that wraps `tpscli.exe`: eight tools over stdio, read-only unless started with `--allow-writes`. | `mcp/README.md` |
+...
+Build and test the CLI from `cli/`, the MCP server from `mcp/`; see each folder's README.</code></pre>
+        </div>
+      </div>
+            <h3 class="tglabel">Final review and fix wave <span class="st-mini">&middot; a7dbca5</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Final &middot; Done &middot; a7dbca5</span>
+        <h3>The statement travels on stdin: Windows argv is a quoting layer after all</h3>
+        <p><strong>Deviation from the spec as written (spec &sect;5 corrected).</strong> The spec said "the SQL is one argv element; there is no shell and therefore no quoting layer". The whole-branch reviewer pointed out that Windows serialises argv into one command line which Clarion's <code>COMMAND()</code> re-splits. A probe against a copied <code>KEYS.TPS</code> confirmed it: over argv, <code>INSERT ... VALUES (9, '12" pizza', 'Q')</code> is a <code>SYNTAX</code> error and a 40 KB statement fails with <code>spawn ENAMETOOLONG</code>; over stdin, <code>a\"b</code> round-trips byte for byte and the 40 KB statement reaches the parser (where the Clarion runtime's own expression limit rejects it, a CLI ceiling). The exe already read the statement from stdin when given no positional argument, so the runner now pipes the statement on stdin and keeps the flags on argv. The runner ignores <code>EPIPE</code> on that write (an exe that exits before reading), the fake exe gained an echo mode, and the e2e round-trips <code>12" pizza\</code> through the real exe.</p>
+        <ul><li><strong>Also fixed:</strong> <code>tps_version</code>'s stderr line now carries the failure kind like every other tool; <code>mcp/README.md</code> describes the stdin path, the log line and the NUL-owner refusal.</li>
+        <li><strong>Parked with rulings (real, nothing builds on them):</strong> <code>taskkill</code> exit 128 after a natural exit in the timeout race is reported as <code>kill_failed</code>; a root folder deleted after startup makes <code>tps_list_files</code> throw past the envelope; a relative <code>--exe</code> is echoed unresolved and duplicate roots list twice; the tests' <code>mkdtemp</code> folders are not removed; no <code>.gitattributes</code> eol rule for <code>mcp/</code>. Deferred from task reviews: <code>kill_failed</code> untested; roots-present + drive-relative name untested; e2e relies on the SDK's <code>close()</code> to end the server child.</li>
+        <li><strong>Ablation pass:</strong> no removals; every helper has three or more callers, the single-use names (<code>STATEMENT_OPS</code>, <code>FULLY_QUALIFIED</code>, <code>SelectArgs</code>) carry their comment, and the injected <code>Run</code> is what the twelve server tests stub.</li>
+        <li><strong>Manual gate, still open for the owner:</strong> fixtures are copied to <code>%TEMP%\tpscli-manual</code>; register with <code>claude mcp add tpscli -- node "C:\Projects\GitHub\tpscli\mcp\dist\server.js" --root "$env:TEMP\tpscli-manual" --allow-writes</code>, exercise the eight tools once (use the absolute path inside <code>[...]</code> for <code>tps_query</code>; it gets no root resolution), and record the results here.</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Final &middot; Change 1 &mdash; <code>mcp/src/server.ts</code> and <code>runner.ts</code>: SQL on stdin</h3>
+        <p class="loc"><code>mcp/src/server.ts</code> <code>invoke()</code>; <code>mcp/src/runner.ts</code> <code>run()</code>. Committed <code>a7dbca5</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>args.push(sql);
+const r = await run(config.exe, args, { timeoutMs: config.timeoutMs, table: o.table === true });
+...
+child = spawn(file, args, { windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>const r = await run(config.exe, args, { timeoutMs: config.timeoutMs, table: o.table === true, stdin: sql });
+...
+child = spawn(file, args, { windowsHide: true, shell: false,
+  stdio: [opts.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
+if (opts.stdin !== undefined) {
+  child.stdin!.on('error', () =&gt; {});   // EPIPE if the exe exits before reading
+  child.stdin!.end(opts.stdin);
+}</code></pre>
+        </div>
+      </div>
+      <!-- TASK_LOG: append the next task group here (h3.tglabel heading, then its dd-card decisions, then its .cc before/after blocks) -->
+    </section>
+  </div>
+</body>
+</html>

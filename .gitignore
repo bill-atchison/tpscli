@@ -1,5 +1,13 @@
 obj/
 map/
 *.exe
-testdata/*.TPS
-testdata/work/
+cli/testdata/*.TPS
+cli/testdata/work/
+.superpowers/
+RT_ERROR*.LOG
+EXCEPTION*.LOG
+.claude/settings.local.json
+mcp/node_modules/
+mcp/dist/
+mcp/work/
+release/

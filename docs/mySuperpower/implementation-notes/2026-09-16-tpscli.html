@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<!--
+  IMPLEMENTATION NOTES / REVIEW DOC — a LIVE doc with TWO regions, both updated in REAL
+  TIME as work happens:
+    1. TASK STATUS table — one task-row per plan task with its TDD SUBTASK rows beneath.
+       Flip each pill pending -> in progress -> done (done rows show commit short-SHA),
+       in sync with the TodoWrite list.
+    2. IMPLEMENTATION LOG · BY TASK — everything for each task together, in task order.
+       The log OPENS with a "PRE-IMPL · CONTEXT" card when the run needs process context
+       (adapted workflow, environment constraints). Then, per task, append a GROUP:
+         a. an <h3 class="tglabel"> task-group heading — task number + title, with a
+            <span class="st-mini"> status/sha annotation ("· abc1234" or "(no code)");
+         b. one dd-card per substantive item (off-spec decision, plan deviation, important
+            fix, cross-task interaction, tradeoff — NOT routine progress). Each card has a
+            maroon tag ("TASK N · DONE · <sha>", "PRE-IMPL · CONTEXT", …), a bold title,
+            and prose/bullets with inline <code> chips;
+         c. one .cc CODE-CHANGE card per applied edit — heading, mono .loc location line,
+            then labelled BEFORE (red) / AFTER (green) <pre> blocks. Keep excerpts minimal:
+            the changed lines plus just enough context; elide unchanged runs with "...".
+       Append new groups at the TASK_LOG comment marker so decisions and code stay co-located.
+
+  FIXED MASTHEAD + PALETTE (per owner spec): header, palette, table, card, and code-block
+  styles are FIXED — reproduce as-is so this doc shares the editorial identity of the spec
+  (Spec · Design) and plan (Plan · Implementation). Stay on-palette.
+
+  HARD RULES: one self-contained .html; ALL CSS inline; web-safe/system fonts only;
+  NO external fonts/CDN/images/<link>/external <script>; renders from file:// offline.
+  An inline is allowed for the live phase.
+
+  LIVE-VIEW: the only fires when the tab is the ACTIVE/visible tab
+  (browsers throttle background tabs) — tell the owner to keep the notes tab visible.
+  At completion: flip Status pill to "Implementation — Complete" and REMOVE the.
+
+  WHO UPDATES WHAT (the controller/agent owns ALL writes; implementer subagents stay report-only):
+    - subagent-driven-development: the CONTROLLER renders the table at setup (all rows
+      pending), flips each task's row to in-progress before dispatch and to done·<sha> after
+      review (filling its subtask rows from the implementer's report), and appends the task's
+      log group (tglabel heading, dd-cards, .cc code cards) from the implementer's report.
+      Implementer subagents never write this file.
+    - executing-plans: the agent renders, flips rows, and appends log groups itself, live.
+
+  PLACEHOLDERS: tpscli Implementation notes: decisions not in the spec, deviations, empirical findings from the TopSpeed corpus. 2026-09-16 feature/tpscli-impl docs/mySuperpower/specs/2026-09-15-tpscli-design.html docs/mySuperpower/plans/2026-09-15-tpscli.html
+    <tr class="task-row" id="t1"><td class="num">1</td><td class="desc">Skeleton: static console build, stdout, args, JSON errors</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="task-row" id="t2"><td class="num">2</td><td class="desc">Test corpus generator with DynFile oracle</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="task-row" id="t3"><td class="num">3</td><td class="desc">tpsSchema A: header, decrypt, pages, records, merged definition</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="task-row" id="t4"><td class="num">4</td><td class="desc">tpsSchema B: definition parser and DESCRIBE parity</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="task-row" id="t5"><td class="num">5</td><td class="desc">DynFile build and shared open</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="task-row" id="t6"><td class="num">6</td><td class="desc">tpsSql: tokenizer, parser, columns, expressions, --parse-only</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="task-row" id="t7"><td class="num">7</td><td class="desc">tpsExec: SELECT with JSON rows and --table</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="task-row" id="t8"><td class="num">8</td><td class="desc">INSERT</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="task-row" id="t9"><td class="num">9</td><td class="desc">UPDATE and DELETE, two-pass, transactional</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="task-row" id="t10"><td class="num">10</td><td class="desc">verify.ps1, README, simplify, final commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>   -> task-row + sub rows per plan task (START all "pending")
+    <div class="dd-card">
+        <span class="dd-tag">Pre-impl &middot; Context</span>
+        <h3>Pre-flight rulings</h3>
+        <ul>
+          <li>Repo already exists at <code>C:\Projects\GitHub	pscli</code>; work on branch <code>feature/tpscli-impl</code>.</li>
+          <li>Every project gets its own <code>&lt;name&gt;.exp</code> (<code>NAME '&lt;name&gt;' CUI</code>) because <code>toolsuild.ps1</code> refuses non-console images: tpscli, mkcorpus, hold.</li>
+          <li>GROUPS.Phones gains <code>Ext STRING(2),DIM(2)</code> in Task 2 because Task 7 selects <code>PHONES[2].EXT[2]</code>.</li>
+          <li>All test work copies live in <code>testdata\work\</code>.</li>
+          <li>Task 3 adds <code>Path</code> and <code>Owner</code> members to tpsSchema (Task 5 needs them).</li>
+          <li>This file replaces the plan's <code>docs\implementation-notes.html</code>; the controller writes it from implementer reports.</li>
+        </ul>
+      </div> -> Implementation Log groups, appended as tasks complete (may start
+                       empty, or with a single PRE-IMPL · CONTEXT card)
+  Eyebrow FIXED "Notes · Implementation". Status pill starts "Implementation — In Progress".
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tpscli</title>
+<style>
+  :root{
+    --paper:#f4efe1; --ink:#221f18; --maroon:#8a2b27; --meta-bg:#e9e1cd;
+    --label:#6d5f4e; --value:#2b2820; --amber:#a8762b; --olive:#7a6a2e;
+    --rule:#ddd3bc; --subrule:#ece4d0; --green:#3f7d3f; --card:#faf7ef;
+    --code-bg:#2b2820; --code-ink:#f4efe1; --add:#3f7d3f; --del:#8a2b27;
+    --serif:Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);padding:3.5rem 2rem;}
+  .wrap{max-width:1040px;margin:0 auto;}
+  .eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.35em;
+           font-size:.8rem;font-weight:700;color:var(--maroon);margin:0 0 1.1rem;}
+  h1{font-family:var(--serif);font-weight:700;font-size:clamp(2.6rem,6vw,4rem);
+     line-height:1.04;letter-spacing:-.01em;margin:0 0 .9rem;}
+  .subtitle{font-family:var(--serif);font-style:italic;font-weight:700;
+            font-size:clamp(1.25rem,2.4vw,1.7rem);line-height:1.3;margin:0 0 1.9rem;max-width:48ch;}
+  .meta-card{display:grid;grid-template-columns:max-content 1fr;column-gap:1.75rem;row-gap:.55rem;
+             align-items:baseline;background:var(--meta-bg);border-radius:14px;
+             border-left:6px solid var(--maroon);padding:1.4rem 1.85rem;}
+  .meta-card dt{font-family:var(--mono);color:var(--label);font-size:.95rem;font-weight:400;}
+  .meta-card dd{font-family:var(--mono);color:var(--value);font-size:.95rem;margin:0;word-break:break-word;}
+  .status-pill{display:inline-block;border:1px solid var(--amber);color:var(--amber);border-radius:999px;
+               padding:.12rem .75rem;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;
+               line-height:1.45;background:transparent;}
+  .section-label{font-family:var(--mono);text-transform:uppercase;letter-spacing:.2em;font-size:.95rem;
+                 font-weight:700;color:var(--ink);border-bottom:2px solid var(--ink);
+                 padding-bottom:.5rem;margin:2.6rem 0 1.4rem;}
+  table.tasks{width:100%;border-collapse:collapse;}
+  table.tasks th{font-family:var(--mono);text-transform:uppercase;letter-spacing:.12em;font-size:.72rem;
+                 color:var(--label);text-align:left;font-weight:400;padding:.4rem .75rem;}
+  table.tasks td{padding:.6rem .75rem;vertical-align:middle;}
+  td.num{font-family:var(--mono);color:var(--label);width:3rem;}
+  td.st{width:1%;white-space:nowrap;text-align:right;}
+  tr.task-row td{border-top:2px solid var(--ink);font-size:1.05rem;}
+  tr.task-row td.desc{font-weight:700;}
+  tr.sub td{border-top:1px solid var(--subrule);}
+  td.subtask{padding-left:2.1rem;color:var(--label);font-size:.95rem;}
+  .tstatus{font-family:var(--mono);font-size:.78rem;padding:.22rem .65rem;border-radius:7px;white-space:nowrap;}
+  .tstatus.done{background:#d6e8cf;color:var(--green);}
+  .tstatus.inprogress{background:#ecdcbf;color:#9a6a1f;}
+  .tstatus.pending{background:#e7dfca;color:var(--label);}
+  .tglabel{font-family:var(--serif);font-weight:700;font-size:1.55rem;color:var(--maroon);margin:2.8rem 0 .2rem;padding-bottom:.3rem;border-bottom:2px solid var(--rule);}
+  .tglabel .st-mini{font-family:var(--mono);font-size:.72rem;font-weight:400;color:var(--label);letter-spacing:.05em;}
+  .cc{margin:1.7rem 0;}
+  .cc h3{font-family:var(--serif);font-weight:700;font-size:1.25rem;margin:.3rem 0 .3rem;color:var(--maroon);}
+  .cc .loc{font-family:var(--mono);font-size:.8rem;color:var(--label);margin:0 0 .6rem;}
+  .cc .ba{display:grid;grid-template-columns:1fr;gap:.5rem;}
+  .cc .lbl{font-family:var(--mono);text-transform:uppercase;letter-spacing:.1em;font-size:.68rem;font-weight:700;margin:.2rem 0 -.2rem;}
+  .cc .lbl.before{color:var(--del);}
+  .cc .lbl.after{color:var(--add);}
+  pre{font-family:var(--mono);font-size:.8rem;line-height:1.5;background:var(--code-bg);color:var(--code-ink);
+      border-radius:10px;padding:1rem 1.2rem;overflow-x:auto;margin:.3rem 0;}
+  pre.before{border-left:4px solid var(--del);}
+  pre.after{border-left:4px solid var(--add);}
+  pre code{background:none;padding:0;font-size:1em;color:inherit;border:none;}
+  .pending-note{font-family:var(--mono);font-size:.85rem;color:var(--label);font-style:italic;}
+  .dd-card{position:relative;background:var(--card);border:1px solid var(--rule);border-radius:14px;
+           padding:1.7rem 1.85rem 1.4rem;margin:1.7rem 0;}
+  .dd-tag{position:absolute;top:-0.75rem;left:1.5rem;background:var(--maroon);color:var(--paper);
+          font-family:var(--mono);text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;
+          font-weight:700;padding:.28rem .7rem;border-radius:6px;}
+  .dd-card h3{font-family:var(--serif);font-weight:700;font-size:1.3rem;margin:.3rem 0 .8rem;}
+  .dd-card p{font-size:1.05rem;line-height:1.55;margin:.5rem 0;}
+  .dd-card ul{margin:.6rem 0;padding-left:1.4rem;}
+  .dd-card li{margin:.5rem 0;line-height:1.55;}
+  code{font-family:var(--mono);background:var(--meta-bg);border:1px solid var(--rule);
+       padding:.05em .35em;border-radius:5px;font-size:.85em;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <p class="eyebrow">Notes &middot; Implementation</p>
+      <h1>tpscli</h1>
+      <p class="subtitle">Implementation notes: decisions not in the spec, deviations, empirical findings from the TopSpeed corpus.</p>
+      <dl class="meta-card">
+        <dt>Started</dt><dd>2026-09-16</dd>
+        <dt>Branch</dt><dd>feature/tpscli-impl</dd>
+        <dt>Spec</dt><dd>docs/mySuperpower/specs/2026-09-15-tpscli-design.html</dd>
+        <dt>Plan</dt><dd>docs/mySuperpower/plans/2026-09-15-tpscli.html</dd>
+        <dt>Updated</dt><dd id="upd">2026-09-18 04:54:22</dd>
+        <dt>Status</dt><dd><span class="status-pill">Implementation &mdash; Complete</span></dd>
+      </dl>
+    </header>
+
+    <section class="task-status">
+      <h2 class="section-label">Task Status</h2>
+      <table class="tasks">
+        <thead><tr><th>Task</th><th>Description</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr class="task-row" id="t1"><td class="num">1</td><td class="desc">Skeleton: static console build, stdout, args, JSON errors</td><td class="st"><span class="tstatus done">&check; done &middot; 5720c39</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="task-row" id="t2"><td class="num">2</td><td class="desc">Test corpus generator with DynFile oracle</td><td class="st"><span class="tstatus done">&check; done &middot; 03862e9</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="task-row" id="t3"><td class="num">3</td><td class="desc">tpsSchema A: header, decrypt, pages, records, merged definition</td><td class="st"><span class="tstatus done">&check; done &middot; 50d2f90</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="task-row" id="t4"><td class="num">4</td><td class="desc">tpsSchema B: definition parser and DESCRIBE parity</td><td class="st"><span class="tstatus done">&check; done &middot; 497a7c8</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="task-row" id="t5"><td class="num">5</td><td class="desc">DynFile build and shared open</td><td class="st"><span class="tstatus done">&check; done &middot; 25b9fe7</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="task-row" id="t6"><td class="num">6</td><td class="desc">tpsSql: tokenizer, parser, columns, expressions, --parse-only</td><td class="st"><span class="tstatus done">&check; done &middot; 141e32d</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="task-row" id="t7"><td class="num">7</td><td class="desc">tpsExec: SELECT with JSON rows and --table</td><td class="st"><span class="tstatus done">&check; done &middot; 60448d3</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="task-row" id="t8"><td class="num">8</td><td class="desc">INSERT</td><td class="st"><span class="tstatus done">&check; done &middot; 08b7ce1</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="task-row" id="t9"><td class="num">9</td><td class="desc">UPDATE and DELETE, two-pass, transactional</td><td class="st"><span class="tstatus done">&check; done &middot; 6928a19</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="task-row" id="t10"><td class="num">10</td><td class="desc">verify.ps1, README, simplify, final commit</td><td class="st"><span class="tstatus done">&check; done &middot; 9df1585</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <!-- One task-row per plan task + its subtask rows. START all "pending"; flip live:
+          <tr class="task-row"><td class="num">1</td><td class="desc">Task title</td><td class="st"><span class="tstatus done">&check; done &middot; abc1234</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; write failing test (red)</td><td class="st"><span class="tstatus done">&check; done</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; implement (green)</td><td class="st"><span class="tstatus inprogress">in progress</span></td></tr>
+          <tr class="sub"><td></td><td class="subtask">&#8627; commit</td><td class="st"><span class="tstatus pending">pending</span></td></tr>
+          -->
+        </tbody>
+      </table>
+    </section>
+
+    <section class="log">
+      <h2 class="section-label">Implementation Log &middot; By Task</h2>
+      <p class="pending-note">Everything for each task together &mdash; decisions/deviations and the before&rarr;after code.</p>
+      <div class="dd-card">
+        <span class="dd-tag">Pre-impl &middot; Context</span>
+        <h3>Pre-flight rulings</h3>
+        <ul>
+          <li>Repo already exists at <code>C:\Projects\GitHub	pscli</code>; work on branch <code>feature/tpscli-impl</code>.</li>
+          <li>Every project gets its own <code>&lt;name&gt;.exp</code> (<code>NAME '&lt;name&gt;' CUI</code>) because <code>toolsuild.ps1</code> refuses non-console images: tpscli, mkcorpus, hold.</li>
+          <li>GROUPS.Phones gains <code>Ext STRING(2),DIM(2)</code> in Task 2 because Task 7 selects <code>PHONES[2].EXT[2]</code>.</li>
+          <li>All test work copies live in <code>testdata\work\</code>.</li>
+          <li>Task 3 adds <code>Path</code> and <code>Owner</code> members to tpsSchema (Task 5 needs them).</li>
+          <li>This file replaces the plan's <code>docs\implementation-notes.html</code>; the controller writes it from implementer reports.</li>
+        </ul>
+      </div>
+      <!-- Append one GROUP per task as it completes: an h3.tglabel heading, then that task's
+           dd-card decision/deviation cards (substantive items only — off-spec decisions, plan
+           deviations, important fixes, cross-task interactions, tradeoffs; NOT routine
+           progress), then one .cc card per applied code change (BEFORE/AFTER excerpts, elide
+           unchanged runs with "..."). A run may open with a PRE-IMPL · CONTEXT dd-card
+           (no tglabel) for process context. Example group:
+
+      <h3 class="tglabel">Task 1 &mdash; Short task title <span class="st-mini">&middot; abc1234</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 1 &middot; Done &middot; abc1234</span>
+        <h3>Short decision title</h3>
+        <p><strong>Decision (off-spec).</strong> What was decided and why; use inline <code>code</code> chips.</p>
+        <ul><li><strong>Rationale:</strong> …</li><li><strong>Interaction for Task N:</strong> …</li></ul>
+      </div>
+      <div class="cc">
+        <h3>Task 1 &middot; Change 1 &mdash; short change title</h3>
+        <p class="loc"><code>path/to/file.ext</code> &mdash; where in the file. Committed <code>abc1234</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>old lines (minimal excerpt; "..." for elided runs)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>new lines</code></pre>
+        </div>
+      </div>
+      -->
+      <h3 class="tglabel">Task 1 &mdash; Skeleton: static console build, stdout, args, JSON errors <span class="st-mini">&middot; 5720c39</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 1 &middot; Done &middot; 5720c39</span>
+        <h3>Clarion facts the plan got wrong or did not know</h3>
+        <ul>
+          <li><strong>Brace escaping:</strong> a literal <code>{</code> in a Clarion string is <code>{{</code>; <code>}</code> is never doubled. The plan's JSON literals were right; the first implementation "fixed" them and the review reverted that.</li>
+          <li><strong>MATCH(…, Match:Regular) has no <code>{m,n}</code> quantifier.</strong> <code>--limit-default</code> now uses <code>^[0-9]+$</code> plus a <code>LEN() &gt; 10</code> guard. Every later regex in the plan (date <code>{4}</code>, decimal <code>{1,15}</code>, base64 groups) must be written the same way.</li>
+          <li><strong>StringTheory.SetSlice does not grow the string</strong> (StringTheory.clw:9042); <code>ReplaceSlice</code> does. JStr's <code>\u00XX</code> escaping was collapsing to one byte until this was switched, and the plan's <code>LOOP i = 1 TO st.Length()</code> froze the bound, so the loop is now <code>LOOP WHILE i &lt;= st.Length()</code>.</li>
+          <li><strong>A StringTheory member cannot be embedded by value in a CLASS</strong>; <code>StdinBuf</code> is <code>&amp;StringTheory</code>, NEW'd in <code>Init</code>. Not disposed (single process-lifetime instance); deferred minor.</li>
+          <li>Environment: <code>NoDefaultCurrentDirectoryInExePath=1</code> on this machine, so shell checks call <code>.\tpscli.exe</code>.</li>
+        </ul>
+      </div>
+      <div class="cc">
+        <h3>Task 1 &middot; Change 1 &mdash; JStr control-character escaping</h3>
+        <p class="loc"><code>tpsOut.clw</code> &mdash; tpsOut.JStr. Committed <code>5720c39</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>  LOOP i = 1 TO st.Length()
+    ...
+      st.SetSlice(i, i, '\u00' &amp; ...)
+      i += 5</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>  i = 1
+  LOOP WHILE i &lt;= st.Length()
+    ...
+      st.ReplaceSlice(i, i, '\u00' &amp; ...)
+      i += 6
+    ELSE
+      i += 1</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 1 &middot; Change 2 &mdash; --limit-default validation without <code>{m,n}</code></h3>
+        <p class="loc"><code>tpscli.clw</code> &mdash; ParseArgs. Committed <code>5720c39</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>IF NOT MATCH(CLIP(COMMAND(n)), '^[0-9]{{1,10}$', Match:Regular) OR COMMAND(n) &gt; 2147483647</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>IF NOT MATCH(CLIP(COMMAND(n)), '^[0-9]+$', Match:Regular) OR LEN(CLIP(COMMAND(n))) &gt; 10 OR COMMAND(n) &gt; 2147483647</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 2 &mdash; Test corpus generator with DynFile oracle <span class="st-mini">&middot; 03862e9</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 2 &middot; Done &middot; 03862e9</span>
+        <h3>PDECIMAL cannot exist in a TopSpeed file</h3>
+        <p><strong>Deviation (plan).</strong> The TOPSPEED driver rejects a <code>PDECIMAL</code> field at CREATE with error 47 "Invalid Record Declaration", reproduced at three precisions in an isolated project while plain DECIMAL works. <code>PD</code> is dropped from ALLTYPES, and every later PDECIMAL step in the plan (Task 4 IsPacked reconciliation, Task 7 PD test) is moot. tpscli reports an unknown type code as <code>UNSUPPORTED_FIELD_TYPE</code>.</p>
+      </div>
+      <div class="dd-card">
+        <span class="dd-tag">Task 2 &middot; Done &middot; 03862e9</span>
+        <h3>Empirical oracle facts Task 4 must reproduce</h3>
+        <ul>
+          <li>Labels are prefixed (<code>AT:D</code>); DECIMAL(7,2) reports <code>size 7, places 2</code>; CSTRING(21)/PSTRING(21) report <code>size 21</code>; <code>STRING(@N9.2)</code> reports <code>size 9, picture "N9.2"</code>; <code>SHORT,DIM(4)</code> reports <code>size 2, dim 4</code>.</li>
+          <li>GROUP <code>fields</code> is a recursive descendant count (Addr = 5: Line1, City, Geo, Lat, Lon). <code>OVER</code> reports the overlaid field's number (RawL.over = 12). A DIM'd leaf inside a DIM'd group reports only its own dim (Ext.dim = 2). Grid DIM(2,3) reports dim 6.</li>
+          <li>Memos read back with <code>nbr 0</code>; MEMO type <code>M</code>, BLOB type <code>B</code> with size 0; <code>,BINARY</code> is <code>binary 1</code>.</li>
+          <li>Keys: PRIMARY reports <code>primary 1</code>; <code>-KY:Amount</code> is <code>asc 0</code>; INDEX reports type <code>I</code> and <code>dup 1</code> even without DUP.</li>
+          <li>Assigning a DIM'd leaf inside a DIM'd group is <code>GR:Phones[i].Ext[j]</code>, not a combined subscript.</li>
+          <li>Generator now fails loudly: every CREATE/OPEN/ADD is followed by a stderr message and HALT(1) on ERRORCODE(). A local named <code>line</code> made <code>ADDRESS(line)</code> ambiguous; renamed.</li>
+        </ul>
+      </div>
+      <div class="cc">
+        <h3>Task 2 &middot; Change 1 &mdash; Phones gains Ext, PD removed</h3>
+        <p class="loc"><code>testdata/gen/mkcorpus.clw</code> &mdash; FILE declarations. Committed <code>03862e9</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>D            DECIMAL(7,2)
+PD           PDECIMAL(9,3)
+...
+Phones         GROUP,DIM(2)
+Kind             STRING(1)
+Number           STRING(12)
+               END</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>D            DECIMAL(7,2)
+...
+Phones         GROUP,DIM(2)
+Kind             STRING(1)
+Number           STRING(12)
+Ext              STRING(2),DIM(2)
+               END</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 3 &mdash; tpsSchema A: header, decrypt, pages, records, merged definition <span class="st-mini">&middot; 50d2f90</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 3 &middot; Done &middot; 50d2f90</span>
+        <h3>Empirical findings from the corpus</h3>
+        <ul>
+          <li><strong>LONG wraps two's-complement</strong> (<code>--selftest</code>: wrap=-2147483648, wrap2=2147483647, bshift=-2147483648), so the decrypt port uses plain LONG arithmetic, no ULONG masking.</li>
+          <li>Every corpus file is <strong>one RLE-compressed page</strong> and its definition record is a <strong>single block</strong> (maxblk 0). Multi-block merging is implemented but not exercised by the corpus.</li>
+          <li>Header counts decoded (fields/memos/indexes): ALLTYPES 15/0/1 (def 307 bytes), KEYS 4/0/5, GROUPS 14/0/1, MEMOS 2/3/1 (driverVersion 2), NOKEY 2/0/0, SECRET 2/0/1 (encrypted, 68 bytes). Decoded labels (<code>AT:ID</code>, <code>SC:ID</code>) match the Task 2 oracle.</li>
+          <li>A file with no <code>tOpS</code> signature and no <code>--owner</code> reports <code>OWNER_REQUIRED</code> (the plan allowed either that or DEFINITION_UNREADABLE).</li>
+        </ul>
+      </div>
+      <div class="dd-card">
+        <span class="dd-tag">Task 3 &middot; Done &middot; 50d2f90</span>
+        <h3>Deviations from the plan text</h3>
+        <ul>
+          <li><code>tpsSchema.st</code> is <code>&amp;StringTheory</code> (Construct/Destruct) &mdash; value embedding does not compile.</li>
+          <li><code>Path</code> and <code>Owner</code> members added, set by <code>Load</code>, for Task 5.</li>
+          <li><code>Out.Fail(CLIP(Sch.Err), CLIP(Sch.ErrMsg), 2)</code>: unclipped fixed STRING members baked 240 trailing spaces into the JSON message. Real bug in the plan text.</li>
+          <li><code>Opt.WantDumpDef</code> instead of <code>Opt.DumpDef</code>: Clarion's flat label namespace collides with the <code>DumpDef</code> procedure.</li>
+          <li>Nested one-line <code>IF … THEN … .</code> forms in <code>Walk</code> expanded to IF/END blocks.</li>
+          <li>Review caught <code>--dump-def</code> hanging on a real console: the option never marked the statement as seen, so ParseArgs fell through to the blocking stdin read. Fixed with <code>seen = 1</code>.</li>
+          <li>Parked for the final review: <code>parts.Data</code> not disposed on early <code>Bad()</code> returns (every path HALTs), duplicated block-ref loop in Decrypt/Walk, <code>BE32</code> lacks a range check.</li>
+        </ul>
+      </div>
+      <div class="cc">
+        <h3>Task 3 &middot; Change 1 &mdash; schema errors printed without padding</h3>
+        <p class="loc"><code>tpscli.clw</code> &mdash; DumpDef. Committed <code>50d2f90</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>Out.Fail(Sch.Err, Sch.ErrMsg, 2)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>Out.Fail(CLIP(Sch.Err), CLIP(Sch.ErrMsg), 2)</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 4 &mdash; tpsSchema B: definition parser and DESCRIBE parity <span class="st-mini">&middot; 497a7c8</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 4 &middot; Done &middot; 497a7c8</span>
+        <h3>TPS definition encoding, pinned against the DynFile oracle</h3>
+        <ul>
+          <li><strong>DECIMAL size:</strong> the definition stores the packed-BCD byte count (D(7,2) &rarr; 4, Amount(9,2) &rarr; 5); DynFile wants digits, so <code>Size = 2*bytes - 1</code>.</li>
+          <li><strong>Memo flags:</strong> bit 0x02 = BINARY (Notes 0x1, Bin 0x3, Pic 0x5), bit 0x04 = BLOB. The plan guessed 0x04 for both.</li>
+          <li><strong>Key flags:</strong> 0x10 = PRIMARY confirmed on PKey only. An INDEX (type bits nonzero) has DUP clear in the file but DynFile reports <code>dup 1</code>; tpscli forces Dup=1 for every INDEX (single data point, KEYS.Idx).</li>
+          <li><strong>Key component ordinals are 0-based</strong> (<code>fno + 1</code> correct as planned). CSTRING/PSTRING sizes are stored as declared. OVER resolves by equal offset.</li>
+          <li><strong>DIM(2,3)</strong> is stored only as 6 elements; GRID is one-dimensional to tpscli (<code>GRID[1]..GRID[6]</code>), Dim2 = 0.</li>
+          <li>The plan's GROUP member-count loop called a queue-mutating helper inside its comparison and miscounted; the group end offset is now computed before the inner loop. INSTRING argument order in the plan's DESCRIBE path extraction was wrong (it is INSTRING(sub, string, step, start)).</li>
+          <li><code>--dump-schema</code> prints prefixed labels (<code>AT:D</code>) so the parity test is a literal compare; it also carries a debug <code>flags</code> member on memos and keys.</li>
+          <li>Non-DECIMAL scalar and GROUP sizes come from <code>Bytes / Elements</code> when the entry carries no explicit size.</li>
+          <li>Review fixes: buf/size restored on every Parse return; key component ordinals validated so a bad definition fails closed as DEFINITION_UNREADABLE. Parked: unused <code>SchFieldOffsetEnd/Of</code>, the debug flags member.</li>
+        </ul>
+      </div>
+      <div class="cc">
+        <h3>Task 4 &middot; Change 1 &mdash; DECIMAL size from packed byte count</h3>
+        <p class="loc"><code>tpsSchema.clw</code> &mdash; Parse, type 0Ah. Committed <code>497a7c8</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>SELF.Fields.Places = SELF.U8(o); SELF.Fields.Digits = SELF.U8(o+1); o += 2
+SELF.Fields.Size = SELF.Fields.Digits</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>SELF.Fields.Places = SELF.U8(o); SELF.Fields.Digits = 2 * SELF.U8(o+1) - 1; o += 2
+SELF.Fields.Size = SELF.Fields.Digits</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 4 &middot; Change 2 &mdash; memo BINARY bit</h3>
+        <p class="loc"><code>tpsSchema.clw</code> &mdash; Parse, memo entries. Committed <code>497a7c8</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>SELF.Memos.IsBlob = CHOOSE(BAND(SELF.Memos.Flags, 4) <> 0, 1, 0)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>SELF.Memos.IsBlob = CHOOSE(BAND(SELF.Memos.Flags, 4) <> 0, 1, 0)
+SELF.Memos.Binary = CHOOSE(BAND(SELF.Memos.Flags, 2) <> 0, 1, 0)</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 5 &mdash; DynFile build and shared open <span class="st-mini">&middot; 25b9fe7</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 5 &middot; Done &middot; 25b9fe7</span>
+        <h3>The driver accepted every reconstructed layout first time</h3>
+        <p>All six corpus files pass <code>FixFormat</code> and <code>SHARE</code> with the Task 4 mappings unchanged (DECIMAL digit count, declared string sizes, picture text without <code>@</code>, recursive GROUP counts, memo bit 0x02). Record counts 3/5/2/2/3/2 match. The negative test (every STRING size +1) produced <code>DEFINITION_MISMATCH</code>, exit 2, naming FIELD 11.</p>
+        <ul>
+          <li><strong>Memo access is by value, not reference.</strong> <code>PROP:Field</code> on a FILE is a dead, commented-out overload in <code>property.clw</code>; the working pattern (DynFile's own <code>GrabData</code>) is <code>F{{PROP:Value, -n}</code>, readable and assignable. <code>MemoRef</code> therefore returns STRING. Task 8 writes memo text with <code>F{{PROP:Value, -n} = text</code>.</li>
+          <li><code>WHO(rec, n)</code> returns the prefixed label (<code>AT:ID</code>); the plan's Open compared it to the bare label and failed closed on every field. Open now compares <code>Prefix:Label</code>.</li>
+          <li><code>Dyn</code> is a <code>&amp;tpsDynFile</code> reference (value embedding of a class with virtual methods does not compile, same as StringTheory).</li>
+          <li>FILE_NOT_FOUND (errors 2/3) and DRIVER branches of Open are implemented but no corpus case exercises them.</li>
+        </ul>
+      </div>
+      <div class="cc">
+        <h3>Task 5 &middot; Change 1 &mdash; Open matches WHO() on the prefixed label</h3>
+        <p class="loc"><code>tpsSchema.clw</code> &mdash; tpsSchema.Open. Committed <code>25b9fe7</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>IF UPPER(CLIP(WHO(rec, j))) = UPPER(CLIP(SELF.Fields.Label)) THEN SELF.Who.Idx = j; BREAK.</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>full = CLIP(SELF.Prefix) &amp; ':' &amp; CLIP(SELF.Fields.Label)
+...
+IF UPPER(CLIP(WHO(rec, j))) = UPPER(CLIP(full)) THEN SELF.Who.Idx = j; BREAK.</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 5 &middot; Change 2 &mdash; MemoRef returns the memo value</h3>
+        <p class="loc"><code>tpsSchema.inc</code> / <code>tpsSchema.clw</code>. Committed <code>25b9fe7</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>MemoRef  PROCEDURE(LONG memoNbr),*?
+...
+r &amp;= SELF.F{{PROP:Field, -memoNbr}</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>MemoRef  PROCEDURE(LONG memoNbr),STRING
+...
+RETURN SELF.F{{PROP:Value, -memoNbr}</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 6 &mdash; tpsSql: tokenizer, parser, columns, expressions, --parse-only <span class="st-mini">&middot; 141e32d</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 6 &middot; Done &middot; 141e32d</span>
+        <h3>Decisions the plan left open</h3>
+        <ul>
+          <li><strong>Fixed-width STRING padding is a systemic Clarion trap.</strong> <code>Take()/Peek()</code> returned the raw <code>STRING(1024)</code> token; every keyword comparison passed (Clarion <code>=</code> ignores trailing blanks) but every WHERE built by <code>&amp;</code> carried kilobytes of spaces. Fixed at the two funnel points plus every fixed-STRING local that reaches a concatenation. A temporary <code>--dump-where</code> hook found it; <code>--parse-only</code> never would have.</li>
+          <li><strong>Whole-array vs GROUP targets:</strong> a GROUP in INSERT/UPDATE is <code>UNSUPPORTED "Assign individual leaves"</code>; a dimmed leaf without a subscript is <code>UNKNOWN_COLUMN</code> (add <code>[n]</code>). The plan said both in different places.</li>
+          <li><strong>Nested DIM flattening:</strong> a leaf inside a DIM'd group uses <code>(GrpElem-1)*Elements + Elem</code> as the single WHAT index and the same number in the Expr text (<code>GR:KIND[1]</code>). Unverified against EVALUATE until Task 7.</li>
+          <li>Generated WHERE text examples: <code>MATCH(AT:STR,'AB*',1)</code>, <code>INLIST(AT:ID,1,2,3) = 0</code>, dates and times as Clarion numbers (<code>AT:DT = 82441</code>). Double parentheses from explicit user grouping are left as-is.</li>
+          <li>JOIN test line changed to <code>JOIN OTHER</code>: a bracket path after JOIN is not a path token by the tokenizer rule, so the backslash fired "Unexpected character" first.</li>
+          <li>Coverage gaps: GROUP BY/HAVING/DISTINCT/UNION/SUM/MIN/MAX/AVG share COUNT's lookup but have no test line; the 40-name UNKNOWN_COLUMN cap and OFFSET-without-LIMIT are untested.</li>
+          <li>Review fixes: duplicate-column errors now report the duplicate's own position (it was read after the token was consumed); bare <code>GROUP</code> is only UNSUPPORTED when followed by <code>BY</code>. Parked: the error-JSON block and op-name CASE are repeated three times in <code>tpscli.clw</code>.</li>
+        </ul>
+      </div>
+      <div class="cc">
+        <h3>Task 6 &middot; Change 1 &mdash; token text clipped at the source</h3>
+        <p class="loc"><code>tpsSql.clw</code> &mdash; tpsSql.Peek / tpsSql.Take. Committed <code>141e32d</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>RETURN SELF.Toks.Text</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>RETURN CLIP(SELF.Toks.Text)</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 7 &mdash; tpsExec: SELECT with JSON rows and --table <span class="st-mini">&middot; 60448d3</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 7 &middot; Done &middot; 60448d3</span>
+        <h3>WHAT() cannot address a leaf inside a DIM'd GROUP</h3>
+        <p><strong>Deviation (spec/plan).</strong> <code>WHAT(rec, fieldIdx, n)</code> only walks the field's own elements; for KIND inside <code>PHONES,DIM(2)</code>, element 2 returns NULL, and for EXT it returns <code>PHONES[1].EXT[2]</code>, never <code>PHONES[2]</code>. Proven with a probe on GROUPS.TPS. <code>WHAT(rec, groupIdx, 2)</code> does return the 17 raw bytes of <code>PHONES[2]</code>, so SELECT slices string leaves out of the group occurrence by offset. EVALUATE has no equivalent: <code>WHERE PHONES[2].KIND = 'M'</code> ran for seconds and exited 0 with no output, so the parser now rejects a WHERE reference with GrpElem &gt; 0 as <code>UNSUPPORTED</code>. Plain array subscripts (<code>WHERE ARR[2] = 20</code>) work. Numeric leaves inside a DIM'd group are UNSUPPORTED in SELECT (nothing in the corpus has one). Task 6's flattening formula is retired for this case; OutColQ keeps GrpElem and Elem separate.</p>
+      </div>
+      <div class="dd-card">
+        <span class="dd-tag">Task 7 &middot; Done &middot; 60448d3</span>
+        <h3>Runtime traps found the hard way</h3>
+        <ul>
+          <li>A <code>QUEUE,TYPE</code> named <code>PosQ</code> crashes <code>NEW</code> with an access violation (10-line standalone repro); renamed <code>SortQ</code>. This was the source of both crash logs.</li>
+          <li>A crashed exe sits behind the Clarion runtime's modal dialog; two agent runs stalled for hours. Every exe invocation now runs under a timeout, and <code>tests\select.ps1</code> does too.</li>
+          <li>Calling builtin <code>FORMAT()</code> inside a method named <code>Format</code> resolves to the method; padding is done with SUB/ALL instead.</li>
+          <li><code>LIKE(ColQ)</code>/<code>LIKE(SchFieldQ)</code> locals do not match by-value queue-row parameters; plain TYPE-name locals do.</li>
+          <li>A ROUTINE reused the caller's loop variable <code>i</code> and repeated a row in the sort fallback.</li>
+          <li><code>tpsOut.JStr</code> now escapes bytes &ge; 128 as well as &lt; 32 (BIN's CHR(255) produced invalid JSON).</li>
+          <li><code>--table</code> now prints <code>CODE: message</code> for parser and schema errors too, not only executor errors.</li>
+          <li>Review fixes: all three test scripts run the exe under a 20-second timeout; ORDER BY on a leaf inside a DIM'd group is rejected as UNSUPPORTED (it silently mis-ordered before). Parked: DoSelect+EmitRow length (~190 lines, shared scan state), NOCASE key selection for case-sensitive ORDER BY, table-mode unescape scope.</li>
+        </ul>
+      </div>
+      <div class="cc">
+        <h3>Task 7 &middot; Change 1 &mdash; JStr escapes high bytes</h3>
+        <p class="loc"><code>tpsOut.clw</code> &mdash; tpsOut.JStr. Committed <code>60448d3</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>IF c &lt; 32</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>IF c &lt; 32 OR c &gt;= 128</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 7 &middot; Change 2 &mdash; sort buffer queue renamed</h3>
+        <p class="loc"><code>tpsExec.inc</code>. Committed <code>60448d3</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>PosQ      QUEUE,TYPE</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>SortQ     QUEUE,TYPE   ! "PosQ" collides with a runtime name and crashes NEW</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 8 &mdash; INSERT <span class="st-mini">&middot; 08b7ce1</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 8 &middot; Done &middot; 08b7ce1</span>
+        <h3>DECIMAL literal width came from the wrong schema field</h3>
+        <p><strong>Plan-vs-repo mismatch, fixed outside the task's file list.</strong> The plan says <code>SchFieldQ.Digits</code> is the decoded digit count. It is not: the TPS definition stores packed-decimal <em>bytes</em> there, and Task 4 decodes the true width into <code>Size</code> (<code>2*bytes-1</code>). Task 6's <code>SqlLitConvert</code> used <code>Digits</code>, so <code>INSERT ... D = 12345.67</code> into a DECIMAL(7,2) was rejected as "overflows DECIMAL(4,2)" before the executor ever ran. One-line fix in <code>tpsSql.clw</code>, regression case in <code>tests\insert.ps1</code>. Ruling: accepted; <code>Digits</code> is misnamed and is a Task 10 rename candidate.</p>
+      </div>
+      <div class="dd-card">
+        <span class="dd-tag">Task 8 &middot; Done &middot; 08b7ce1</span>
+        <h3>Where VALUE_OUT_OF_RANGE actually fires</h3>
+        <p>The parser (<code>ParseBody</code> &rarr; <code>SqlLitConvert</code>) already converts every INSERT literal at parse time, so bad dates, out-of-range integers, fractional SHORTs and DECIMAL overflow are reported from the parser's JSON shape (with <code>position</code>/<code>token</code>) before <code>Validate()</code> runs. <code>Validate()</code> keeps the same checks as defence in depth. Other findings: BLOB writes work through <code>F{PROP:Blob, -memoNbr}</code> (negative index, matching the read path; the plan's positive index was wrong) and were verified end to end on MEMOS.TPS; text memos write through <code>F{PROP:Value, -memoNbr}</code>; DECIMAL display trims trailing fraction zeros (<code>10.00</code> reads back as <code>"10"</code>, consistent with pre-existing <code>0</code> &rarr; <code>"0"</code>); INSERT into a leaf inside a DIM'd GROUP is rejected UNSUPPORTED per the Task 7 ruling, untested because no corpus file has one.</p>
+      </div>
+      <div class="cc">
+        <h3>Task 8 &middot; Change 1 &mdash; DECIMAL width in the literal converter</h3>
+        <p class="loc"><code>tpsSql.clw</code> &mdash; SqlLitConvert. Committed <code>08b7ce1</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>places = s.Sch.Fields.Places; digits = s.Sch.Fields.Digits</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>places = s.Sch.Fields.Places; digits = s.Sch.Fields.Size   ! Size holds the decoded digit count</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 8 &middot; Change 2 &mdash; INSERT executor</h3>
+        <p class="loc"><code>tpsExec.clw</code> &mdash; Validate, Assign, Range, DoInsert. Committed <code>08b7ce1</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>tpsExec.DoInsert PROCEDURE()
+  CODE
+  RETURN SELF.ErrOut('insert', 'UNSUPPORTED', 'Not implemented', 'none', 1)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>LOOP i = 1 TO RECORDS(SELF.Sql.Cols)      ! every Validate before the first mutation
+  rc = SELF.Validate(i); IF rc THEN RETURN SELF.ErrOut('insert', SELF.ErrCode, SELF.ErrMsg, 'none', rc, ...).
+END
+rec &= SELF.Sch.F{PROP:Record}; CLEAR(rec)
+LOOP i = 1 TO RECORDS(SELF.Sql.Cols); SELF.Assign(i); ... END
+ADD(SELF.Sch.F)
+CASE ERRORCODE()
+OF 0  ; ... "affected": 1 (+ warnings)
+OF 40 ; DUPLICATE_KEY, "key": &lt;unique key label&gt;, outcome none, exit 3
+ELSE  ; DRIVER, outcome none, exit 3
+END</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 9 &mdash; UPDATE and DELETE, two-pass, transactional <span class="st-mini">&middot; 6928a19</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 9 &middot; Done &middot; 6928a19</span>
+        <h3>Rollback proven against a live hold</h3>
+        <p>The hold case is the deliverable's proof: <code>tests\hold.exe</code> opens the work copy of KEYS shared and HOLDs row 2 for eight seconds; <code>DELETE ... WHERE ID &gt; 0</code> then deletes row 1 inside LOGOUT, hits error 43 (<code>IsHeldErr</code>, ERRORS.CLW:23) on row 2, and reports <code>RECORD_HELD</code>, row "2", matched 5, affected 0, outcome rolled_back, exit 3. A SELECT afterwards shows all five rows, so ROLLBACK undid an already-applied DELETE. LOGOUT(2,F) works on the file as tpsSchema opens it (SHARE), so no non-transactional downgrade was needed. The driver's error-40 text is bare "Creates Duplicate Key", which is why the key-name fallback exists.</p>
+      </div>
+      <div class="dd-card">
+        <span class="dd-tag">Task 9 &middot; Done &middot; 6928a19</span>
+        <h3>Plan corrections applied</h3>
+        <ul>
+          <li>The plan's candidate queue type <code>PosQ</code> does not exist and the name crashes NEW (Task 7); <code>SortQ</code> is used.</li>
+          <li>The plan hardcodes exit 3 for a failed SET-literal Validate; UNSUPPORTED (leaf inside a DIM'd group) is exit 1, so the code uses DoInsert's rule.</li>
+          <li>The plan's Assign loop ignored failure; inside a transaction with a record held that would leak the hold, so an Assign failure now RELEASEs, rolls back and POPBINDs.</li>
+          <li><code>SET NAME = NAME</code> was already rejected by the parser (SqlCaptureValue); no new code.</li>
+          <li>"First unique key" lookup is now one method, <code>IdKeyNbr()</code> (primary, else first non-dup), shared by DoInsert and RowIdText.</li>
+          <li>Review fix: any failure after LOGOUT now exits 3 (spec 8 says exit 1 promises no data was modified), overriding the plan's exit 1 for a pass-2 EVALUATE rejection. Ceiling worth naming: the protocol holds every mutated record until COMMIT; a very large UPDATE holds many records at once.</li>
+        </ul>
+      </div>
+      <div class="cc">
+        <h3>Task 9 &middot; Change 1 &mdash; UPDATE/DELETE wired to Mutate</h3>
+        <p class="loc"><code>tpsExec.clw</code> &mdash; DoUpdate, DoDelete. Committed <code>6928a19</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>tpsExec.DoUpdate PROCEDURE()
+  CODE
+  RETURN SELF.ErrOut('update', 'UNSUPPORTED', 'Not implemented', 'none', 1)</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>tpsExec.DoUpdate PROCEDURE()
+  CODE
+  RETURN SELF.Mutate(0)          ! DoDelete: SELF.Mutate(1)</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 9 &middot; Change 2 &mdash; pass 2 core of Mutate</h3>
+        <p class="loc"><code>tpsExec.clw</code> &mdash; Mutate, Undo, IdKeyNbr. Committed <code>6928a19</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>tpsExec.Mutate PROCEDURE(BYTE isDelete)
+  CODE
+  RETURN 0</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>LOGOUT(2, SELF.Sch.F)
+LOOP i = 1 TO RECORDS(cands)
+  GET(cands, i)
+  HOLD(SELF.Sch.F, 1)                       ! spec: one second, no retries
+  REGET(SELF.Sch.F, cands.Pos)
+  e = ERRORCODE(); em = ERROR(); fe = FILEERRORCODE(); fm = FILEERROR()
+  IF e THEN ... oc = SELF.Undo(); POPBIND; RETURN ErrOut(RECORD_HELD if e = 43 else DRIVER, row, matched, affected 0).
+  IF SELF.Matches() = 0 THEN RELEASE(SELF.Sch.F); CYCLE.
+  IF isDelete THEN DELETE(SELF.Sch.F) ELSE Assign each column; PUT(SELF.Sch.F).
+  ...
+END
+COMMIT</code></pre>
+        </div>
+      </div>
+
+      <h3 class="tglabel">Task 10 &mdash; verify.ps1, README, release prep <span class="st-mini">&middot; 9df1585</span></h3>
+      <div class="dd-card">
+        <span class="dd-tag">Task 10 &middot; Done &middot; 9df1585</span>
+        <h3>What the end-to-end verifier found</h3>
+        <ul>
+          <li>DESCRIBE does not expose the OVER marker or the picture, so verify.ps1 joins <code>--dump-schema</code> (which has neither <code>ok</code> nor <code>complete</code>) onto the DESCRIBE tree to build its round-trip rows.</li>
+          <li>An <code>INDEX</code> is populated only by BUILD, which nothing here issues, so <code>--walk-key IDX</code> reports count 0; the verifier accepts a zero count for an INDEX and still requires <code>ordered</code>. Consequence checked in review: ORDER BY must never select an INDEX.</li>
+          <li>A STRING declared with a picture deformats on assignment: <code>'rrr'</code> stores <code>00000.00</code> with <code>ok: true</code>. Picture columns are left out of the round trip and the behaviour is documented; classification (warning vs VALUE_OUT_OF_RANGE) is a spec decision recorded in the final review.</li>
+          <li>Step 7 (SELECT ... LIMIT 1 median under 250 ms) is dominated by process start and fails when the machine is pinned by another process; the spec bound is kept and the measured baseline (30&ndash;60 ms idle) recorded.</li>
+          <li><code>tests\select.ps1</code> and <code>tests\parser.expected.txt</code> were LF only in the working tree but already CRLF in the index; normalising them produced no diff.</li>
+        </ul>
+      </div>
+      <div class="dd-card">
+        <span class="dd-tag">Task 10 &middot; Done &middot; 9df1585</span>
+        <h3>Rulings applied to the plan's Task 10</h3>
+        <p>The implementer did not edit this notes page (controller-owned), did not run <code>/simplify</code> (replaced by the controller's ablation pass before the final review), and did not tag v0.1.0 (tagging follows the final whole-branch review). <code>-Extra</code>, <code>-Expected</code> and <code>-TpsFixLog</code> are implemented per the plan but untested: no dtpos files exist in this repository.</p>
+      </div>
+      <div class="dd-card">
+        <span class="dd-tag">Task 10 &middot; Done &middot; 9df1585</span>
+        <h3>Review fixes: two product defects the verifier exposed</h3>
+        <ul>
+          <li><strong>ORDER BY could select an unbuilt INDEX.</strong> <code>tpsExec.ChooseKey</code> filtered only OPT keys; an INDEX is populated only by BUILD, which tpscli never issues, so a SELECT whose only matching key was an INDEX returned zero rows with <code>ok: true</code>. ChooseKey now skips <code>IsKey = 0</code> and falls back to the in-memory sort. No corpus file reached the old path (KEYS.DUPKEY precedes KEYS.IDX), so there is no regression test; the trade-off is that a built INDEX is no longer used for ordering.</li>
+          <li><strong>Picture STRING silently zeroed unreadable literals.</strong> <code>INSERT ... PIC = 'rrr'</code> reported <code>ok: true</code> and stored <code>00000.00</code>. Spec &sect;8 calls every conversion failure VALUE_OUT_OF_RANGE, so <code>Validate</code> now applies <code>DEFORMAT(lit, '@' &amp; picture)</code> and rejects a literal that deformats to blank (or to zero while containing no digit) with "PIC does not match picture @N9.2". Probe results: 'rrr' &rarr; blank (rejected); '7' &rarr; 7; '00007.00' &rarr; 7; '' accepted; 'r7r' &rarr; 7 (accepted, known ceiling: FORMAT does not take a runtime picture, so a round-trip check is impossible). Seven cases added to <code>tests\insert.ps1</code>; verify.ps1 asserts the refusal on every picture column.</li>
+          <li>verify.ps1 now FAILs (not skips) a file whose unique key has an unwritable component, joins schema metadata by field ordinal from <code>--dump-schema</code> instead of bare labels, and survives a failing test script in step 2.</li>
+        </ul>
+      </div>
+      <div class="cc">
+        <h3>Task 10 &middot; Change 1 &mdash; --walk-key test hook</h3>
+        <p class="loc"><code>tpscli.clw</code> &mdash; ParseArgs, WalkKey. Committed <code>9df1585</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>OF '--dump-def'
+  ...</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>OF '--walk-key'
+  n += 1; Opt.WalkKey = COMMAND(n)   ! SET(key)/NEXT over exactly that key;
+                                     ! prints count and ordered, for verify.ps1 step 5</code></pre>
+        </div>
+      </div>
+      <div class="cc">
+        <h3>Task 10 &middot; Change 2 &mdash; bounded runner accepts argument-less exes</h3>
+        <p class="loc"><code>tests\TestHelpers.ps1</code> &mdash; Invoke-Tpscli_Bounded. Committed <code>9df1585</code>.</p>
+        <div class="ba">
+          <p class="lbl before">Before</p>
+          <pre class="before"><code>[Parameter(Mandatory)] [string[]]$ArgumentList</code></pre>
+          <p class="lbl after">After</p>
+          <pre class="after"><code>[string[]]$ArgumentList = @()      ! mkcorpus.exe takes no arguments; Start-Process
+                                   ! is called without -ArgumentList when the list is empty</code></pre>
+        </div>
+      </div>
+
+      <div class="dd-card">
+        <span class="dd-tag">ABLATION &middot; da465cb</span>
+        <h3>Ablation pass before the final review</h3>
+        <p>Every abstraction the branch added was tried without: the only removal that survived the test suites is <code>tpsExec.Validate</code>'s duplicated integer-range, DECIMAL digit-count and overflow guards, which the parser's <code>SqlLitConvert</code> already applies to every INSERT and UPDATE literal (Task 8's reviewer flagged the duplication). Validate now only converts. Kept: the small module-local helpers (base64 shape check, digit scan, table unescape) and every multi-caller schema accessor; they are named functions, not layers.</p>
+      </div>
+      <div class="dd-card">
+        <span class="dd-tag">FINAL REVIEW &middot; f402937</span>
+        <h3>Whole-branch review: "with fixes"</h3>
+        <p>The final reviewer (Opus, 20 commits, f8c4c7c..da465cb) found the architecture sound and every ruling honoured, but flagged values the corpus never produced. <strong>Critical:</strong> two fixed-width buffers (a 4&nbsp;KB cell buffer in SELECT output, a 1&nbsp;KB token buffer in the tokenizer) silently truncate a long memo/BLOB into invalid JSON or a short write. <strong>Important:</strong> memo columns carry field number 0 and borrow the last field's type in the literal converter; ORDER BY on a memo is ignored; --table prints nothing over 64 columns; a DIM'd group over 512 bytes slices a wrong value; columns named COUNT/SUM/MAX are unreachable; even-width DECIMALs are undecidable from the file; GRID[2][3] is documented but unsupported; verify.ps1 prints PASS for skipped steps; the UPDATE/DELETE candidate queue costs 1.8&nbsp;KB per row; DESCRIBE writes names unescaped. One fix wave (commits 1aec17c, 6a3a8f2, f402937) addressed all of them; the two undecidable items (even-width DECIMAL, two-dimensional subscripts) are documented in the README deviations. The scoped re-review confirmed every finding addressed with no new breakage. Tests added: a 3150-byte BLOB round trip, memo-literal typing, ORDER BY on a memo refused, a column named COUNT resolving as a name.</p>
+      </div>
+      <div class="dd-card">
+        <span class="dd-tag">CLOSE-OUT &middot; parked items</span>
+        <h3>Left as is, with reasons</h3>
+        <ul>
+          <li><code>SELECT DISTINCT</code> answers UNKNOWN_COLUMN rather than UNSUPPORTED (spec &sect;8's UNSUPPORTED row does not list DISTINCT; JOIN/HAVING/UNION still UNSUPPORTED).</li>
+          <li><code>--table</code> clips a cell over 255 characters; the JSON contract is unaffected.</li>
+          <li>The <code>-Extra</code>/<code>-Expected</code>/<code>-TpsFixLog</code> paths of verify.ps1 have never executed: no dtpos files exist in this repository. A local run now ends "all steps PASS (2 skipped - not a release qualification)". The real release gate is that run against copied dtpos files.</li>
+          <li>Even-width DECIMAL fields are reported one digit wider than declared (undecidable from the packed byte count); <code>DIM(a,b)</code> is flattened to a single extent.</li>
+          <li>Method length in DoSelect/ExprCmp/ColumnRef; StdinBuf and one width queue never freed (one statement per process); UPDATE's DUPLICATE_KEY carries <code>row</code> not <code>key</code>.</li>
+        </ul>
+      </div>
+      <!-- TASK_LOG: append the next task group here (h3.tglabel heading, then its dd-card decisions, then its .cc before/after blocks) -->
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tpscli MCP server Implementation Plan</title>
+<style>
+  :root{
+    --paper:#f4efe1; --ink:#221f18; --maroon:#8a2b27; --meta-bg:#e9e1cd;
+    --label:#6d5f4e; --value:#2b2820; --amber:#a8762b;
+    --serif:Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;
+    --rule:#cdbfa3; --soft:#ece4d2; --code-bg:#2b2820; --code-ink:#f4efe1;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);padding:3.5rem 2rem;line-height:1.6;}
+  .wrap{max-width:1280px;margin:0 auto;}
+
+  /* ---- ONE MEASURE ---- */
+  main p,main ul,main ol{max-width:84ch;}
+  main ol.steps{max-width:none;}
+  main pre{max-width:100%;overflow-x:auto;}
+
+  /* ---- FIXED masthead (do not restyle) ---- */
+  .eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.35em;font-size:.8rem;font-weight:700;color:var(--maroon);margin:0 0 1.1rem;}
+  h1{font-family:var(--serif);font-weight:700;font-size:clamp(2.6rem,6vw,4rem);line-height:1.04;letter-spacing:-.01em;margin:0 0 .9rem;}
+  .subtitle{font-family:var(--serif);font-style:italic;font-weight:700;font-size:clamp(1.25rem,2.4vw,1.7rem);line-height:1.3;margin:0 0 1.9rem;max-width:52ch;}
+  .meta-card{display:grid;grid-template-columns:max-content 1fr;column-gap:1.75rem;row-gap:.55rem;align-items:baseline;background:var(--meta-bg);border-radius:14px;border-left:6px solid var(--maroon);padding:1.4rem 1.85rem;}
+  .meta-card dt{font-family:var(--mono);color:var(--label);font-size:.95rem;font-weight:400;}
+  .meta-card dd{font-family:var(--mono);color:var(--value);font-size:.95rem;margin:0;word-break:break-word;}
+  .agentic-note{background:var(--meta-bg);border-radius:14px;padding:1.25rem 1.85rem;margin-top:1rem;font-family:var(--mono);color:var(--value);font-size:.92rem;line-height:1.6;}
+
+  /* ---- BODY ---- */
+  main{margin-top:3rem;}
+  main h2{font-family:var(--serif);font-size:1.8rem;line-height:1.15;margin:2.4rem 0 .8rem;padding-top:1.6rem;border-top:1px solid var(--rule);}
+  main h2:first-child{border-top:none;padding-top:0;margin-top:0;}
+  main h3{font-family:var(--mono);font-size:.85rem;text-transform:uppercase;letter-spacing:.14em;color:var(--maroon);margin:1.6rem 0 .6rem;}
+  main p{margin:0 0 .9rem;}
+  main li::marker{color:var(--maroon);}
+  .constraints li{margin:.25rem 0;}
+  section.task{margin:0 0 1.2rem;padding:.2rem 0;}
+  .tasknum{font-family:var(--mono);font-size:.8rem;color:var(--amber);font-weight:700;}
+  .files{background:var(--soft);border-left:4px solid var(--amber);border-radius:0 10px 10px 0;padding:.7rem 1.1rem;margin:.7rem 0 1rem;font-family:var(--mono);font-size:.86rem;line-height:1.7;}
+  .files .k{color:var(--maroon);font-weight:700;text-transform:uppercase;font-size:.72rem;letter-spacing:.05em;}
+  ol.steps{list-style:none;counter-reset:step;padding-left:0;margin:.6rem 0;}
+  ol.steps>li.step{position:relative;padding:.15rem 0 .6rem 2.2rem;margin:0;}
+  ol.steps>li.step::before{content:"";position:absolute;left:0;top:.18rem;width:1.15rem;height:1.15rem;border:2px solid var(--maroon);border-radius:4px;background:transparent;}
+  ol.steps>li.step::after{counter-increment:step;content:counter(step);position:absolute;left:1.55rem;top:.05rem;font-family:var(--mono);font-size:.72rem;color:var(--amber);font-weight:700;}
+  li.step .t{font-weight:700;}
+  pre{font-family:var(--mono);font-size:.76rem;line-height:1.5;background:var(--code-bg);color:var(--code-ink);border-radius:10px;padding:1rem 1.2rem;overflow-x:auto;margin:.6rem 0;white-space:pre-wrap;overflow-wrap:anywhere;}
+  pre code{background:none;padding:0;font-size:1em;color:inherit;}
+  code{font-family:var(--mono);font-size:.88em;background:var(--soft);padding:.06rem .35rem;border-radius:5px;}
+  .expect{font-family:var(--mono);font-size:.8rem;color:var(--label);margin:.3rem 0;}
+  table{border-collapse:collapse;width:100%;margin:.6rem 0 1.2rem;font-size:.95rem;}
+  th,td{text-align:left;padding:.5rem .7rem;border-bottom:1px solid var(--rule);vertical-align:top;}
+  th{font-family:var(--mono);font-size:.74rem;text-transform:uppercase;letter-spacing:.12em;color:var(--label);}
+  blockquote{margin:1rem 0;padding:.6rem 1.2rem;border-left:4px solid var(--amber);background:var(--soft);font-style:italic;border-radius:0 8px 8px 0;}
+  @media (max-width:640px){
+    body{padding:2.25rem 1.1rem;}
+    .meta-card{grid-template-columns:1fr;row-gap:.2rem;}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <p class="eyebrow">Plan &middot; Implementation</p>
+      <h1>tpscli MCP server</h1>
+      <p class="subtitle">TDD: three TypeScript modules, a fake exe for the unit tests, the real exe and corpus for the end-to-end run, and a manual gate from a real MCP client.</p>
+      <dl class="meta-card">
+        <dt>Date</dt><dd>2026-09-19</dd>
+        <dt>Branch</dt><dd>feature/tpscli-mcp</dd>
+        <dt>Spec</dt><dd>docs/mySuperpower/specs/2026-09-19-tpscli-mcp-design.html</dd>
+      </dl>
+      <p class="agentic-note">REQUIRED SUB-SKILL: execute task-by-task with TDD (red &rarr; green &rarr; commit) using subagent-driven-development (recommended) or executing-plans. Codex review of this plan + spec before implementation; per-task two-stage review. Steps are checkbox-styled; track progress with your task tools, not by editing this file.</p>
+    </header>
+
+    <main>
+      <h2>Overview</h2>
+      <p><strong>Goal:</strong> <code>mcp/</code> becomes a working MCP server that exposes every tpscli function (five statements, <code>--owner</code>, <code>--limit-default</code>, <code>--parse-only</code>, <code>--table</code>, <code>--version</code>) as eight tools over stdio, read-only unless started with <code>--allow-writes</code>.</p>
+      <p><strong>Architecture:</strong> three modules with one job each. <code>sql.ts</code> is pure (arguments in, statement text out, every literal and identifier rule). <code>runner.ts</code> spawns the exe with no shell, under a timeout and an output ceiling, and decides whether stdout is a response. <code>server.ts</code> holds the policy (write gate, root resolution, owner), builds argv, shapes results into the spec's envelopes, registers the tools and parses the command line. The exe's JSON is passed through unchanged, so <code>cli/README.md</code> stays the contract.</p>
+      <p><strong>Tech stack:</strong> Node 20 (20.18.1 on this machine), TypeScript 5, <code>@modelcontextprotocol/sdk</code> 1.30, <code>zod</code> 3.25, <code>node --test</code> with plain ESM JavaScript tests that import the built <code>dist/</code>. No other runtime dependency.</p>
+      <p><strong>Spec:</strong> <code>docs/mySuperpower/specs/2026-09-19-tpscli-mcp-design.html</code> (d08e9ed). Section numbers below refer to it. The spec's tool table (&sect;3), builder rules (&sect;4), runner and result mapping (&sect;5), policy (&sect;6), layout (&sect;8) and verification list (&sect;9) are implemented verbatim; the plan adds the order of work and the exact code.</p>
+
+      <h3>Global constraints</h3>
+      <ul class="constraints">
+        <li>Two working directories: every <code>npm</code>, <code>npx</code> and <code>node</code> command below is typed in <code>C:\Projects\GitHub\tpscli\mcp</code> (the CLI is then <code>..\cli</code>); every <code>git</code> and <code>mkdir</code> command is typed at the repository root <code>C:\Projects\GitHub\tpscli</code>, which is why the staged paths start with <code>mcp/</code>.</li>
+        <li>Node <code>&gt;=20</code>; <code>@modelcontextprotocol/sdk ^1.30.0</code>; <code>zod ^3.25.0</code>; dev only <code>typescript ^5.6.0</code>, <code>@types/node ^20.0.0</code>. Add no other dependency.</li>
+        <li>Tests are <code>.js</code> under <code>mcp/test/</code>, run with <code>node --test &lt;files&gt;</code>, importing from <code>../dist/</code>; <code>tsconfig</code> compiles <code>src/</code> only (Node 20 runs neither <code>.ts</code> nor test-directory globs).</li>
+        <li>Line endings: every <code>.ts</code>, <code>.js</code>, <code>.json</code>, <code>.md</code> and <code>.html</code> you write is CRLF with lone-LF 0. <code>package-lock.json</code> is npm's and exempt. After writing a file, check and fix:<pre><code>python -c &quot;import sys; b=open(sys.argv[1],&#x27;rb&#x27;).read(); c=b.count(b&#x27;\r\n&#x27;); print(sys.argv[1],&#x27;CRLF&#x27;,c,&#x27;lone-LF&#x27;,b.count(b&#x27;\n&#x27;)-c)&quot; &lt;file&gt;</code></pre><pre><code>python -c &quot;import sys; p=sys.argv[1]; b=open(p,&#x27;rb&#x27;).read().replace(b&#x27;\r\n&#x27;,b&#x27;\n&#x27;).replace(b&#x27;\n&#x27;,b&#x27;\r\n&#x27;); open(p,&#x27;wb&#x27;).write(b)&quot; &lt;file&gt;</code></pre></li>
+        <li>Never write to <code>..\cli\testdata\*.TPS</code>. Tests and the manual gate copy the six fixtures to a temp folder first.</li>
+        <li>Never run the exe without a timeout: the runner has one; ad-hoc probes use <code>timeout 20 ..\cli\tpscli.exe ...</code> in Git Bash. A crashed Clarion exe blocks behind a modal dialog.</li>
+        <li>Stage files by name (<code>git add mcp/src/sql.ts ...</code>); a hook rejects <code>git add -A</code> and <code>git add .</code>. Commit messages end with the attribution lines the session reminder gives you.</li>
+        <li>The exe's dialect facts the tests rely on, verified 2026-09-19 against <code>tpscli.exe</code> 0.1.0: DECIMAL literals must be numeric (a quoted <code>'12.50'</code> is <code>VALUE_OUT_OF_RANGE</code>); there is no exponent literal and no comment syntax; <code>OFFSET</code> without <code>LIMIT</code> is <code>SYNTAX</code>; <code>--table</code> prints one <code>CODE: message</code> line on failure; <code>--owner</code> is harmless on an unencrypted file; <code>--version</code> prints <code>{ "ok": true, "op": null, "version": "0.1.0", "complete": true }</code>.</li>
+        <li>Keep a live implementation-notes file at <code>docs/mySuperpower/implementation-notes/2026-09-19-tpscli-mcp.html</code> (create it in Task 1 with the spec's palette and one dated list; append in every task anything you decided that the spec did not say, anything you changed, and every tradeoff).</li>
+      </ul>
+
+      <h3>File structure</h3>
+      <table>
+        <thead><tr><th>File</th><th>Responsibility</th><th>Task</th></tr></thead>
+        <tbody>
+          <tr><td><code>mcp/package.json</code>, <code>mcp/tsconfig.json</code></td><td>Dependencies, scripts (<code>build</code>, <code>test</code>), compiler settings.</td><td>1</td></tr>
+          <tr><td><code>.gitignore</code> (root)</td><td>Adds <code>mcp/node_modules/</code> and <code>mcp/dist/</code>.</td><td>1</td></tr>
+          <tr><td><code>mcp/src/sql.ts</code></td><td>Statement builder: <code>bracket</code>, <code>column</code>, <code>literal</code>, <code>buildDescribe/Select/Insert/Update/Delete</code>, <code>classify</code>, <code>InvalidArgument</code>, <code>WRITE_OPS</code>. No I/O.</td><td>1</td></tr>
+          <tr><td><code>mcp/test/sql.test.js</code></td><td>Every rule of spec &sect;4, the three spec examples byte for byte.</td><td>1</td></tr>
+          <tr><td><code>mcp/src/runner.ts</code></td><td><code>run(file, args, opts)</code>, <code>parseResponse</code>, <code>RunResult</code> with <code>failure</code>, <code>OUTPUT_LIMIT</code>.</td><td>2</td></tr>
+          <tr><td><code>mcp/test/fake-tpscli.js</code>, <code>mcp/test/runner.test.js</code></td><td>A scriptable stand-in for the exe and the runner's failure matrix.</td><td>2</td></tr>
+          <tr><td><code>mcp/src/server.ts</code></td><td><code>createServer(config, run)</code>, <code>toResult</code>, the eight tools, <code>parseArgs</code>, <code>discoverExe</code>, <code>main</code>.</td><td>3, 4</td></tr>
+          <tr><td><code>mcp/test/server.test.js</code></td><td>Tools over <code>InMemoryTransport</code> with a stub <code>run</code>: gates, resolution, argv, envelopes, <code>toResult</code>.</td><td>3</td></tr>
+          <tr><td><code>mcp/test/args.test.js</code></td><td><code>parseArgs</code>, <code>discoverExe</code>, startup exit 2.</td><td>4</td></tr>
+          <tr><td><code>mcp/test/e2e.test.js</code></td><td>Real server process over stdio against the real exe and copied fixtures; skips itself when they are absent.</td><td>4</td></tr>
+          <tr><td><code>mcp/README.md</code>, root <code>README.md</code></td><td>Install, client config, flags, tools, error codes; the root table row loses "not started yet".</td><td>5</td></tr>
+        </tbody>
+      </table>
+      <p>The spec's &sect;8 lists <code>server.test.js</code> as holding the argv tests too; they are split into <code>args.test.js</code> here because they spawn a real process and need their own temp layout. Same coverage, one more file.</p>
+
+      <section class="task">
+        <h2>Task 1 <span class="tasknum">&middot; project scaffold and the SQL builder</span></h2>
+        <p>Deliverable: <code>npm test</code> compiles <code>src/sql.ts</code> and passes a table-driven test of every builder rule in spec &sect;4. Nothing spawns yet.</p>
+        <div class="files">
+          <div><span class="k">Create</span> <code>mcp\package.json</code>, <code>mcp\tsconfig.json</code>, <code>mcp\src\sql.ts</code>, <code>mcp\test\sql.test.js</code>, <code>docs\mySuperpower\implementation-notes\2026-09-19-tpscli-mcp.html</code></div>
+          <div><span class="k">Modify</span> <code>.gitignore</code> (repo root)</div>
+          <div><span class="k">Produces</span> <code>InvalidArgument</code> (Error with <code>code: "INVALID_ARGUMENT"</code>); <code>WRITE_OPS: ReadonlySet&lt;string&gt;</code>; <code>bracket(file): string</code>; <code>column(name): string</code>; <code>literal(value: unknown, col: string): string</code>; <code>classify(sql): string | null</code>; <code>buildDescribe(file)</code>; <code>buildSelect({ file, columns?, where?, order_by?, limit?, offset? })</code>; <code>buildInsert(file, values)</code>; <code>buildUpdate(file, set, where)</code>; <code>buildDelete(file, where)</code>, all returning the statement string or throwing <code>InvalidArgument</code></div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Create the folder and the two project files.</span> At the repository root: <code>mkdir mcp\src, mcp\test</code> (PowerShell creates <code>mcp</code> on the way). Then, in <code>mcp\</code>, <code>mcp\package.json</code>:<pre><code>{
+  &quot;name&quot;: &quot;tpscli-mcp&quot;,
+  &quot;version&quot;: &quot;0.1.0&quot;,
+  &quot;description&quot;: &quot;MCP server that exposes tpscli.exe (SQL over TopSpeed files) over stdio&quot;,
+  &quot;type&quot;: &quot;module&quot;,
+  &quot;private&quot;: true,
+  &quot;bin&quot;: { &quot;tpscli-mcp&quot;: &quot;dist/server.js&quot; },
+  &quot;engines&quot;: { &quot;node&quot;: &quot;&gt;=20&quot; },
+  &quot;scripts&quot;: {
+    &quot;build&quot;: &quot;tsc&quot;,
+    &quot;test&quot;: &quot;tsc &amp;&amp; node --test test/sql.test.js&quot;
+  },
+  &quot;dependencies&quot;: {
+    &quot;@modelcontextprotocol/sdk&quot;: &quot;^1.30.0&quot;,
+    &quot;zod&quot;: &quot;^3.25.0&quot;
+  },
+  &quot;devDependencies&quot;: {
+    &quot;@types/node&quot;: &quot;^20.0.0&quot;,
+    &quot;typescript&quot;: &quot;^5.6.0&quot;
+  }
+}</code></pre><code>mcp\tsconfig.json</code>:<pre><code>{
+  &quot;compilerOptions&quot;: {
+    &quot;target&quot;: &quot;ES2022&quot;,
+    &quot;module&quot;: &quot;NodeNext&quot;,
+    &quot;moduleResolution&quot;: &quot;NodeNext&quot;,
+    &quot;strict&quot;: true,
+    &quot;rootDir&quot;: &quot;src&quot;,
+    &quot;outDir&quot;: &quot;dist&quot;,
+    &quot;types&quot;: [&quot;node&quot;],
+    &quot;skipLibCheck&quot;: true
+  },
+  &quot;include&quot;: [&quot;src&quot;]
+}</code></pre>The <code>test</code> script names only the test files that exist; Tasks 2, 3 and 4 each append theirs.</li>
+          <li class="step"><span class="t">Install and ignore.</span> <pre><code>npm install</code></pre><p class="expect">Expected: package-lock.json appears; node_modules/ holds @modelcontextprotocol/sdk 1.30.x and zod 3.25.x (check with npm ls --depth=0). No errors.</p>Append to the root <code>.gitignore</code> (CRLF):<pre><code>mcp/node_modules/
+mcp/dist/</code></pre></li>
+          <li class="step"><span class="t">Start the implementation notes.</span> Create <code>docs\mySuperpower\implementation-notes\2026-09-19-tpscli-mcp.html</code>: copy the <code>&lt;head&gt;</code> and masthead of <code>docs\mySuperpower\implementation-notes\2026-09-16-tpscli.html</code>, change the title to "tpscli MCP server: implementation notes", the date to 2026-09-19, and leave one <code>&lt;ol&gt;</code> with a single item: "Task 1: tests are .js importing dist/ because Node 20 runs neither .ts nor --test directory globs (spec &sect;8)." Every later task appends to this list.</li>
+          <li class="step"><span class="t">Write the failing builder test.</span> <code>mcp\test\sql.test.js</code>:<pre><code>import { test } from &#x27;node:test&#x27;;
+import assert from &#x27;node:assert/strict&#x27;;
+import {
+  InvalidArgument, WRITE_OPS, bracket, column, literal, classify,
+  buildDescribe, buildSelect, buildInsert, buildUpdate, buildDelete,
+} from &#x27;../dist/sql.js&#x27;;
+
+// Every refusal is an InvalidArgument whose message says what to do instead.
+const rejects = (fn, re) =&gt; assert.throws(fn, e =&gt; e instanceof InvalidArgument &amp;&amp; e.code === &#x27;INVALID_ARGUMENT&#x27; &amp;&amp; re.test(e.message));
+
+test(&#x27;bracket wraps the path and refuses ]&#x27;, () =&gt; {
+  assert.equal(bracket(&#x27;C:\\pos\\data\\ITEMS.TPS&#x27;), &#x27;[C:\\pos\\data\\ITEMS.TPS]&#x27;);
+  rejects(() =&gt; bracket(&#x27;C:\\odd]name.TPS&#x27;), /&quot;\]&quot;/);
+});
+
+test(&#x27;column accepts identifier paths and refuses everything else&#x27;, () =&gt; {
+  for (const ok of [&#x27;ID&#x27;, &#x27;ADDR.CITY&#x27;, &#x27;QTY[3]&#x27;, &#x27;ADDR[2].CITY&#x27;, &#x27;_x1&#x27;]) assert.equal(column(ok), ok);
+  for (const bad of [&#x27;&#x27;, &#x27;1ID&#x27;, &#x27;A B&#x27;, &#x27;A;&#x27;, &#x27;A.&#x27;, &#x27;A[]&#x27;, &#x27;A[1&#x27;, &#x27;A[1][2]&#x27;, &#x27;A:B&#x27;, &#x27;ID, NAME&#x27;]) {
+    rejects(() =&gt; column(bad), /identifier path/);
+  }
+});
+
+test(&#x27;literal renders strings, numbers and booleans&#x27;, () =&gt; {
+  assert.equal(literal(&quot;O&#x27;Brien&quot;, &#x27;NAME&#x27;), &quot;&#x27;O&#x27;&#x27;Brien&#x27;&quot;);
+  assert.equal(literal(&#x27;&#x27;, &#x27;NAME&#x27;), &quot;&#x27;&#x27;&quot;);
+  assert.equal(literal(12.5, &#x27;AMOUNT&#x27;), &#x27;12.5&#x27;);
+  assert.equal(literal(-4, &#x27;ID&#x27;), &#x27;-4&#x27;);
+  assert.equal(literal(0, &#x27;ID&#x27;), &#x27;0&#x27;);
+  assert.equal(literal(true, &#x27;FLAG&#x27;), &#x27;1&#x27;);
+  assert.equal(literal(false, &#x27;FLAG&#x27;), &#x27;0&#x27;);
+});
+
+test(&#x27;literal refuses what the dialect cannot spell&#x27;, () =&gt; {
+  rejects(() =&gt; literal(1e-7, &#x27;AMOUNT&#x27;), /exponent/);
+  rejects(() =&gt; literal(1e21, &#x27;AMOUNT&#x27;), /exponent/);
+  rejects(() =&gt; literal(2 ** 53, &#x27;ID&#x27;), /safe range/);
+  rejects(() =&gt; literal(Number.NaN, &#x27;ID&#x27;), /not finite/);
+  rejects(() =&gt; literal(Number.POSITIVE_INFINITY, &#x27;ID&#x27;), /not finite/);
+  rejects(() =&gt; literal(null, &#x27;ID&#x27;), /null/);
+  rejects(() =&gt; literal([1], &#x27;ID&#x27;), /array/);
+  rejects(() =&gt; literal({ a: 1 }, &#x27;ID&#x27;), /object/);
+  rejects(() =&gt; literal(undefined, &#x27;ID&#x27;), /undefined/);
+});
+
+test(&#x27;buildDescribe&#x27;, () =&gt; {
+  assert.equal(buildDescribe(&#x27;C:\\d\\KEYS.TPS&#x27;), &#x27;DESCRIBE [C:\\d\\KEYS.TPS]&#x27;);
+});
+
+test(&#x27;buildSelect: the spec example, byte for byte&#x27;, () =&gt; {
+  assert.equal(
+    buildSelect({ file: &#x27;C:\\pos\\data\\ITEMS.TPS&#x27;, columns: [&#x27;SKU&#x27;, &#x27;DESC&#x27;], where: &quot;PRICE &gt; 5 AND DESC LIKE &#x27;a%&#x27;&quot;, order_by: &#x27;SKU DESC&#x27;, limit: 20 }),
+    &quot;SELECT SKU, DESC FROM [C:\\pos\\data\\ITEMS.TPS] WHERE PRICE &gt; 5 AND DESC LIKE &#x27;a%&#x27; ORDER BY SKU DESC LIMIT 20&quot;);
+});
+
+test(&#x27;buildSelect: defaults and optional clauses&#x27;, () =&gt; {
+  assert.equal(buildSelect({ file: &#x27;K.TPS&#x27; }), &#x27;SELECT * FROM [K.TPS]&#x27;);
+  assert.equal(buildSelect({ file: &#x27;K.TPS&#x27;, columns: [] }), &#x27;SELECT * FROM [K.TPS]&#x27;);
+  assert.equal(buildSelect({ file: &#x27;K.TPS&#x27;, where: &#x27;  &#x27;, order_by: &#x27;&#x27; }), &#x27;SELECT * FROM [K.TPS]&#x27;);
+  assert.equal(buildSelect({ file: &#x27;K.TPS&#x27;, limit: 0 }), &#x27;SELECT * FROM [K.TPS] LIMIT 0&#x27;);
+  assert.equal(buildSelect({ file: &#x27;K.TPS&#x27;, limit: 10, offset: 5 }), &#x27;SELECT * FROM [K.TPS] LIMIT 10 OFFSET 5&#x27;);
+  rejects(() =&gt; buildSelect({ file: &#x27;K.TPS&#x27;, offset: 5 }), /offset requires limit.*limit: 0/);
+  rejects(() =&gt; buildSelect({ file: &#x27;K.TPS&#x27;, columns: [&#x27;ID; DROP&#x27;] }), /identifier path/);
+});
+
+test(&#x27;buildInsert: the spec example&#x27;, () =&gt; {
+  assert.equal(
+    buildInsert(&#x27;C:\\pos\\data\\KEYS.TPS&#x27;, { ID: 9, NAME: &quot;O&#x27;Brien&quot;, CODE: &#x27;N&#x27; }),
+    &quot;INSERT INTO [C:\\pos\\data\\KEYS.TPS] (ID, NAME, CODE) VALUES (9, &#x27;O&#x27;&#x27;Brien&#x27;, &#x27;N&#x27;)&quot;);
+  rejects(() =&gt; buildInsert(&#x27;K.TPS&#x27;, {}), /at least one column/);
+  rejects(() =&gt; buildInsert(&#x27;K.TPS&#x27;, { ID: null }), /null/);
+});
+
+test(&#x27;buildUpdate and buildDelete&#x27;, () =&gt; {
+  assert.equal(
+    buildUpdate(&#x27;C:\\pos\\data\\KEYS.TPS&#x27;, { NAME: &#x27;niner&#x27; }, &#x27;ID = 9&#x27;),
+    &quot;UPDATE [C:\\pos\\data\\KEYS.TPS] SET NAME = &#x27;niner&#x27; WHERE ID = 9&quot;);
+  assert.equal(buildUpdate(&#x27;K.TPS&#x27;, { A: 1, B: &#x27;x&#x27; }, &#x27; ID = 1 &#x27;), &quot;UPDATE [K.TPS] SET A = 1, B = &#x27;x&#x27; WHERE ID = 1&quot;);
+  rejects(() =&gt; buildUpdate(&#x27;K.TPS&#x27;, {}, &#x27;ID = 1&#x27;), /at least one column/);
+  rejects(() =&gt; buildUpdate(&#x27;K.TPS&#x27;, { A: 1 }, &#x27;&#x27;), /where clause.*1 = 1/);
+  rejects(() =&gt; buildUpdate(&#x27;K.TPS&#x27;, { A: 1 }, undefined), /where clause/);
+  assert.equal(buildDelete(&#x27;K.TPS&#x27;, &#x27;ID = 9&#x27;), &#x27;DELETE FROM [K.TPS] WHERE ID = 9&#x27;);
+  rejects(() =&gt; buildDelete(&#x27;K.TPS&#x27;, &#x27;   &#x27;), /where clause/);
+});
+
+test(&#x27;classify&#x27;, () =&gt; {
+  assert.equal(classify(&#x27;SELECT * FROM [K.TPS]&#x27;), &#x27;SELECT&#x27;);
+  assert.equal(classify(&#x27;  \n\tdelete from [K.TPS] where ID = 1&#x27;), &#x27;DELETE&#x27;);
+  assert.equal(classify(&#x27;&#x27;), null);
+  assert.equal(classify(&#x27;   &#x27;), null);
+  assert.equal(classify(&#x27;[K.TPS]&#x27;), null);
+  assert.deepEqual([...WRITE_OPS].sort(), [&#x27;DELETE&#x27;, &#x27;INSERT&#x27;, &#x27;UPDATE&#x27;]);
+});</code></pre></li>
+          <li class="step"><span class="t">Run it to see it fail.</span> <pre><code>npm test</code></pre><p class="expect">Expected: tsc exits with error TS18003 (no inputs found in src) and the test never runs; or, if you created an empty sql.ts first, node --test reports every test failing on &#x27;does not provide an export named&#x27;.</p></li>
+          <li class="step"><span class="t">Write the builder.</span> <code>mcp\src\sql.ts</code>:<pre><code>// Pure: arguments in, statement text out. Every rule for what tpscli accepts as text lives here;
+// whether the statement is valid for the file (column exists, value fits) is the exe&#x27;s business.
+
+export class InvalidArgument extends Error {
+  readonly code = &#x27;INVALID_ARGUMENT&#x27;;
+}
+
+export const WRITE_OPS: ReadonlySet&lt;string&gt; = new Set([&#x27;INSERT&#x27;, &#x27;UPDATE&#x27;, &#x27;DELETE&#x27;]);
+
+// ID, ADDR.CITY, QTY[3], ADDR[2].CITY: identifiers with one optional subscript each, joined by dots.
+const COLUMN = /^[A-Za-z_]\w*(\[\d+\])?(\.[A-Za-z_]\w*(\[\d+\])?)*$/;
+
+export function bracket(file: string): string {
+  if (file.includes(&#x27;]&#x27;)) throw new InvalidArgument(`file path contains &quot;]&quot;, which the dialect cannot escape: ${file}`);
+  return `[${file}]`;
+}
+
+export function column(name: string): string {
+  if (!COLUMN.test(name)) {
+    throw new InvalidArgument(`${JSON.stringify(name)} is not an identifier path such as ID, ADDR.CITY or QTY[3]`);
+  }
+  return name;
+}
+
+export function literal(value: unknown, col: string): string {
+  if (typeof value === &#x27;string&#x27;) return `&#x27;${value.replace(/&#x27;/g, &quot;&#x27;&#x27;&quot;)}&#x27;`;
+  if (typeof value === &#x27;boolean&#x27;) return value ? &#x27;1&#x27; : &#x27;0&#x27;;
+  if (typeof value === &#x27;number&#x27;) {
+    const text = String(value);
+    if (!Number.isFinite(value)) throw new InvalidArgument(`${col}: ${text} is not finite`);
+    if (/e/i.test(text)) throw new InvalidArgument(`${col}: ${text} has no plain decimal form; the dialect has no exponent literal`);
+    if (Number.isInteger(value) &amp;&amp; !Number.isSafeInteger(value)) {
+      throw new InvalidArgument(`${col}: ${text} is outside the safe range and would be rounded`);
+    }
+    return text;
+  }
+  if (value === null) throw new InvalidArgument(`${col}: null is not a value (TopSpeed has no NULL); omit the column instead`);
+  const kind = Array.isArray(value) ? &#x27;an array&#x27; : typeof value === &#x27;object&#x27; ? &#x27;an object&#x27; : typeof value;
+  throw new InvalidArgument(`${col}: a value must be a string, number or boolean, not ${kind}`);
+}
+
+export function classify(sql: string): string | null {
+  const m = /^\s*([A-Za-z]+)/.exec(sql);
+  return m ? m[1].toUpperCase() : null;
+}
+
+export function buildDescribe(file: string): string {
+  return `DESCRIBE ${bracket(file)}`;
+}
+
+export interface SelectArgs {
+  file: string;
+  columns?: string[];
+  where?: string;
+  order_by?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export function buildSelect(a: SelectArgs): string {
+  const cols = a.columns &amp;&amp; a.columns.length &gt; 0 ? a.columns.map(column).join(&#x27;, &#x27;) : &#x27;*&#x27;;
+  let sql = `SELECT ${cols} FROM ${bracket(a.file)}`;
+  const where = a.where?.trim();
+  if (where) sql += ` WHERE ${where}`;
+  const order = a.order_by?.trim();
+  if (order) sql += ` ORDER BY ${order}`;
+  if (a.limit === undefined) {
+    if (a.offset !== undefined) throw new InvalidArgument(&#x27;offset requires limit; pass limit: 0 for no cap&#x27;);
+  } else {
+    sql += ` LIMIT ${a.limit}`;
+    if (a.offset !== undefined) sql += ` OFFSET ${a.offset}`;
+  }
+  return sql;
+}
+
+function assignments(obj: Record&lt;string, unknown&gt;, what: string): [string, string][] {
+  const entries = Object.entries(obj);
+  if (entries.length === 0) throw new InvalidArgument(`${what} must name at least one column`);
+  return entries.map(([name, value]) =&gt; [column(name), literal(value, name)]);
+}
+
+function requireWhere(where: string | undefined, op: string): string {
+  const text = (where ?? &#x27;&#x27;).trim();
+  if (!text) throw new InvalidArgument(`${op} needs a where clause; use 1 = 1 to affect every row`);
+  return text;
+}
+
+export function buildInsert(file: string, values: Record&lt;string, unknown&gt;): string {
+  const pairs = assignments(values, &#x27;values&#x27;);
+  return `INSERT INTO ${bracket(file)} (${pairs.map(p =&gt; p[0]).join(&#x27;, &#x27;)}) VALUES (${pairs.map(p =&gt; p[1]).join(&#x27;, &#x27;)})`;
+}
+
+export function buildUpdate(file: string, set: Record&lt;string, unknown&gt;, where: string | undefined): string {
+  const text = requireWhere(where, &#x27;UPDATE&#x27;);
+  const pairs = assignments(set, &#x27;set&#x27;);
+  return `UPDATE ${bracket(file)} SET ${pairs.map(p =&gt; `${p[0]} = ${p[1]}`).join(&#x27;, &#x27;)} WHERE ${text}`;
+}
+
+export function buildDelete(file: string, where: string | undefined): string {
+  return `DELETE FROM ${bracket(file)} WHERE ${requireWhere(where, &#x27;DELETE&#x27;)}`;
+}</code></pre></li>
+          <li class="step"><span class="t">Run the test to see it pass.</span> <pre><code>npm test</code></pre><p class="expect">Expected: tsc silent; node --test: 11 pass, 0 fail. Then the CRLF check on package.json, tsconfig.json, sql.ts, sql.test.js, the notes file and .gitignore: lone-LF 0 each.</p></li>
+          <li class="step"><span class="t">Commit.</span> <pre><code>git add .gitignore mcp/package.json mcp/package-lock.json mcp/tsconfig.json mcp/src/sql.ts mcp/test/sql.test.js docs/mySuperpower/implementation-notes/2026-09-19-tpscli-mcp.html
+git commit -m &quot;mcp: project scaffold and SQL builder&quot;</code></pre></li>
+        </ol>
+      </section>
+
+      <section class="task">
+        <h2>Task 2 <span class="tasknum">&middot; runner: spawn, timeout, ceiling, response validation</span></h2>
+        <p>Deliverable: <code>run()</code> from spec &sect;5 with its whole failure matrix proven against a fake exe, including the proof that a hung process is really gone afterwards.</p>
+        <div class="files">
+          <div><span class="k">Create</span> <code>mcp\src\runner.ts</code>, <code>mcp\test\fake-tpscli.js</code>, <code>mcp\test\runner.test.js</code></div>
+          <div><span class="k">Modify</span> <code>mcp\package.json</code> (test script)</div>
+          <div><span class="k">Consumes</span> nothing from Task 1</div>
+          <div><span class="k">Produces</span> <code>type Run = (file: string, args: string[], opts: { timeoutMs: number; table?: boolean }) =&gt; Promise&lt;RunResult&gt;</code>; <code>run: Run</code>; <code>RunResult = { exitCode: number | null; stdout; stderr; json: Record&lt;string, unknown&gt; | null; durationMs; timedOut: boolean; failure?: { kind: "spawn" | "timeout" | "output_limit" | "kill_failed"; message; pid? } }</code>; <code>parseResponse(stdout, exitCode)</code>; <code>OUTPUT_LIMIT = 67108864</code></div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Write the fake exe.</span> <code>mcp\test\fake-tpscli.js</code>. It is launched as <code>node fake-tpscli.js &lt;mode&gt;</code>, so in the runner tests "the exe" is <code>process.execPath</code> and the script path is the first argument: no shell, no <code>.cmd</code> wrapper (Node refuses to spawn a <code>.cmd</code> without a shell).<pre><code>// Stand-in for tpscli.exe in the runner tests. The runner launches it as
+//   node test/fake-tpscli.js &lt;mode&gt; [anything]
+// so the mode arrives as the first &quot;argument&quot; the runner was given. Output goes through
+// process.exitCode, never process.exit(): on Windows a pipe write is asynchronous and exit()
+// would truncate it.
+const mode = process.argv[2];
+const out = s =&gt; process.stdout.write(s);
+
+switch (mode) {
+  case &#x27;ok&#x27;:
+    out(&#x27;{ &quot;ok&quot;: true, &quot;op&quot;: &quot;select&quot;, &quot;columns&quot;: [], &quot;rows&quot;: [], &quot;row_count&quot;: 0, &quot;truncated&quot;: false, &quot;complete&quot;: true }\n&#x27;);
+    break;
+  case &#x27;err3&#x27;:
+    out(&#x27;{ &quot;ok&quot;: false, &quot;op&quot;: &quot;update&quot;, &quot;error&quot;: { &quot;code&quot;: &quot;RECORD_HELD&quot;, &quot;message&quot;: &quot;held&quot; }, &quot;outcome&quot;: &quot;rolled_back&quot;, &quot;complete&quot;: true }\n&#x27;);
+    process.exitCode = 3;
+    break;
+  case &#x27;ok-exit1&#x27;:          // ok:true but exit 1: the object disagrees with the exit code
+    out(&#x27;{ &quot;ok&quot;: true, &quot;op&quot;: &quot;select&quot;, &quot;complete&quot;: true }\n&#x27;);
+    process.exitCode = 1;
+    break;
+  case &#x27;notcomplete&#x27;:
+    out(&#x27;{ &quot;ok&quot;: true, &quot;op&quot;: &quot;select&quot;, &quot;complete&quot;: false }\n&#x27;);
+    break;
+  case &#x27;incomplete&#x27;:        // cut off mid-object, as a crash would leave it
+    out(&#x27;{ &quot;ok&quot;: true, &quot;op&quot;: &quot;select&quot;, &quot;rows&quot;: [[1&#x27;);
+    break;
+  case &#x27;table&#x27;:
+    out(&#x27;ID  NAME \n--  -----\n 1  Able \n(1 rows)\n&#x27;);
+    break;
+  case &#x27;garbage&#x27;:
+    out(&#x27;not json at all\n&#x27;);
+    process.stderr.write(&#x27;boom\n&#x27;);
+    process.exitCode = 3;
+    break;
+  case &#x27;empty&#x27;:
+    break;
+  case &#x27;exit9&#x27;:
+    process.exitCode = 9;
+    break;
+  case &#x27;flood&#x27;: {           // 200 MiB, honouring backpressure, so the runner&#x27;s ceiling is what stops it
+    const chunk = &#x27;x&#x27;.repeat(1024 * 1024);
+    let n = 0;
+    const pump = () =&gt; {
+      while (n &lt; 200 &amp;&amp; process.stdout.write(chunk)) n++;
+      if (n &lt; 200) process.stdout.once(&#x27;drain&#x27;, pump);
+    };
+    pump();
+    break;
+  }
+  case &#x27;hang&#x27;:              // prints its pid so the test can prove it was killed
+    out(`${process.pid}\n`);
+    setInterval(() =&gt; {}, 1000);
+    break;
+  default:
+    process.stderr.write(`fake-tpscli: unknown mode ${mode}\n`);
+    process.exitCode = 99;
+}</code></pre></li>
+          <li class="step"><span class="t">Write the failing runner test.</span> <code>mcp\test\runner.test.js</code>:<pre><code>import { test } from &#x27;node:test&#x27;;
+import assert from &#x27;node:assert/strict&#x27;;
+import { execFileSync } from &#x27;node:child_process&#x27;;
+import { fileURLToPath } from &#x27;node:url&#x27;;
+import { run, parseResponse, OUTPUT_LIMIT } from &#x27;../dist/runner.js&#x27;;
+
+const fake = fileURLToPath(new URL(&#x27;./fake-tpscli.js&#x27;, import.meta.url));
+// The fake is a script, so &quot;the exe&quot; is node and the script is the first argument.
+const go = (mode, opts = {}) =&gt; run(process.execPath, [fake, mode, &#x27;SELECT 1&#x27;], { timeoutMs: 10000, ...opts });
+
+test(&#x27;parseResponse accepts only a complete object that agrees with the exit code&#x27;, () =&gt; {
+  assert.deepEqual(parseResponse(&#x27; {&quot;ok&quot;:true,&quot;complete&quot;:true}\r\n&#x27;, 0), { ok: true, complete: true });
+  assert.deepEqual(parseResponse(&#x27;{&quot;ok&quot;:false,&quot;complete&quot;:true}&#x27;, 2), { ok: false, complete: true });
+  assert.equal(parseResponse(&#x27;{&quot;ok&quot;:true,&quot;complete&quot;:true}&#x27;, 1), null);
+  assert.equal(parseResponse(&#x27;{&quot;ok&quot;:true,&quot;complete&quot;:false}&#x27;, 0), null);
+  assert.equal(parseResponse(&#x27;{}&#x27;, 0), null);
+  assert.equal(parseResponse(&#x27;[]&#x27;, 0), null);
+  assert.equal(parseResponse(&#x27;&#x27;, 0), null);
+  assert.equal(parseResponse(&#x27;{&quot;ok&quot;:true&#x27;, 0), null);
+});
+
+test(&#x27;exit 0 with a response&#x27;, async () =&gt; {
+  const r = await go(&#x27;ok&#x27;);
+  assert.equal(r.exitCode, 0);
+  assert.equal(r.json.ok, true);
+  assert.equal(r.json.op, &#x27;select&#x27;);
+  assert.equal(r.failure, undefined);
+  assert.equal(r.timedOut, false);
+  assert.ok(r.durationMs &gt;= 0);
+});
+
+test(&#x27;exit 3 with an error response&#x27;, async () =&gt; {
+  const r = await go(&#x27;err3&#x27;);
+  assert.equal(r.exitCode, 3);
+  assert.equal(r.json.error.code, &#x27;RECORD_HELD&#x27;);
+  assert.equal(r.json.outcome, &#x27;rolled_back&#x27;);
+});
+
+test(&#x27;an object that disagrees with the exit code, or is not complete, is not a response&#x27;, async () =&gt; {
+  assert.equal((await go(&#x27;ok-exit1&#x27;)).json, null);
+  assert.equal((await go(&#x27;notcomplete&#x27;)).json, null);
+  assert.equal((await go(&#x27;incomplete&#x27;)).json, null);
+});
+
+test(&#x27;table mode keeps stdout and never parses&#x27;, async () =&gt; {
+  const r = await go(&#x27;table&#x27;, { table: true });
+  assert.equal(r.exitCode, 0);
+  assert.equal(r.json, null);
+  assert.match(r.stdout, /^ID {2}NAME/);
+});
+
+test(&#x27;garbage, empty and out-of-range exits give no json and keep stderr&#x27;, async () =&gt; {
+  const g = await go(&#x27;garbage&#x27;);
+  assert.equal(g.json, null);
+  assert.equal(g.exitCode, 3);
+  assert.match(g.stderr, /boom/);
+  const e = await go(&#x27;empty&#x27;);
+  assert.equal(e.json, null);
+  assert.equal(e.exitCode, 0);
+  const x = await go(&#x27;exit9&#x27;);
+  assert.equal(x.json, null);
+  assert.equal(x.exitCode, 9);
+});
+
+test(&#x27;a file that cannot be spawned is a spawn failure&#x27;, async () =&gt; {
+  const r = await run(&#x27;C:\\no\\such\\tpscli.exe&#x27;, [&#x27;--version&#x27;], { timeoutMs: 1000 });
+  assert.equal(r.failure.kind, &#x27;spawn&#x27;);
+  assert.match(r.failure.message, /ENOENT/);
+  assert.equal(r.exitCode, null);
+  assert.equal(r.json, null);
+});
+
+test(&#x27;an argument spawn cannot pass is a spawn failure too, not a crash&#x27;, async () =&gt; {
+  const r = await run(process.execPath, [fake, &#x27;ok&#x27;, &#x27;bad\u0000arg&#x27;], { timeoutMs: 1000 });
+  assert.equal(r.failure.kind, &#x27;spawn&#x27;);
+  assert.equal(r.exitCode, null);
+});
+
+test(&#x27;output past the ceiling kills the process&#x27;, async () =&gt; {
+  const r = await go(&#x27;flood&#x27;, { timeoutMs: 60000 });
+  assert.equal(r.failure.kind, &#x27;output_limit&#x27;);
+  assert.match(r.failure.message, /LIMIT/);
+  assert.ok(Buffer.byteLength(r.stdout) &lt;= OUTPUT_LIMIT);
+});
+
+test(&#x27;a hang trips the timeout and leaves no process behind&#x27;, async () =&gt; {
+  const r = await go(&#x27;hang&#x27;, { timeoutMs: 500 });
+  assert.equal(r.failure.kind, &#x27;timeout&#x27;);
+  assert.equal(r.timedOut, true);
+  assert.equal(r.json, null);
+  const pid = Number(r.stdout.trim());
+  assert.ok(pid &gt; 0, &#x27;the fake printed its pid&#x27;);
+  const list = execFileSync(&#x27;tasklist&#x27;, [&#x27;/FI&#x27;, `PID eq ${pid}`, &#x27;/NH&#x27;], { encoding: &#x27;utf8&#x27; });
+  assert.ok(!/node\.exe/i.test(list), `pid ${pid} is still running:\n${list}`);
+});</code></pre>Add <code>test/runner.test.js</code> to the <code>test</code> script in <code>package.json</code>: <code>"test": "tsc &amp;&amp; node --test test/sql.test.js test/runner.test.js"</code>.</li>
+          <li class="step"><span class="t">Run it to see it fail.</span> <pre><code>npm test</code></pre><p class="expect">Expected: runner.test.js: every test fails with &quot;does not provide an export named &#x27;run&#x27;&quot; (module missing). sql tests still pass.</p></li>
+          <li class="step"><span class="t">Write the runner.</span> <code>mcp\src\runner.ts</code>:<pre><code>// One exe call, one result. Spawns tpscli.exe with no shell, collects its output under a byte
+// ceiling and a wall-clock limit, and decides whether what came back is a response at all.
+import { spawn, type ChildProcess } from &#x27;node:child_process&#x27;;
+
+export interface RunFailure {
+  kind: &#x27;spawn&#x27; | &#x27;timeout&#x27; | &#x27;output_limit&#x27; | &#x27;kill_failed&#x27;;
+  message: string;
+  pid?: number;
+}
+
+export interface RunResult {
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  json: Record&lt;string, unknown&gt; | null;
+  durationMs: number;
+  timedOut: boolean;
+  failure?: RunFailure;
+}
+
+export interface RunOptions {
+  timeoutMs: number;
+  table?: boolean;          // --table output is a grid, never parsed
+}
+
+export type Run = (file: string, args: string[], opts: RunOptions) =&gt; Promise&lt;RunResult&gt;;
+
+export const OUTPUT_LIMIT = 64 * 1024 * 1024;
+const KILL_DEADLINE_MS = 5000;
+
+// A response is one JSON object, complete, whose ok agrees with the exit code. Anything else is
+// not a response and the caller reports INCOMPLETE rather than guessing at a write&#x27;s outcome.
+export function parseResponse(stdout: string, exitCode: number | null): Record&lt;string, unknown&gt; | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(stdout.trim());
+  } catch {
+    return null;
+  }
+  if (typeof value !== &#x27;object&#x27; || value === null || Array.isArray(value)) return null;
+  const obj = value as Record&lt;string, unknown&gt;;
+  if (obj.complete !== true || obj.ok !== (exitCode === 0)) return null;
+  return obj;
+}
+
+export const run: Run = (file, args, opts) =&gt; new Promise(resolve =&gt; {
+  const started = Date.now();
+  const out: Buffer[] = [];
+  const err: Buffer[] = [];
+  let bytes = 0;
+  let settled = false;
+  let timedOut = false;
+  let failure: RunFailure | undefined;
+  let timer: NodeJS.Timeout | undefined;
+  let killTimer: NodeJS.Timeout | undefined;
+  let child: ChildProcess;
+
+  const finish = (exitCode: number | null) =&gt; {
+    if (settled) return;
+    settled = true;
+    if (timer) clearTimeout(timer);
+    if (killTimer) clearTimeout(killTimer);
+    const stdout = Buffer.concat(out).toString(&#x27;utf8&#x27;);
+    const stderr = Buffer.concat(err).toString(&#x27;utf8&#x27;);
+    const normal = failure === undefined &amp;&amp; exitCode !== null &amp;&amp; exitCode &gt;= 0 &amp;&amp; exitCode &lt;= 3;
+    resolve({
+      exitCode, stdout, stderr, timedOut, failure,
+      json: normal &amp;&amp; !opts.table ? parseResponse(stdout, exitCode) : null,
+      durationMs: Date.now() - started,
+    });
+  };
+
+  // taskkill /T takes the whole tree: a crashed Clarion exe sits behind a modal dialog that
+  // child.kill() would leave on screen with the file handle still open.
+  const kill = (why: RunFailure) =&gt; {
+    if (failure) return;
+    failure = why;
+    const pid = child.pid;
+    if (pid === undefined) { finish(null); return; }
+    const killFailed = (what: string) =&gt; {
+      failure = { kind: &#x27;kill_failed&#x27;, pid, message: `${what}; tpscli (pid ${pid}) may still be running` };
+      finish(null);
+    };
+    const tk = spawn(&#x27;taskkill&#x27;, [&#x27;/PID&#x27;, String(pid), &#x27;/T&#x27;, &#x27;/F&#x27;], { windowsHide: true, stdio: &#x27;ignore&#x27; });
+    killTimer = setTimeout(() =&gt; killFailed(`taskkill did not return within ${KILL_DEADLINE_MS} ms`), KILL_DEADLINE_MS);
+    tk.on(&#x27;error&#x27;, e =&gt; killFailed(`taskkill failed: ${e.message}`));
+    tk.on(&#x27;exit&#x27;, code =&gt; { if (code !== 0) killFailed(`taskkill exited ${code}`); });
+    // On success the child&#x27;s own close event finishes, with failure already set.
+  };
+
+  timer = setTimeout(() =&gt; {
+    timedOut = true;
+    kill({ kind: &#x27;timeout&#x27;, message: `tpscli did not finish within ${opts.timeoutMs} ms` });
+  }, opts.timeoutMs);
+
+  try {
+    child = spawn(file, args, { windowsHide: true, shell: false, stdio: [&#x27;ignore&#x27;, &#x27;pipe&#x27;, &#x27;pipe&#x27;] });
+  } catch (e) {
+    // spawn throws synchronously for an argument it cannot pass at all, e.g. a NUL byte
+    failure = { kind: &#x27;spawn&#x27;, message: (e as Error).message };
+    finish(null);
+    return;
+  }
+
+  const collect = (sink: Buffer[]) =&gt; (chunk: Buffer) =&gt; {
+    bytes += chunk.length;
+    if (bytes &gt; OUTPUT_LIMIT) {
+      kill({ kind: &#x27;output_limit&#x27;, message: `output exceeded ${OUTPUT_LIMIT} bytes; add a LIMIT` });
+      return;
+    }
+    sink.push(chunk);
+  };
+  child.stdout!.on(&#x27;data&#x27;, collect(out));
+  child.stderr!.on(&#x27;data&#x27;, collect(err));
+  child.on(&#x27;error&#x27;, e =&gt; { failure ??= { kind: &#x27;spawn&#x27;, message: e.message }; finish(null); });
+  child.on(&#x27;close&#x27;, code =&gt; finish(code));
+});</code></pre>Why <code>close</code> and not <code>exit</code>: Node may still be draining stdout after <code>exit</code>, and a truncated response would look like a crash. Why the settle-once guard: after a timeout the child's own <code>close</code> and the taskkill <code>exit</code> both try to finish.</li>
+          <li class="step"><span class="t">Run the tests to see them pass.</span> <pre><code>npm test</code></pre><p class="expect">Expected: sql: 11 pass. runner: 10 pass, 0 fail; the flood test takes a few seconds; the hang test prints nothing about node.exe from tasklist. CRLF check on the three new files: lone-LF 0.</p></li>
+          <li class="step"><span class="t">Probe the real exe once, by hand, to confirm the parse rule matches reality.</span> <pre><code>node -e &quot;import(&#x27;./dist/runner.js&#x27;).then(async m =&gt; { const r = await m.run(&#x27;..\\cli\\tpscli.exe&#x27;, [&#x27;--version&#x27;], { timeoutMs: 10000 }); console.log(r.exitCode, r.json, r.failure); })&quot;</code></pre><p class="expect">Expected: 0 { ok: true, op: null, version: &#x27;0.1.0&#x27;, complete: true } undefined</p>Append to the notes: the real exe writes a single line; the parser trims and parses the whole stdout anyway (spec &sect;5).</li>
+          <li class="step"><span class="t">Commit.</span> <pre><code>git add mcp/package.json mcp/src/runner.ts mcp/test/fake-tpscli.js mcp/test/runner.test.js docs/mySuperpower/implementation-notes/2026-09-19-tpscli-mcp.html
+git commit -m &quot;mcp: runner with timeout, tree kill, output ceiling and response validation&quot;</code></pre></li>
+        </ol>
+      </section>
+
+      <section class="task">
+        <h2>Task 3 <span class="tasknum">&middot; server: the eight tools, policy and result shaping</span></h2>
+        <p>Deliverable: <code>createServer(config, run)</code> registers the eight tools of spec &sect;3, applies &sect;6 (write gate, roots, owner) and maps results per &sect;5, all proven over the SDK's in-memory transport with a stub runner. The command line comes in Task 4; until then <code>server.ts</code> ends at <code>return server;</code>.</p>
+        <div class="files">
+          <div><span class="k">Create</span> <code>mcp\src\server.ts</code> (everything above the "command line" divider in the listing below), <code>mcp\test\server.test.js</code></div>
+          <div><span class="k">Modify</span> <code>mcp\package.json</code> (test script)</div>
+          <div><span class="k">Consumes</span> <code>Run</code>, <code>RunResult</code> from Task 2; every export of <code>sql.ts</code> from Task 1</div>
+          <div><span class="k">Produces</span> <code>Config = { exe; roots: string[]; allowWrites; owner?; timeoutMs; version }</code>; <code>Op</code>; <code>ToolResult</code>; <code>toResult(r: RunResult, op: Op, write: boolean, table: boolean): ToolResult</code>; <code>createServer(config: Config, run: Run): McpServer</code></div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Write the failing server test.</span> <code>mcp\test\server.test.js</code>:<pre><code>import { test } from &#x27;node:test&#x27;;
+import assert from &#x27;node:assert/strict&#x27;;
+import { mkdtempSync, mkdirSync, writeFileSync } from &#x27;node:fs&#x27;;
+import os from &#x27;node:os&#x27;;
+import path from &#x27;node:path&#x27;;
+import { Client } from &#x27;@modelcontextprotocol/sdk/client/index.js&#x27;;
+import { InMemoryTransport } from &#x27;@modelcontextprotocol/sdk/inMemory.js&#x27;;
+import { createServer, toResult } from &#x27;../dist/server.js&#x27;;
+
+// ---- fixtures: two roots, a bare name present in both, one only in b, a non-TPS file above them
+const tmp = mkdtempSync(path.join(os.tmpdir(), &#x27;tpscli-mcp-&#x27;));
+const rootA = path.join(tmp, &#x27;a&#x27;);
+const rootB = path.join(tmp, &#x27;b&#x27;);
+mkdirSync(rootA);
+mkdirSync(rootB);
+writeFileSync(path.join(rootA, &#x27;KEYS.TPS&#x27;), &#x27;&#x27;);
+writeFileSync(path.join(rootB, &#x27;KEYS.TPS&#x27;), &#x27;&#x27;);
+writeFileSync(path.join(rootB, &#x27;ONLYB.TPS&#x27;), &#x27;&#x27;);
+writeFileSync(path.join(tmp, &#x27;notes.txt&#x27;), &#x27;&#x27;);
+
+const OK = { exitCode: 0, stdout: &#x27;&#x27;, stderr: &#x27;&#x27;, json: { ok: true, op: &#x27;select&#x27;, rows: [], complete: true }, durationMs: 1, timedOut: false };
+const ERR2 = { exitCode: 2, stdout: &#x27;&#x27;, stderr: &#x27;&#x27;, json: { ok: false, op: &#x27;describe&#x27;, error: { code: &#x27;FILE_NOT_FOUND&#x27;, message: &#x27;x&#x27; }, complete: true }, durationMs: 1, timedOut: false };
+const TABLE = { exitCode: 0, stdout: &#x27;ID\n--\n 1\n(1 rows)\n&#x27;, stderr: &#x27;&#x27;, json: null, durationMs: 1, timedOut: false };
+const VERSION = { exitCode: 0, stdout: &#x27;&#x27;, stderr: &#x27;&#x27;, json: { ok: true, op: null, version: &#x27;9.9.9&#x27;, complete: true }, durationMs: 1, timedOut: false };
+const TIMEOUT = { exitCode: null, stdout: &#x27;&#x27;, stderr: &#x27;partial&#x27;, json: null, durationMs: 60000, timedOut: true, failure: { kind: &#x27;timeout&#x27;, message: &#x27;tpscli did not finish within 60000 ms&#x27; } };
+
+// A stub Run that records what the server asked for and answers with a canned RunResult.
+const stub = (result = OK) =&gt; {
+  const calls = [];
+  const run = async (file, args, opts) =&gt; { calls.push({ file, args, opts }); return result; };
+  run.calls = calls;
+  return run;
+};
+
+const base = { exe: &#x27;C:\\fake\\tpscli.exe&#x27;, roots: [rootA, rootB], allowWrites: false, timeoutMs: 1234, version: &#x27;0.0.0-test&#x27; };
+
+async function connect(config, run) {
+  const server = createServer(config, run);
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverSide);
+  const client = new Client({ name: &#x27;test&#x27;, version: &#x27;0&#x27; });
+  await client.connect(clientSide);
+  return client;
+}
+const call = (client, name, args = {}) =&gt; client.callTool({ name, arguments: args });
+
+test(&#x27;exactly the eight tools are registered&#x27;, async () =&gt; {
+  const client = await connect(base, stub());
+  const names = (await client.listTools()).tools.map(t =&gt; t.name).sort();
+  assert.deepEqual(names, [&#x27;tps_delete&#x27;, &#x27;tps_describe&#x27;, &#x27;tps_insert&#x27;, &#x27;tps_list_files&#x27;, &#x27;tps_query&#x27;, &#x27;tps_select&#x27;, &#x27;tps_update&#x27;, &#x27;tps_version&#x27;]);
+});
+
+test(&#x27;bare names resolve against the roots in order; absolute paths pass through&#x27;, async () =&gt; {
+  const run = stub();
+  const client = await connect(base, run);
+  await call(client, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27; });
+  assert.deepEqual(run.calls[0], { file: base.exe, args: [`DESCRIBE [${path.join(rootA, &#x27;KEYS.TPS&#x27;)}]`], opts: { timeoutMs: 1234, table: false } });
+  await call(client, &#x27;tps_describe&#x27;, { file: &#x27;ONLYB.TPS&#x27; });
+  assert.equal(run.calls[1].args[0], `DESCRIBE [${path.join(rootB, &#x27;ONLYB.TPS&#x27;)}]`);
+  await call(client, &#x27;tps_describe&#x27;, { file: &#x27;C:\\somewhere\\else\\X.TPS&#x27; });
+  assert.equal(run.calls[2].args[0], &#x27;DESCRIBE [C:\\somewhere\\else\\X.TPS]&#x27;);
+});
+
+test(&#x27;a name that is missing or escapes the roots is FILE_NOT_FOUND before the exe runs&#x27;, async () =&gt; {
+  const run = stub();
+  const client = await connect(base, run);
+  const missing = await call(client, &#x27;tps_describe&#x27;, { file: &#x27;NOPE.TPS&#x27; });
+  assert.equal(missing.isError, true);
+  assert.equal(missing.structuredContent.error.code, &#x27;FILE_NOT_FOUND&#x27;);
+  assert.equal(missing.structuredContent.op, &#x27;describe&#x27;);
+  assert.equal(missing.structuredContent.complete, true);
+  const escape = await call(client, &#x27;tps_describe&#x27;, { file: &#x27;..\\notes.txt&#x27; });
+  assert.equal(escape.structuredContent.error.code, &#x27;FILE_NOT_FOUND&#x27;);
+  assert.equal(run.calls.length, 0);
+  await call(client, &#x27;tps_describe&#x27;, { file: &#x27;..\\b\\ONLYB.TPS&#x27; });      // lands inside another root: allowed
+  assert.equal(run.calls[0].args[0], `DESCRIBE [${path.join(rootB, &#x27;ONLYB.TPS&#x27;)}]`);
+  const noRoots = await connect({ ...base, roots: [] }, run);
+  const r = await call(noRoots, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27; });
+  assert.equal(r.structuredContent.error.code, &#x27;FILE_NOT_FOUND&#x27;);
+  assert.match(r.structuredContent.error.message, /--root/);
+  for (const notQualified of [&#x27;\\data\\KEYS.TPS&#x27;, &#x27;C:KEYS.TPS&#x27;]) {
+    assert.equal((await call(noRoots, &#x27;tps_describe&#x27;, { file: notQualified })).structuredContent.error.code, &#x27;FILE_NOT_FOUND&#x27;);
+  }
+  await call(noRoots, &#x27;tps_describe&#x27;, { file: &#x27;\\\\server\\share\\KEYS.TPS&#x27; });
+  assert.equal(run.calls.at(-1).args[0], &#x27;DESCRIBE [\\\\server\\share\\KEYS.TPS]&#x27;);
+});
+
+test(&#x27;owner: server default, per-call override, or none, always its own argv element&#x27;, async () =&gt; {
+  const run = stub();
+  const client = await connect({ ...base, owner: &#x27;srv&#x27; }, run);
+  await call(client, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27; });
+  assert.deepEqual(run.calls[0].args.slice(0, 2), [&#x27;--owner&#x27;, &#x27;srv&#x27;]);
+  await call(client, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27;, owner: &#x27;mine&#x27; });
+  assert.deepEqual(run.calls[1].args.slice(0, 2), [&#x27;--owner&#x27;, &#x27;mine&#x27;]);
+  const plain = await connect(base, run);
+  await call(plain, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27; });
+  assert.equal(run.calls[2].args.length, 1);
+  const nul = await call(client, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27;, owner: &#x27;SENTINEL\u0000X&#x27; });
+  assert.equal(nul.structuredContent.error.code, &#x27;INVALID_ARGUMENT&#x27;);
+  assert.ok(!JSON.stringify(nul).includes(&#x27;SENTINEL&#x27;), &#x27;the owner value must not be echoed&#x27;);
+  assert.equal(run.calls.length, 3);
+});
+
+test(&#x27;tps_select builds the statement; format table adds --table and returns the grid as text&#x27;, async () =&gt; {
+  const run = stub(TABLE);
+  const client = await connect(base, run);
+  const r = await call(client, &#x27;tps_select&#x27;, { file: &#x27;KEYS.TPS&#x27;, columns: [&#x27;ID&#x27;], where: &#x27;ID &gt; 1&#x27;, order_by: &#x27;ID DESC&#x27;, limit: 5, offset: 1, format: &#x27;table&#x27; });
+  assert.deepEqual(run.calls[0].args, [&#x27;--table&#x27;, `SELECT ID FROM [${path.join(rootA, &#x27;KEYS.TPS&#x27;)}] WHERE ID &gt; 1 ORDER BY ID DESC LIMIT 5 OFFSET 1`]);
+  assert.equal(run.calls[0].opts.table, true);
+  assert.deepEqual(r.content, [{ type: &#x27;text&#x27;, text: TABLE.stdout }]);
+  assert.equal(r.structuredContent, undefined);
+  assert.equal(r.isError, false);
+});
+
+test(&#x27;a JSON result carries the exe object as structuredContent and text; isError follows the exit code&#x27;, async () =&gt; {
+  const client = await connect(base, stub(ERR2));
+  const r = await call(client, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27; });
+  assert.equal(r.isError, true);
+  assert.deepEqual(r.structuredContent, ERR2.json);
+  assert.deepEqual(JSON.parse(r.content[0].text), ERR2.json);
+});
+
+test(&#x27;writes are refused with WRITES_DISABLED and outcome none unless allowWrites&#x27;, async () =&gt; {
+  const run = stub();
+  const client = await connect(base, run);
+  for (const [tool, args, op] of [
+    [&#x27;tps_insert&#x27;, { file: &#x27;KEYS.TPS&#x27;, values: { ID: 1 } }, &#x27;insert&#x27;],
+    [&#x27;tps_update&#x27;, { file: &#x27;KEYS.TPS&#x27;, set: { ID: 1 }, where: &#x27;ID = 1&#x27; }, &#x27;update&#x27;],
+    [&#x27;tps_delete&#x27;, { file: &#x27;KEYS.TPS&#x27;, where: &#x27;ID = 1&#x27; }, &#x27;delete&#x27;],
+  ]) {
+    const r = await call(client, tool, args);
+    assert.equal(r.isError, true);
+    assert.equal(r.structuredContent.error.code, &#x27;WRITES_DISABLED&#x27;);
+    assert.match(r.structuredContent.error.message, /--allow-writes/);
+    assert.equal(r.structuredContent.op, op);
+    assert.equal(r.structuredContent.outcome, &#x27;none&#x27;);
+  }
+  assert.equal(run.calls.length, 0);
+  const rw = await connect({ ...base, allowWrites: true }, run);
+  await call(rw, &#x27;tps_update&#x27;, { file: &#x27;KEYS.TPS&#x27;, set: { NAME: &#x27;x&#x27; }, where: &#x27;ID = 1&#x27; });
+  assert.deepEqual(run.calls[0].args, [`UPDATE [${path.join(rootA, &#x27;KEYS.TPS&#x27;)}] SET NAME = &#x27;x&#x27; WHERE ID = 1`]);
+  await call(rw, &#x27;tps_insert&#x27;, { file: &#x27;KEYS.TPS&#x27;, values: { ID: 9, NAME: &#x27;nine&#x27; } });
+  assert.deepEqual(run.calls[1].args, [`INSERT INTO [${path.join(rootA, &#x27;KEYS.TPS&#x27;)}] (ID, NAME) VALUES (9, &#x27;nine&#x27;)`]);
+  await call(rw, &#x27;tps_delete&#x27;, { file: &#x27;KEYS.TPS&#x27;, where: &#x27;ID = 9&#x27; });
+  assert.deepEqual(run.calls[2].args, [`DELETE FROM [${path.join(rootA, &#x27;KEYS.TPS&#x27;)}] WHERE ID = 9`]);
+});
+
+test(&#x27;handler refusals wear the envelope; schema failures are the SDK\&#x27;s&#x27;, async () =&gt; {
+  const run = stub();
+  const client = await connect({ ...base, allowWrites: true }, run);
+  const empty = await call(client, &#x27;tps_update&#x27;, { file: &#x27;KEYS.TPS&#x27;, set: {}, where: &#x27;ID = 1&#x27; });
+  assert.equal(empty.structuredContent.error.code, &#x27;INVALID_ARGUMENT&#x27;);
+  assert.equal(empty.structuredContent.outcome, &#x27;none&#x27;);
+  const nul = await call(client, &#x27;tps_insert&#x27;, { file: &#x27;KEYS.TPS&#x27;, values: { ID: null } });
+  assert.match(nul.structuredContent.error.message, /omit the column/);
+  const blank = await call(client, &#x27;tps_delete&#x27;, { file: &#x27;KEYS.TPS&#x27;, where: &#x27;  &#x27; });
+  assert.match(blank.structuredContent.error.message, /where clause/);
+  // The SDK answers a schema failure itself: an isError text result, no envelope, handler never ran.
+  const noWhere = await call(client, &#x27;tps_update&#x27;, { file: &#x27;KEYS.TPS&#x27;, set: { A: 1 } });
+  assert.equal(noWhere.isError, true);
+  assert.match(noWhere.content[0].text, /^MCP error -32602: Input validation error: Invalid arguments for tool tps_update: Required at where/);
+  assert.equal(noWhere.structuredContent, undefined);
+  const negative = await call(client, &#x27;tps_select&#x27;, { file: &#x27;KEYS.TPS&#x27;, limit: -1 });
+  assert.match(negative.content[0].text, /Invalid arguments for tool tps_select/);
+  assert.equal(run.calls.length, 0);
+});
+
+test(&#x27;tps_query: verbatim SQL, flags, the write gate, parse_only, and no table for writes&#x27;, async () =&gt; {
+  const run = stub();
+  const client = await connect(base, run);
+  await call(client, &#x27;tps_query&#x27;, { sql: &#x27;SELECT ID FROM [C:\\d\\K.TPS]&#x27;, limit_default: 5 });
+  assert.deepEqual(run.calls[0].args, [&#x27;--limit-default&#x27;, &#x27;5&#x27;, &#x27;SELECT ID FROM [C:\\d\\K.TPS]&#x27;]);
+  const refused = await call(client, &#x27;tps_query&#x27;, { sql: &#x27;  delete FROM [C:\\d\\K.TPS] WHERE ID = 1&#x27; });
+  assert.equal(refused.structuredContent.error.code, &#x27;WRITES_DISABLED&#x27;);
+  assert.equal(refused.structuredContent.op, &#x27;delete&#x27;);
+  assert.equal(refused.structuredContent.outcome, &#x27;none&#x27;);
+  await call(client, &#x27;tps_query&#x27;, { sql: &#x27;DELETE FROM [C:\\d\\K.TPS] WHERE ID = 1&#x27;, parse_only: true });
+  assert.deepEqual(run.calls[1].args, [&#x27;--parse-only&#x27;, &#x27;DELETE FROM [C:\\d\\K.TPS] WHERE ID = 1&#x27;]);
+  const rw = await connect({ ...base, allowWrites: true }, run);
+  const tbl = await call(rw, &#x27;tps_query&#x27;, { sql: &#x27;UPDATE [C:\\d\\K.TPS] SET A = 1 WHERE ID = 1&#x27;, format: &#x27;table&#x27; });
+  assert.equal(tbl.structuredContent.error.code, &#x27;INVALID_ARGUMENT&#x27;);
+  assert.match(tbl.structuredContent.error.message, /outcome/);
+  await call(rw, &#x27;tps_query&#x27;, { sql: &#x27;DESCRIBE [C:\\d\\K.TPS]&#x27;, format: &#x27;table&#x27; });
+  assert.deepEqual(run.calls[2].args, [&#x27;--table&#x27;, &#x27;DESCRIBE [C:\\d\\K.TPS]&#x27;]);
+  await call(client, &#x27;tps_query&#x27;, { sql: &#x27;[K.TPS]&#x27; });      // no keyword: not a write, so the exe decides
+  assert.deepEqual(run.calls[3].args, [&#x27;[K.TPS]&#x27;]);
+  assert.equal(run.calls.length, 4);
+});
+
+test(&#x27;tps_list_files lists the roots, one level, by pattern, or NO_ROOT&#x27;, async () =&gt; {
+  const client = await connect(base, stub());
+  const all = await call(client, &#x27;tps_list_files&#x27;);
+  assert.deepEqual(all.structuredContent.files.map(f =&gt; f.path), [path.join(rootA, &#x27;KEYS.TPS&#x27;), path.join(rootB, &#x27;KEYS.TPS&#x27;), path.join(rootB, &#x27;ONLYB.TPS&#x27;)]);
+  const f = all.structuredContent.files[0];
+  assert.equal(f.name, &#x27;KEYS.TPS&#x27;);
+  assert.equal(f.size, 0);
+  assert.match(f.modified, /^\d{4}-\d{2}-\d{2}T/);
+  const one = await call(client, &#x27;tps_list_files&#x27;, { pattern: &#x27;only*&#x27; });
+  assert.deepEqual(one.structuredContent.files.map(x =&gt; x.name), [&#x27;ONLYB.TPS&#x27;]);
+  const none = await call(client, &#x27;tps_list_files&#x27;, { pattern: &#x27;k?ys.tps&#x27; });
+  assert.equal(none.structuredContent.files.length, 2);
+  const noRoots = await connect({ ...base, roots: [] }, stub());
+  const r = await call(noRoots, &#x27;tps_list_files&#x27;);
+  assert.equal(r.isError, true);
+  assert.equal(r.structuredContent.error.code, &#x27;NO_ROOT&#x27;);
+});
+
+test(&#x27;tps_version pairs the server version with the exe object&#x27;, async () =&gt; {
+  const run = stub(VERSION);
+  const client = await connect(base, run);
+  const r = await call(client, &#x27;tps_version&#x27;);
+  assert.deepEqual(run.calls[0].args, [&#x27;--version&#x27;]);
+  assert.deepEqual(r.structuredContent, { server: &#x27;0.0.0-test&#x27;, exe: VERSION.json });
+  assert.equal(r.isError, false);
+  const broken = await connect(base, stub(TIMEOUT));
+  assert.equal((await call(broken, &#x27;tps_version&#x27;)).structuredContent.error.code, &#x27;INCOMPLETE&#x27;);
+});
+
+test(&#x27;toResult: precedence and the INCOMPLETE envelope&#x27;, () =&gt; {
+  const t = toResult(TIMEOUT, &#x27;update&#x27;, true, false);
+  assert.equal(t.isError, true);
+  assert.deepEqual(t.structuredContent, {
+    ok: false, complete: false, op: &#x27;update&#x27;,
+    error: { code: &#x27;INCOMPLETE&#x27;, message: t.structuredContent.error.message },
+    exit_code: null, timed_out: true, stderr: &#x27;partial&#x27;, outcome: &#x27;unknown&#x27;,
+  });
+  assert.match(t.structuredContent.error.message, /within 60000 ms.*write outcome is unknown.*do not retry/);
+  const nine = toResult({ ...OK, exitCode: 9, json: null }, &#x27;select&#x27;, false, false);
+  assert.match(nine.structuredContent.error.message, /exited with code 9/);
+  assert.equal(nine.structuredContent.outcome, undefined);
+  const noObj = toResult({ ...OK, json: null }, &#x27;select&#x27;, false, false);
+  assert.match(noObj.structuredContent.error.message, /no valid response object/);
+  const tableErr = toResult({ ...TABLE, exitCode: 1, stdout: &#x27;UNKNOWN_COLUMN: Unknown column ZZ\n&#x27; }, &#x27;select&#x27;, false, true);
+  assert.deepEqual(tableErr, { content: [{ type: &#x27;text&#x27;, text: &#x27;UNKNOWN_COLUMN: Unknown column ZZ\n&#x27; }], isError: true });
+  const tableNine = toResult({ ...TABLE, exitCode: 9 }, &#x27;select&#x27;, false, true);
+  assert.equal(tableNine.structuredContent.error.code, &#x27;INCOMPLETE&#x27;);
+  const raced = toResult({ ...OK, failure: { kind: &#x27;timeout&#x27;, message: &#x27;late&#x27; }, timedOut: true }, &#x27;select&#x27;, false, false);
+  assert.equal(raced.structuredContent.error.code, &#x27;INCOMPLETE&#x27;);
+});</code></pre>Add <code>test/server.test.js</code> to the <code>test</code> script.</li>
+          <li class="step"><span class="t">Run it to see it fail.</span> <pre><code>npm test</code></pre><p class="expect">Expected: server.test.js fails on the missing module (createServer/toResult not exported). sql and runner still pass.</p></li>
+          <li class="step"><span class="t">Write the server module, without the command-line part.</span> Create <code>mcp\src\server.ts</code> with everything in the listing below from the shebang line down to and including <code>return server;</code> and the closing brace of <code>createServer</code>. Leave out the <code>// ---- command line</code> section and everything after it; Task 4 adds it. Remove the two imports that section needs (<code>readFileSync</code>, <code>fileURLToPath</code>, <code>StdioServerTransport</code>, <code>spawnRun</code>) for now so <code>tsc</code> does not complain about unused names, or keep them and accept the warning-free build: <code>strict</code> does not flag unused imports.<pre><code>#!/usr/bin/env node
+// tpscli-mcp: every tpscli function as an MCP tool over stdio. Policy (writes, roots, owner),
+// argv building and result shaping live here; SQL text rules are in sql.ts, process handling in
+// runner.ts. The exe&#x27;s JSON is passed through unchanged, so cli/README.md is the contract.
+import { existsSync, readdirSync, readFileSync, statSync } from &#x27;node:fs&#x27;;
+import path from &#x27;node:path&#x27;;
+import { fileURLToPath } from &#x27;node:url&#x27;;
+import { z } from &#x27;zod&#x27;;
+import { McpServer } from &#x27;@modelcontextprotocol/sdk/server/mcp.js&#x27;;
+import { StdioServerTransport } from &#x27;@modelcontextprotocol/sdk/server/stdio.js&#x27;;
+import { run as spawnRun, type Run, type RunResult } from &#x27;./runner.js&#x27;;
+import {
+  InvalidArgument, WRITE_OPS, buildDelete, buildDescribe, buildInsert, buildSelect, buildUpdate, classify,
+} from &#x27;./sql.js&#x27;;
+
+export interface Config {
+  exe: string;
+  roots: string[];
+  allowWrites: boolean;
+  owner?: string;
+  timeoutMs: number;
+  version: string;
+}
+
+export type Op = &#x27;describe&#x27; | &#x27;select&#x27; | &#x27;insert&#x27; | &#x27;update&#x27; | &#x27;delete&#x27; | null;
+
+export type ToolResult = {
+  content: { type: &#x27;text&#x27;; text: string }[];
+  structuredContent?: Record&lt;string, unknown&gt;;
+  isError?: boolean;
+};
+
+class ToolError extends Error {
+  constructor(readonly code: string, message: string) {
+    super(message);
+  }
+}
+
+const body = (o: Record&lt;string, unknown&gt;, isError: boolean): ToolResult =&gt;
+  ({ content: [{ type: &#x27;text&#x27;, text: JSON.stringify(o, null, 2) }], structuredContent: o, isError });
+
+// Every refusal the server makes itself wears the exe&#x27;s error shape, so the model sees one format.
+function refusal(code: string, message: string, op: Op, write: boolean): ToolResult {
+  return body({ ok: false, complete: true, op, error: { code, message }, ...(write ? { outcome: &#x27;none&#x27; } : {}) }, true);
+}
+
+// Spec section 5, in this order: a runner failure or an exit outside 0..3 is INCOMPLETE whatever
+// stdout holds; then table mode, which never looks at json; then JSON mode, where no valid object
+// is INCOMPLETE.
+export function toResult(r: RunResult, op: Op, write: boolean, table: boolean): ToolResult {
+  const badExit = r.exitCode === null || r.exitCode &lt; 0 || r.exitCode &gt; 3;
+  if (r.failure || badExit || (!table &amp;&amp; r.json === null)) {
+    const why = r.failure ? r.failure.message
+      : r.exitCode === null ? &#x27;tpscli ended without an exit code&#x27;
+      : badExit ? `tpscli exited with code ${r.exitCode}`
+      : &#x27;tpscli produced no valid response object&#x27;;
+    const unknown = write ? &#x27; and the write outcome is unknown&#x27; : &#x27;&#x27;;
+    return body({
+      ok: false, complete: false, op,
+      error: { code: &#x27;INCOMPLETE&#x27;, message: `${why}. The response is incomplete${unknown}; do not retry without checking the file.` },
+      exit_code: r.exitCode, timed_out: r.timedOut, stderr: r.stderr,
+      ...(write ? { outcome: &#x27;unknown&#x27; } : {}),
+    }, true);
+  }
+  if (table) return { content: [{ type: &#x27;text&#x27;, text: r.stdout }], isError: r.exitCode !== 0 };
+  return body(r.json!, r.exitCode !== 0);
+}
+
+const DIALECT = `Dialect: the file goes in square brackets, e.g. [C:\\pos\\data\\ITEMS.TPS]; string literals use single quotes with &#x27;&#x27; for an embedded quote; WHERE supports = &lt;&gt; != &lt; &gt; &lt;= &gt;=, AND OR NOT, parentheses, LIKE with % and _, IN (...), and has no IS NULL (compare to &#x27;&#x27; or 0); dates are &#x27;YYYY-MM-DD&#x27;, times &#x27;HH:MM:SS.hh&#x27;, DECIMAL values are plain numbers; LIMIT 0 means no cap. Look before you write: run tps_select with the same where first.`;
+
+const FILE_ARG = z.string().min(1).describe(&#x27;Path to the .TPS file: absolute, or a bare name resolved inside the server\&#x27;s --root folders.&#x27;);
+const OWNER_ARG = z.string().optional().describe(&#x27;Owner (encryption) string for this call only. Prefer the server-wide --owner / TPSCLI_OWNER so the secret stays out of the conversation.&#x27;);
+const WHERE_ARG = z.string().describe(&#x27;Filter in the tpscli dialect without the WHERE keyword, e.g. &quot;PRICE &gt; 5 AND DESC LIKE \&#x27;a%\&#x27;&quot;.&#x27;);
+const FORMAT_ARG = z.enum([&#x27;json&#x27;, &#x27;table&#x27;]).optional().describe(&#x27;&quot;json&quot; (default) returns the exe\&#x27;s response object; &quot;table&quot; returns the aligned text grid, easier to read for wide results.&#x27;);
+const INT_ARG = z.number().int().min(0).max(2147483647);
+const STATEMENT_OPS = [&#x27;DESCRIBE&#x27;, &#x27;SELECT&#x27;, &#x27;INSERT&#x27;, &#x27;UPDATE&#x27;, &#x27;DELETE&#x27;];
+const FULLY_QUALIFIED = /^(?:[A-Za-z]:[\\/]|\\\\)/;    // drive letter or UNC; \x and C:x are neither
+
+export function createServer(config: Config, run: Run): McpServer {
+  const server = new McpServer({ name: &#x27;tpscli-mcp&#x27;, version: config.version });
+
+  const resolveFile = (file: string): string =&gt; {
+    if (FULLY_QUALIFIED.test(file)) return file;
+    if (config.roots.length === 0) {
+      throw new ToolError(&#x27;FILE_NOT_FOUND&#x27;, `${file} is not an absolute path and the server was started without --root folders`);
+    }
+    const inside = (root: string, candidate: string) =&gt; {
+      const rel = path.relative(root, candidate);
+      return rel !== &#x27;&#x27; &amp;&amp; rel !== &#x27;..&#x27; &amp;&amp; !rel.startsWith(`..${path.sep}`) &amp;&amp; !path.isAbsolute(rel);
+    };
+    for (const root of config.roots) {
+      const candidate = path.resolve(root, file);
+      if (!config.roots.some(r =&gt; inside(r, candidate))) continue;   // escaped every root
+      if (existsSync(candidate)) return candidate;
+    }
+    throw new ToolError(&#x27;FILE_NOT_FOUND&#x27;, `${file} not found inside ${config.roots.join(&#x27;; &#x27;)}`);
+  };
+
+  const invoke = async (
+    tool: string, sql: string, op: Op, write: boolean,
+    o: { owner?: string; limitDefault?: number; parseOnly?: boolean; table?: boolean },
+  ): Promise&lt;ToolResult&gt; =&gt; {
+    const args: string[] = [];
+    const owner = o.owner ?? config.owner;
+    // spawn cannot pass a NUL byte and its error message would echo the value; the owner is never echoed.
+    if (owner !== undefined &amp;&amp; owner.includes(&#x27;\0&#x27;)) throw new InvalidArgument(&#x27;the owner string contains a NUL character and cannot be passed&#x27;);
+    if (owner !== undefined) args.push(&#x27;--owner&#x27;, owner);
+    if (o.limitDefault !== undefined) args.push(&#x27;--limit-default&#x27;, String(o.limitDefault));
+    if (o.parseOnly) args.push(&#x27;--parse-only&#x27;);
+    if (o.table) args.push(&#x27;--table&#x27;);
+    args.push(sql);
+    const r = await run(config.exe, args, { timeoutMs: config.timeoutMs, table: o.table === true });
+    // One line per call; never argv, which may hold the owner string.
+    process.stderr.write(`tpscli-mcp ${tool} ${r.durationMs}ms exit ${r.exitCode}${r.failure ? ` ${r.failure.kind}` : &#x27;&#x27;}\n`);
+    return toResult(r, op, write, o.table === true);
+  };
+
+  const writesDisabled = (op: Op) =&gt; refusal(&#x27;WRITES_DISABLED&#x27;,
+    &#x27;This server was started without --allow-writes, so INSERT, UPDATE and DELETE are refused. Restart it with --allow-writes to enable them.&#x27;, op, true);
+
+  // Handler refusals (bad column, null value, empty set, blank where, unresolvable file) become
+  // envelopes; anything else is a bug and propagates.
+  const attempt = async (op: Op, write: boolean, fn: () =&gt; Promise&lt;ToolResult&gt;): Promise&lt;ToolResult&gt; =&gt; {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e instanceof InvalidArgument || e instanceof ToolError) return refusal(e.code, e.message, op, write);
+      throw e;
+    }
+  };
+
+  server.registerTool(&#x27;tps_version&#x27;, {
+    title: &#x27;tpscli version&#x27;,
+    description: &#x27;Version of this MCP server and of the tpscli.exe it runs.&#x27;,
+  }, async () =&gt; {
+    const r = await run(config.exe, [&#x27;--version&#x27;], { timeoutMs: config.timeoutMs });
+    process.stderr.write(`tpscli-mcp tps_version ${r.durationMs}ms exit ${r.exitCode}\n`);
+    const res = toResult(r, null, false, false);
+    return res.isError ? res : body({ server: config.version, exe: r.json! }, false);
+  });
+
+  server.registerTool(&#x27;tps_list_files&#x27;, {
+    title: &#x27;List TopSpeed files&#x27;,
+    description: &#x27;Lists the .TPS files directly inside the server\&#x27;s --root folders (no recursion): name, path, size and modified time. Returns NO_ROOT when the server has no roots; then pass absolute paths to the other tools.&#x27;,
+    inputSchema: { pattern: z.string().optional().describe(&#x27;Glob on the file name, case-insensitive, * and ? only. Default *.TPS.&#x27;) },
+  }, async ({ pattern }) =&gt; attempt(null, false, async () =&gt; {
+    if (config.roots.length === 0) {
+      throw new ToolError(&#x27;NO_ROOT&#x27;, &#x27;The server was started without --root folders, so there is nothing to list; pass absolute paths to the other tools.&#x27;);
+    }
+    const glob = pattern ?? &#x27;*.TPS&#x27;;
+    const re = new RegExp(`^${glob.replace(/[.+^${}()|[\]\\]/g, &#x27;\\$&amp;&#x27;).replace(/\*/g, &#x27;.*&#x27;).replace(/\?/g, &#x27;.&#x27;)}$`, &#x27;i&#x27;);
+    const files: { name: string; path: string; size: number; modified: string }[] = [];
+    for (const root of config.roots) {
+      for (const entry of readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isFile() || !re.test(entry.name)) continue;
+        const full = path.join(root, entry.name);
+        const st = statSync(full);
+        files.push({ name: entry.name, path: full, size: st.size, modified: st.mtime.toISOString() });
+      }
+    }
+    files.sort((a, b) =&gt; a.path.localeCompare(b.path));
+    return body({ files }, false);
+  }));
+
+  server.registerTool(&#x27;tps_describe&#x27;, {
+    title: &#x27;Describe a TopSpeed file&#x27;,
+    description: `Layout of a .TPS file: record count, whether it is encrypted, every column with its type (groups and arrays keep their members and dim) and every key. Run it before selecting from or changing a file you have not seen. ${DIALECT}`,
+    inputSchema: { file: FILE_ARG, owner: OWNER_ARG },
+  }, async ({ file, owner }) =&gt; attempt(&#x27;describe&#x27;, false, () =&gt;
+    invoke(&#x27;tps_describe&#x27;, buildDescribe(resolveFile(file)), &#x27;describe&#x27;, false, { owner })));
+
+  server.registerTool(&#x27;tps_select&#x27;, {
+    title: &#x27;Select rows&#x27;,
+    description: `Reads rows from a .TPS file. Response: columns, rows (arrays in column order), row_count, truncated (true when the cap cut the result short). Without limit the exe caps at 1000 rows. ${DIALECT}`,
+    inputSchema: {
+      file: FILE_ARG,
+      columns: z.array(z.string()).optional().describe(&#x27;Column names; omit for all. A group or array name expands to its leaves.&#x27;),
+      where: WHERE_ARG.optional(),
+      order_by: z.string().optional().describe(&#x27;e.g. &quot;SKU DESC, ID&quot;.&#x27;),
+      limit: INT_ARG.optional().describe(&#x27;Row cap; 0 means no cap; omitted means the exe default of 1000.&#x27;),
+      offset: INT_ARG.optional().describe(&#x27;Rows to skip; requires limit.&#x27;),
+      format: FORMAT_ARG,
+      owner: OWNER_ARG,
+    },
+  }, async a =&gt; attempt(&#x27;select&#x27;, false, () =&gt;
+    invoke(&#x27;tps_select&#x27;, buildSelect({ ...a, file: resolveFile(a.file) }), &#x27;select&#x27;, false, { owner: a.owner, table: a.format === &#x27;table&#x27; })));
+
+  server.registerTool(&#x27;tps_insert&#x27;, {
+    title: &#x27;Insert a row&#x27;,
+    description: `Inserts one row. values maps column name to value: strings, numbers (DECIMAL columns too) and booleans (1/0); dates &#x27;YYYY-MM-DD&#x27;, times &#x27;HH:MM:SS.hh&#x27;, BLOB base64. Omit a column to leave it blank; there is no NULL. Refused with WRITES_DISABLED unless the server runs with --allow-writes. ${DIALECT}`,
+    inputSchema: { file: FILE_ARG, values: z.record(z.unknown()).describe(&#x27;column -&gt; value, at least one&#x27;), owner: OWNER_ARG },
+  }, async ({ file, values, owner }) =&gt; attempt(&#x27;insert&#x27;, true, async () =&gt; {
+    if (!config.allowWrites) return writesDisabled(&#x27;insert&#x27;);
+    return invoke(&#x27;tps_insert&#x27;, buildInsert(resolveFile(file), values), &#x27;insert&#x27;, true, { owner });
+  }));
+
+  server.registerTool(&#x27;tps_update&#x27;, {
+    title: &#x27;Update rows&#x27;,
+    description: `Updates every row matching where. Response: matched and affected. Refused with WRITES_DISABLED unless the server runs with --allow-writes. ${DIALECT}`,
+    inputSchema: { file: FILE_ARG, set: z.record(z.unknown()).describe(&#x27;column -&gt; new value, at least one&#x27;), where: WHERE_ARG, owner: OWNER_ARG },
+  }, async ({ file, set, where, owner }) =&gt; attempt(&#x27;update&#x27;, true, async () =&gt; {
+    if (!config.allowWrites) return writesDisabled(&#x27;update&#x27;);
+    return invoke(&#x27;tps_update&#x27;, buildUpdate(resolveFile(file), set, where), &#x27;update&#x27;, true, { owner });
+  }));
+
+  server.registerTool(&#x27;tps_delete&#x27;, {
+    title: &#x27;Delete rows&#x27;,
+    description: `Deletes every row matching where. Response: matched and affected. Refused with WRITES_DISABLED unless the server runs with --allow-writes. ${DIALECT}`,
+    inputSchema: { file: FILE_ARG, where: WHERE_ARG, owner: OWNER_ARG },
+  }, async ({ file, where, owner }) =&gt; attempt(&#x27;delete&#x27;, true, async () =&gt; {
+    if (!config.allowWrites) return writesDisabled(&#x27;delete&#x27;);
+    return invoke(&#x27;tps_delete&#x27;, buildDelete(resolveFile(file), where), &#x27;delete&#x27;, true, { owner });
+  }));
+
+  server.registerTool(&#x27;tps_query&#x27;, {
+    title: &#x27;Run a tpscli statement&#x27;,
+    description: `Runs one statement exactly as written: DESCRIBE, SELECT, INSERT, UPDATE or DELETE. Use it when the structured tools cannot express what you need. The file path in the statement is used verbatim (no --root resolution). Writes are refused unless the server runs with --allow-writes; parse_only is always allowed and never touches a record. ${DIALECT}`,
+    inputSchema: {
+      sql: z.string().min(1).describe(&#x27;Exactly one statement.&#x27;),
+      owner: OWNER_ARG,
+      limit_default: INT_ARG.optional().describe(&#x27;Cap for a SELECT without LIMIT (exe default 1000).&#x27;),
+      parse_only: z.boolean().optional().describe(&#x27;Validate syntax and columns against the file without touching a record.&#x27;),
+      format: FORMAT_ARG,
+    },
+  }, async ({ sql, owner, limit_default, parse_only, format }) =&gt; {
+    const kind = classify(sql);
+    const write = kind !== null &amp;&amp; WRITE_OPS.has(kind);
+    const op = (kind !== null &amp;&amp; STATEMENT_OPS.includes(kind) ? kind.toLowerCase() : null) as Op;
+    return attempt(op, write, async () =&gt; {
+      if (write &amp;&amp; format === &#x27;table&#x27;) throw new InvalidArgument(&#x27;format &quot;table&quot; is not available for a write: the grid drops the outcome field&#x27;);
+      if (write &amp;&amp; !parse_only &amp;&amp; !config.allowWrites) return writesDisabled(op);
+      return invoke(&#x27;tps_query&#x27;, sql, op, write, { owner, limitDefault: limit_default, parseOnly: parse_only, table: format === &#x27;table&#x27; });
+    });
+  });
+
+  return server;
+}
+
+// ---- command line ------------------------------------------------------------------------------
+
+const VERSION: string = JSON.parse(readFileSync(new URL(&#x27;../package.json&#x27;, import.meta.url), &#x27;utf8&#x27;)).version;
+
+// --exe (or TPSCLI_EXE) is the only candidate when given: a wrong explicit path must fail, not fall
+// through to some other exe. Otherwise: tpscli.exe beside server.js, then ..\..\cli\tpscli.exe (the repo).
+export function discoverExe(explicit: string | undefined, here: string): string {
+  const candidates = explicit !== undefined
+    ? [explicit]
+    : [path.join(here, &#x27;tpscli.exe&#x27;), path.resolve(here, &#x27;..&#x27;, &#x27;..&#x27;, &#x27;cli&#x27;, &#x27;tpscli.exe&#x27;)];
+  const hit = candidates.find(c =&gt; existsSync(c) &amp;&amp; statSync(c).isFile());
+  if (hit === undefined) {
+    throw new Error(`tpscli.exe not found; tried ${candidates.join(&#x27;, &#x27;)}. Pass --exe &lt;path&gt; or set TPSCLI_EXE.`);
+  }
+  return hit;
+}
+
+export function parseArgs(argv: string[], env: NodeJS.ProcessEnv, here: string): Config {
+  let exe = env.TPSCLI_EXE || undefined;
+  const roots: string[] = [];
+  let allowWrites = false;
+  let owner = env.TPSCLI_OWNER || undefined;
+  let timeoutMs = 60_000;
+  const value = (i: number): string =&gt; {
+    const v = argv[i + 1];
+    if (v === undefined) throw new Error(`${argv[i]} needs a value`);
+    return v;
+  };
+  for (let i = 0; i &lt; argv.length; i++) {
+    switch (argv[i]) {
+      case &#x27;--exe&#x27;: exe = value(i++); break;
+      case &#x27;--root&#x27;: roots.push(path.resolve(value(i++))); break;
+      case &#x27;--allow-writes&#x27;: allowWrites = true; break;
+      case &#x27;--owner&#x27;: owner = value(i++); break;
+      case &#x27;--timeout&#x27;: {
+        const s = value(i++);
+        if (!/^\d+$/.test(s) || Number(s) === 0) throw new Error(`--timeout needs a positive whole number of seconds, not ${s}`);
+        if (Number(s) &gt; 2147483) throw new Error(`--timeout is at most 2147483 seconds (Node&#x27;s timer limit), not ${s}`);
+        timeoutMs = Number(s) * 1000;
+        break;
+      }
+      default: throw new Error(`unknown option ${argv[i]}`);
+    }
+  }
+  for (const r of roots) {
+    if (!existsSync(r) || !statSync(r).isDirectory()) throw new Error(`--root ${r} is not a folder`);
+  }
+  return { exe: discoverExe(exe, here), roots, allowWrites, owner, timeoutMs, version: VERSION };
+}
+
+async function main(): Promise&lt;void&gt; {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const config = parseArgs(process.argv.slice(2), process.env, here);
+  await createServer(config, spawnRun).connect(new StdioServerTransport());
+  process.stderr.write(`tpscli-mcp ${config.version} ready: exe ${config.exe}; roots ${config.roots.length ? config.roots.join(&#x27;; &#x27;) : &#x27;(none)&#x27;}; `
+    + `writes ${config.allowWrites ? &#x27;enabled&#x27; : &#x27;disabled&#x27;}; owner ${config.owner === undefined ? &#x27;none&#x27; : &#x27;set&#x27;}; timeout ${config.timeoutMs / 1000}s\n`);
+}
+
+// Start only when run as a program; the tests import this module.
+if (process.argv[1] !== undefined &amp;&amp; path.resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase()) {
+  main().catch((e: Error) =&gt; {
+    process.stderr.write(`tpscli-mcp: ${e.message}\n`);
+    process.exit(2);
+  });
+}</code></pre>Notes on the shape: <code>ToolResult</code> is a type alias, not an interface, so the object literals are assignable to the SDK's <code>CallToolResult</code> (which has an index signature). <code>inputSchema</code> takes a raw zod shape; the SDK validates it before the handler runs and answers a schema failure itself as an <code>isError</code> text result beginning <code>MCP error -32602: Input validation error</code>, with no <code>structuredContent</code>; that is what the missing-<code>where</code> and <code>limit: -1</code> tests assert. <code>values</code> and <code>set</code> are <code>z.record(z.unknown())</code> on purpose: a stricter union would make the SDK reject <code>null</code> before the handler can say "omit the column instead".</li>
+          <li class="step"><span class="t">Run the tests to see them pass.</span> <pre><code>npm test</code></pre><p class="expect">Expected: sql 11, runner 10, server 12 pass; 0 fail. CRLF check on server.ts and server.test.js: lone-LF 0.</p></li>
+          <li class="step"><span class="t">Append to the notes.</span> Two decisions the spec left to the implementation: the write gate runs before file resolution (a read-only server does not report whether a file exists), and <code>tps_list_files</code> returns bare <code>{ files }</code> without the <code>ok</code>/<code>complete</code> pair because nothing ran (spec &sect;3).</li>
+          <li class="step"><span class="t">Commit.</span> <pre><code>git add mcp/package.json mcp/src/server.ts mcp/test/server.test.js docs/mySuperpower/implementation-notes/2026-09-19-tpscli-mcp.html
+git commit -m &quot;mcp: eight tools with write gate, root resolution and result envelopes&quot;</code></pre></li>
+        </ol>
+      </section>
+
+      <section class="task">
+        <h2>Task 4 <span class="tasknum">&middot; command line, startup, and the end-to-end run</span></h2>
+        <p>Deliverable: <code>node dist\server.js</code> is a real stdio MCP server; a bad flag, a missing root or a missing exe exits 2 with the reason; the e2e suite drives the built server against the real exe and copied fixtures and covers spec &sect;9's end-to-end list.</p>
+        <div class="files">
+          <div><span class="k">Create</span> <code>mcp\test\args.test.js</code>, <code>mcp\test\e2e.test.js</code></div>
+          <div><span class="k">Modify</span> <code>mcp\src\server.ts</code> (append the command-line section), <code>mcp\package.json</code> (test script)</div>
+          <div><span class="k">Consumes</span> <code>createServer</code> from Task 3, <code>run</code> from Task 2</div>
+          <div><span class="k">Produces</span> <code>parseArgs(argv: string[], env: NodeJS.ProcessEnv, here: string): Config</code>; <code>discoverExe(explicit: string | undefined, here: string): string</code>; the program entry</div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Write the failing argument test.</span> <code>mcp\test\args.test.js</code>:<pre><code>import { test } from &#x27;node:test&#x27;;
+import assert from &#x27;node:assert/strict&#x27;;
+import { mkdtempSync, mkdirSync, writeFileSync } from &#x27;node:fs&#x27;;
+import { spawnSync } from &#x27;node:child_process&#x27;;
+import os from &#x27;node:os&#x27;;
+import path from &#x27;node:path&#x27;;
+import { fileURLToPath } from &#x27;node:url&#x27;;
+import { parseArgs, discoverExe } from &#x27;../dist/server.js&#x27;;
+
+const serverJs = fileURLToPath(new URL(&#x27;../dist/server.js&#x27;, import.meta.url));
+const tmp = mkdtempSync(path.join(os.tmpdir(), &#x27;tpscli-args-&#x27;));
+const here = path.join(tmp, &#x27;dist&#x27;);            // pretend server.js lives here
+mkdirSync(here);
+const beside = path.join(here, &#x27;tpscli.exe&#x27;);
+writeFileSync(beside, &#x27;&#x27;);
+const rootDir = path.join(tmp, &#x27;data&#x27;);
+mkdirSync(rootDir);
+
+test(&#x27;defaults, flags and environment&#x27;, () =&gt; {
+  const c = parseArgs([], {}, here);
+  assert.deepEqual(c, { exe: beside, roots: [], allowWrites: false, owner: undefined, timeoutMs: 60000, version: c.version });
+  assert.match(c.version, /^\d+\.\d+\.\d+/);
+  const full = parseArgs([&#x27;--root&#x27;, rootDir, &#x27;--allow-writes&#x27;, &#x27;--owner&#x27;, &#x27;s3cret&#x27;, &#x27;--timeout&#x27;, &#x27;5&#x27;, &#x27;--exe&#x27;, beside], {}, here);
+  assert.deepEqual(full, { exe: beside, roots: [rootDir], allowWrites: true, owner: &#x27;s3cret&#x27;, timeoutMs: 5000, version: c.version });
+  const env = parseArgs([], { TPSCLI_EXE: beside, TPSCLI_OWNER: &#x27;envowner&#x27; }, &#x27;C:\\nowhere&#x27;);
+  assert.equal(env.exe, beside);
+  assert.equal(env.owner, &#x27;envowner&#x27;);
+  assert.equal(parseArgs([&#x27;--owner&#x27;, &#x27;flag&#x27;], { TPSCLI_OWNER: &#x27;env&#x27; }, here).owner, &#x27;flag&#x27;);
+  assert.equal(parseArgs([], { TPSCLI_OWNER: &#x27;&#x27; }, here).owner, undefined);
+});
+
+test(&#x27;bad flags fail with a message&#x27;, () =&gt; {
+  assert.throws(() =&gt; parseArgs([&#x27;--bogus&#x27;], {}, here), /unknown option --bogus/);
+  assert.throws(() =&gt; parseArgs([&#x27;--root&#x27;], {}, here), /--root needs a value/);
+  assert.throws(() =&gt; parseArgs([&#x27;--timeout&#x27;, &#x27;0&#x27;], {}, here), /positive whole number/);
+  assert.throws(() =&gt; parseArgs([&#x27;--timeout&#x27;, &#x27;x&#x27;], {}, here), /positive whole number/);
+  assert.throws(() =&gt; parseArgs([&#x27;--timeout&#x27;, &#x27;2147484&#x27;], {}, here), /at most 2147483/);
+  assert.throws(() =&gt; parseArgs([&#x27;--exe&#x27;, tmp], {}, here), /tried .*\. Pass --exe/);   // a folder is not an exe
+  assert.throws(() =&gt; parseArgs([&#x27;--root&#x27;, path.join(tmp, &#x27;missing&#x27;)], {}, here), /is not a folder/);
+  assert.throws(() =&gt; parseArgs([&#x27;--exe&#x27;, &#x27;C:\\no\\tpscli.exe&#x27;], {}, here), /tried C:\\no\\tpscli\.exe\. Pass --exe/);
+});
+
+test(&#x27;discovery order: beside server.js, then the repo layout&#x27;, () =&gt; {
+  assert.equal(discoverExe(undefined, here), beside);
+  const repo = path.join(tmp, &#x27;repo&#x27;);
+  mkdirSync(path.join(repo, &#x27;mcp&#x27;, &#x27;dist&#x27;), { recursive: true });
+  mkdirSync(path.join(repo, &#x27;cli&#x27;));
+  writeFileSync(path.join(repo, &#x27;cli&#x27;, &#x27;tpscli.exe&#x27;), &#x27;&#x27;);
+  assert.equal(discoverExe(undefined, path.join(repo, &#x27;mcp&#x27;, &#x27;dist&#x27;)), path.join(repo, &#x27;cli&#x27;, &#x27;tpscli.exe&#x27;));
+  assert.throws(() =&gt; discoverExe(undefined, tmp), /tried .*tpscli\.exe, .*tpscli\.exe\./);
+});
+
+test(&#x27;a startup failure exits 2 with the reason on stderr&#x27;, () =&gt; {
+  const r = spawnSync(process.execPath, [serverJs, &#x27;--exe&#x27;, beside, &#x27;--root&#x27;, path.join(tmp, &#x27;missing&#x27;)], { encoding: &#x27;utf8&#x27;, windowsHide: true });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /tpscli-mcp: --root .* is not a folder/);
+});</code></pre>Add <code>test/args.test.js</code> to the <code>test</code> script.</li>
+          <li class="step"><span class="t">Run it to see it fail.</span> <pre><code>npm test</code></pre><p class="expect">Expected: args.test.js: &#x27;does not provide an export named parseArgs&#x27;.</p></li>
+          <li class="step"><span class="t">Append the command-line section to server.ts.</span> Everything in the Task 3 listing from <code>// ---- command line</code> to the end of the file, plus the imports it needs (<code>readFileSync</code>, <code>fileURLToPath</code>, <code>StdioServerTransport</code>, <code>run as spawnRun</code>) if you removed them. The entry guard compares <code>process.argv[1]</code> with the module's own path, lower-cased, so importing the module from a test does not start a server.</li>
+          <li class="step"><span class="t">Run the tests to see them pass.</span> <pre><code>npm test</code></pre><p class="expect">Expected: args: 4 pass. The startup test spawns the built server with a missing root and sees exit 2 and &quot;tpscli-mcp: --root ... is not a folder&quot; on stderr.</p></li>
+          <li class="step"><span class="t">Write the end-to-end test.</span> <code>mcp\test\e2e.test.js</code>:<pre><code>import { test } from &#x27;node:test&#x27;;
+import assert from &#x27;node:assert/strict&#x27;;
+import { copyFileSync, existsSync, mkdtempSync, readFileSync } from &#x27;node:fs&#x27;;
+import os from &#x27;node:os&#x27;;
+import path from &#x27;node:path&#x27;;
+import { fileURLToPath } from &#x27;node:url&#x27;;
+import { Client } from &#x27;@modelcontextprotocol/sdk/client/index.js&#x27;;
+import { StdioClientTransport } from &#x27;@modelcontextprotocol/sdk/client/stdio.js&#x27;;
+
+// Real server process, real exe, real fixtures, copied so nothing under cli\testdata is written.
+const here = path.dirname(fileURLToPath(import.meta.url));
+const serverJs = path.resolve(here, &#x27;..&#x27;, &#x27;dist&#x27;, &#x27;server.js&#x27;);
+const exe = path.resolve(here, &#x27;..&#x27;, &#x27;..&#x27;, &#x27;cli&#x27;, &#x27;tpscli.exe&#x27;);
+const fixtures = path.resolve(here, &#x27;..&#x27;, &#x27;..&#x27;, &#x27;cli&#x27;, &#x27;testdata&#x27;);
+const NAMES = [&#x27;ALLTYPES&#x27;, &#x27;GROUPS&#x27;, &#x27;KEYS&#x27;, &#x27;MEMOS&#x27;, &#x27;NOKEY&#x27;, &#x27;SECRET&#x27;];
+const serverVersion = JSON.parse(readFileSync(path.resolve(here, &#x27;..&#x27;, &#x27;package.json&#x27;), &#x27;utf8&#x27;)).version;
+
+const absent = !existsSync(exe) ? exe : NAMES.map(n =&gt; path.join(fixtures, `${n}.TPS`)).find(p =&gt; !existsSync(p));
+const skip = absent ? `e2e skipped: ${absent} is missing (build the CLI and run cli\\verify.ps1 to generate the corpus)` : false;
+
+function corpus() {
+  const work = mkdtempSync(path.join(os.tmpdir(), &#x27;tpscli-e2e-&#x27;));
+  for (const n of NAMES) copyFileSync(path.join(fixtures, `${n}.TPS`), path.join(work, `${n}.TPS`));
+  return work;
+}
+
+async function start(work, extraArgs = [], env = {}) {
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [serverJs, &#x27;--exe&#x27;, exe, &#x27;--root&#x27;, work, ...extraArgs],
+    env: { ...process.env, TPSCLI_OWNER: &#x27;&#x27;, ...env },   // an inherited owner would defeat the no-owner checks
+    stderr: &#x27;pipe&#x27;,
+  });
+  const client = new Client({ name: &#x27;e2e&#x27;, version: &#x27;0&#x27; });
+  await client.connect(transport);
+  return client;
+}
+const call = (client, name, args = {}) =&gt; client.callTool({ name, arguments: args });
+const ok = r =&gt; { assert.equal(r.isError, false, r.content[0].text); return r.structuredContent; };
+const err = (r, code) =&gt; { assert.equal(r.isError, true); assert.equal(r.structuredContent.error.code, code, r.content[0].text); return r.structuredContent; };
+
+test(&#x27;e2e: read-only server, every read tool, every gate&#x27;, { skip }, async t =&gt; {
+  const work = corpus();
+  const keys = path.join(work, &#x27;KEYS.TPS&#x27;);
+  const client = await start(work);
+  t.after(() =&gt; client.close());
+
+  const v = ok(await call(client, &#x27;tps_version&#x27;));
+  assert.equal(v.server, serverVersion);
+  assert.equal(typeof v.exe.version, &#x27;string&#x27;);
+
+  assert.equal(ok(await call(client, &#x27;tps_list_files&#x27;)).files.length, 6);
+
+  const d = ok(await call(client, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27; }));
+  assert.equal(d.op, &#x27;describe&#x27;);
+  assert.equal(d.records, 5);
+
+  const s = ok(await call(client, &#x27;tps_select&#x27;, { file: &#x27;KEYS.TPS&#x27;, columns: [&#x27;ID&#x27;, &#x27;NAME&#x27;], where: &quot;NAME LIKE &#x27;b%&#x27;&quot;, order_by: &#x27;ID&#x27;, limit: 2 }));
+  assert.deepEqual(s.rows, [[2, &#x27;baker&#x27;]]);
+  assert.equal(s.truncated, false);
+
+  const tbl = await call(client, &#x27;tps_select&#x27;, { file: &#x27;KEYS.TPS&#x27;, limit: 2, format: &#x27;table&#x27; });
+  assert.equal(tbl.isError, false);
+  assert.match(tbl.content[0].text, /^ID\s+NAME/);
+  assert.equal(tbl.structuredContent, undefined);
+
+  assert.equal(ok(await call(client, &#x27;tps_query&#x27;, { sql: `SELECT ID FROM [${keys}] WHERE ID = 1` })).row_count, 1);
+
+  const refused = err(await call(client, &#x27;tps_delete&#x27;, { file: &#x27;KEYS.TPS&#x27;, where: &#x27;ID = 1&#x27; }), &#x27;WRITES_DISABLED&#x27;);
+  assert.equal(refused.outcome, &#x27;none&#x27;);
+  assert.equal(ok(await call(client, &#x27;tps_query&#x27;, { sql: `DELETE FROM [${keys}] WHERE ID = 1`, parse_only: true })).parse_only, true);
+  assert.equal(ok(await call(client, &#x27;tps_select&#x27;, { file: &#x27;KEYS.TPS&#x27;, where: &#x27;ID = 1&#x27; })).row_count, 1);   // nothing changed
+
+  err(await call(client, &#x27;tps_describe&#x27;, { file: &#x27;SECRET.TPS&#x27; }), &#x27;OWNER_REQUIRED&#x27;);
+  assert.equal(ok(await call(client, &#x27;tps_describe&#x27;, { file: &#x27;SECRET.TPS&#x27;, owner: &#x27;s3cret&#x27; })).records, 2);
+
+  const tbErr = await call(client, &#x27;tps_select&#x27;, { file: &#x27;KEYS.TPS&#x27;, where: &#x27;ZZ = 1&#x27;, format: &#x27;table&#x27; });
+  assert.equal(tbErr.isError, true);
+  assert.match(tbErr.content[0].text, /^UNKNOWN_COLUMN: /);
+});
+
+test(&#x27;e2e: writes enabled, owner from the environment, one row round trip&#x27;, { skip }, async t =&gt; {
+  const work = corpus();
+  const keys = path.join(work, &#x27;KEYS.TPS&#x27;);
+  const client = await start(work, [&#x27;--allow-writes&#x27;], { TPSCLI_OWNER: &#x27;s3cret&#x27; });
+  t.after(() =&gt; client.close());
+
+  assert.equal(ok(await call(client, &#x27;tps_describe&#x27;, { file: &#x27;SECRET.TPS&#x27; })).records, 2);
+  assert.equal(ok(await call(client, &#x27;tps_insert&#x27;, { file: &#x27;KEYS.TPS&#x27;, values: { ID: 9, NAME: &quot;O&#x27;Nine&quot;, CODE: &#x27;N&#x27; } })).affected, 1);
+  const u = ok(await call(client, &#x27;tps_update&#x27;, { file: &#x27;KEYS.TPS&#x27;, set: { NAME: &#x27;niner&#x27; }, where: &#x27;ID = 9&#x27; }));
+  assert.deepEqual([u.matched, u.affected], [1, 1]);
+  assert.deepEqual(ok(await call(client, &#x27;tps_select&#x27;, { file: &#x27;KEYS.TPS&#x27;, columns: [&#x27;NAME&#x27;], where: &#x27;ID = 9&#x27; })).rows, [[&#x27;niner&#x27;]]);
+  err(await call(client, &#x27;tps_query&#x27;, { sql: `UPDATE [${keys}] SET NAME = &#x27;x&#x27;` }), &#x27;WHERE_REQUIRED&#x27;);
+  assert.equal(ok(await call(client, &#x27;tps_delete&#x27;, { file: &#x27;KEYS.TPS&#x27;, where: &#x27;ID = 9&#x27; })).affected, 1);
+  assert.equal(ok(await call(client, &#x27;tps_select&#x27;, { file: &#x27;KEYS.TPS&#x27;, where: &#x27;ID = 9&#x27; })).row_count, 0);
+  const noWhere = await call(client, &#x27;tps_update&#x27;, { file: &#x27;KEYS.TPS&#x27;, set: { NAME: &#x27;x&#x27; } });
+  assert.equal(noWhere.isError, true);
+  assert.match(noWhere.content[0].text, /Invalid arguments for tool tps_update/);
+});</code></pre>Add <code>test/e2e.test.js</code> to the <code>test</code> script; the final script is <code>"test": "tsc &amp;&amp; node --test test/sql.test.js test/runner.test.js test/server.test.js test/args.test.js test/e2e.test.js"</code>. The fixture facts the assertions use come from <code>..\cli\tests\describe.ps1</code> (KEYS 5 records, SECRET 2 records with owner <code>s3cret</code>) and the README's own example (<code>NAME LIKE 'b%'</code> gives <code>[[2,"baker"]]</code>).</li>
+          <li class="step"><span class="t">Make sure the corpus exists, then run everything.</span> If <code>..\cli\testdata\KEYS.TPS</code> is missing, run <code>..\cli\verify.ps1</code> once from <code>..\cli</code> (it builds mkcorpus and generates the six files; about two minutes). Then:<pre><code>npm test</code></pre><p class="expect">Expected: sql 11, runner 10, server 12, args 4, e2e 2: 38 pass, 0 skipped. Each e2e test prints the server&#x27;s &quot;ready&quot; line and one line per call on stderr.</p>Also prove the skip path: temporarily rename <code>..\cli\tpscli.exe</code>, run <code>node --test test/e2e.test.js</code>, see "e2e skipped: ...tpscli.exe is missing", rename it back.</li>
+          <li class="step"><span class="t">Start it by hand once.</span> <pre><code>node dist\server.js --root ..\cli\testdata</code></pre><p class="expect">Expected: stderr: &quot;tpscli-mcp 0.1.0 ready: exe C:\...\cli\tpscli.exe; roots C:\...\cli\testdata; writes disabled; owner none; timeout 60s&quot;, then it waits on stdin. Ctrl+C.</p>Append to the notes anything the real run taught you (for example, how long the six-fixture e2e takes).</li>
+          <li class="step"><span class="t">Commit.</span> <pre><code>git add mcp/package.json mcp/src/server.ts mcp/test/args.test.js mcp/test/e2e.test.js docs/mySuperpower/implementation-notes/2026-09-19-tpscli-mcp.html
+git commit -m &quot;mcp: command line, exe discovery, startup checks and end-to-end suite&quot;</code></pre></li>
+        </ol>
+      </section>
+
+      <section class="task">
+        <h2>Task 5 <span class="tasknum">&middot; README, manual gate from a real client, simplify, final commit</span></h2>
+        <p>Deliverable: <code>mcp\README.md</code> that lets a support person install and configure the server without this plan; the root README row updated; the eight tools exercised once from Claude Code with the results in the notes; a <code>/simplify</code> pass; the final commit.</p>
+        <div class="files">
+          <div><span class="k">Create</span> <code>mcp\README.md</code></div>
+          <div><span class="k">Modify</span> <code>README.md</code> (root, the <code>mcp/</code> row), <code>docs\mySuperpower\implementation-notes\2026-09-19-tpscli-mcp.html</code></div>
+        </div>
+        <ol class="steps">
+          <li class="step"><span class="t">Write mcp\README.md.</span> <pre><code># tpscli-mcp
+
+MCP server that exposes `tpscli.exe` (SQL over TopSpeed files) to an LLM client over stdio.
+It runs on the machine that holds the `.TPS` files, treats the exe as a black box, and passes
+its JSON through unchanged, so `..\cli\README.md` (*Response contract*, *Error codes and exit
+codes*) is the contract here too. Design: `..\docs\mySuperpower\specs\2026-09-19-tpscli-mcp-design.html`.
+
+## Install
+
+Node 20 or later. From this folder:
+
+```
+npm install
+npm run build        # writes dist\server.js
+npm test             # unit tests with a fake exe; e2e when ..\cli\tpscli.exe and the corpus exist
+```
+
+## Configure a client
+
+One entry in the client&#x27;s MCP configuration. Claude Code, from any folder:
+
+```
+claude mcp add tpscli -- node &quot;C:\Projects\GitHub\tpscli\mcp\dist\server.js&quot; --root &quot;C:\pos\data&quot;
+```
+
+Claude Desktop (`claude_desktop_config.json`):
+
+```json
+{
+  &quot;mcpServers&quot;: {
+    &quot;tpscli&quot;: {
+      &quot;command&quot;: &quot;node&quot;,
+      &quot;args&quot;: [&quot;C:\\Projects\\GitHub\\tpscli\\mcp\\dist\\server.js&quot;, &quot;--root&quot;, &quot;C:\\pos\\data&quot;],
+      &quot;env&quot;: { &quot;TPSCLI_OWNER&quot;: &quot;the owner string, if the files are encrypted&quot; }
+    }
+  }
+}
+```
+
+Append `&quot;--allow-writes&quot;` to `args` when the model may change rows. Without it the server is
+read-only.
+
+## Server flags
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--exe &lt;path&gt;` | `TPSCLI_EXE`, else `tpscli.exe` beside `server.js`, else `..\..\cli\tpscli.exe` | Path to the exe. Missing exe fails at startup. |
+| `--root &lt;dir&gt;` | none | Repeatable. Bare file names resolve inside these folders, in order; `tps_list_files` lists them. Must exist. |
+| `--allow-writes` | off | Enables `INSERT`, `UPDATE` and `DELETE`, structured and raw. |
+| `--owner &lt;string&gt;` | `TPSCLI_OWNER`, else none | Owner (encryption) string for every call that does not pass its own. Never printed. |
+| `--timeout &lt;seconds&gt;` | 60 | Wall-clock limit per exe run; the process tree is killed past it. |
+
+Startup problems (bad flag, missing exe, missing root) exit 2 with the reason on stderr. While
+running, one line per call goes to stderr: tool, duration, exit code.
+
+## Tools
+
+| Tool | Arguments | Runs |
+| --- | --- | --- |
+| `tps_version` | | `--version`; returns `{ server, exe }` |
+| `tps_list_files` | `pattern?` (`*.TPS`) | no exe; `{ files: [{ name, path, size, modified }] }` from the roots, one level deep |
+| `tps_describe` | `file`, `owner?` | `DESCRIBE [file]` |
+| `tps_select` | `file`, `columns?`, `where?`, `order_by?`, `limit?`, `offset?`, `format?`, `owner?` | built `SELECT`; `limit` omitted = exe default 1000, `0` = no cap, `offset` needs `limit` |
+| `tps_insert` | `file`, `values`, `owner?` | built `INSERT` |
+| `tps_update` | `file`, `set`, `where`, `owner?` | built `UPDATE` |
+| `tps_delete` | `file`, `where`, `owner?` | built `DELETE` |
+| `tps_query` | `sql`, `owner?`, `limit_default?`, `parse_only?`, `format?` | the statement verbatim, no root resolution |
+
+`file` is an absolute path, or a bare name resolved inside the roots. `where` and `order_by` are
+fragments in the exe&#x27;s dialect. Values: strings, numbers (DECIMAL columns take numbers, never
+quoted), booleans (`1`/`0`); dates `&#x27;YYYY-MM-DD&#x27;`, times `&#x27;HH:MM:SS.hh&#x27;`, BLOB base64; `null`
+is refused (TopSpeed has no NULL; omit the column). `format: &quot;table&quot;` returns the `--table` grid
+as text and is not available for writes.
+
+## Results
+
+A tool result is the exe&#x27;s response object, as `structuredContent` and as pretty-printed text.
+`isError` is true for any non-zero exit; the object&#x27;s `error.code` and `error.message` explain,
+and `outcome` is passed through for writes. Errors the server raises itself use the same shape:
+
+| Code | When |
+| --- | --- |
+| `WRITES_DISABLED` | A write without `--allow-writes`. `outcome: &quot;none&quot;`. |
+| `NO_ROOT` | `tps_list_files` on a server with no `--root`. |
+| `FILE_NOT_FOUND` | A bare name not found inside the roots, or a path that escapes them. |
+| `INVALID_ARGUMENT` | Empty `set`/`values`, blank `where`, bad column name, `null`, exponent or unsafe number, `offset` without `limit`, `]` in a path, table format on a write. |
+| `INCOMPLETE` | Timeout, spawn failure, output over 64 MiB, exit outside 0-3, or no valid response object. `complete: false`; for a write `outcome: &quot;unknown&quot;`. The write may or may not have happened: check the file, do not retry blindly. |
+
+A malformed argument (wrong type, missing required field) is rejected by the SDK before the
+handler runs: the result is `isError: true` with the text `MCP error -32602: Input validation
+error: Invalid arguments for tool ...` and no `structuredContent`.
+
+## Layout
+
+```
+src/server.ts    tools, policy, argv, stdio transport
+src/sql.ts       statement builder and literal rules
+src/runner.ts    spawn, timeout, output ceiling, response validation
+test/*.test.js   node --test; fake-tpscli.js stands in for the exe
+```</code></pre>Check every command in it by running it; check every flag and code against <code>server.ts</code>.</li>
+          <li class="step"><span class="t">Update the root README row.</span> In the root <code>README.md</code> table, change the <code>mcp/</code> row to: <code>| `mcp/` | The MCP server that wraps `tpscli.exe`: eight tools over stdio, read-only unless started with `--allow-writes`. | `mcp/README.md` |</code>, and the last paragraph to: "Build and test the CLI from `cli/`, the MCP server from `mcp/`; see each folder's README."</li>
+          <li class="step"><span class="t">Prepare the manual gate.</span> Copy the six fixtures to a disposable folder and register the server in Claude Code:<pre><code># PowerShell, in mcp\
+$m = &quot;$env:TEMP\tpscli-manual&quot;
+New-Item -ItemType Directory -Force $m | Out-Null
+Copy-Item ..\cli\testdata\*.TPS $m
+claude mcp add tpscli -- node &quot;C:\Projects\GitHub\tpscli\mcp\dist\server.js&quot; --root $m --allow-writes</code></pre>Then stop and hand over: the owner opens a new Claude Code session and asks for, in order, the version, the file list, the layout of KEYS.TPS, the rows whose NAME starts with b, the same as a table, an insert of ID 9, an update of that row, its deletion, and a raw <code>SELECT</code> through <code>tps_query</code>. The owner pastes each result into the notes file under a "Manual gate" heading. Afterwards <code>claude mcp remove tpscli</code>.</li>
+          <li class="step"><span class="t">Simplify.</span> Run <code>/simplify</code> on <code>mcp/src</code> and <code>mcp/test</code>; apply the fixes that keep every test green; re-run <code>npm test</code>.<p class="expect">Expected: all suites pass; e2e not skipped.</p></li>
+          <li class="step"><span class="t">Line endings and final commit.</span> CRLF check on every file under <code>mcp/</code> except <code>package-lock.json</code>, and on both READMEs and the notes: lone-LF 0.<pre><code>git add mcp/README.md README.md mcp/src mcp/test docs/mySuperpower/implementation-notes/2026-09-19-tpscli-mcp.html
+git commit -m &quot;mcp: README, manual gate recorded, simplify pass&quot;</code></pre></li>
+        </ol>
+      </section>
+
+      <h2>Risks and how the plan meets them</h2>
+      <table>
+        <thead><tr><th>Risk</th><th>Where it is caught</th></tr></thead>
+        <tbody>
+          <tr><td>A hung or crashed exe survives the timeout with the file open.</td><td>Task 2: the hang test reads the fake's pid from stdout and asks <code>tasklist</code> after the runner returns.</td></tr>
+          <tr><td>A truncated response is taken for a crash-free success, or a crash for a clean failure.</td><td>Task 2: <code>parseResponse</code> requires <code>complete: true</code> and <code>ok</code> agreeing with the exit code; Task 3: <code>toResult</code> tests the precedence order, including a timeout racing a complete exit.</td></tr>
+          <tr><td>The model writes a value the dialect cannot spell and the exe's error is confusing.</td><td>Task 1: <code>literal</code> refuses exponent, unsafe-integer, null, array and object values with a message that says what to pass instead, verified against the exe's actual behaviour.</td></tr>
+          <tr><td>The owner string leaks into a log or an error.</td><td>Task 3: the per-call stderr line carries tool, duration and exit only; the argv tests check the owner is its own element and nothing else prints argv.</td></tr>
+          <tr><td>A bare file name climbs out of the roots.</td><td>Task 3: the <code>..\notes.txt</code> case is <code>FILE_NOT_FOUND</code> and the stub records zero exe calls.</td></tr>
+          <tr><td>The SDK's validation behaviour differs from the spec's description.</td><td>Checked by running <code>@modelcontextprotocol/sdk</code> 1.30.0 on 2026-09-19: a schema failure is an <code>isError</code> text result (<code>MCP error -32602: Input validation error ...</code>), not a thrown error; the spec was corrected to say so and Task 3 asserts the text.</td></tr>
+          <tr><td>The e2e suite silently skips on the machine that matters.</td><td>Task 4: the skip message names the missing path, and the step proves both the run and the skip once.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Self-review</h2>
+      <ul>
+        <li><strong>Spec coverage:</strong> &sect;3 flags and discovery (Task 4 <code>parseArgs</code>, <code>discoverExe</code>), tools and file argument (Task 3); &sect;4 every builder row and the three examples (Task 1 tests quote them); &sect;5 runner, <code>failure</code> channel, ceiling, settle-on-close, kill deadline (Task 2), result precedence and envelopes (Task 3 <code>toResult</code>); &sect;6 write gate, roots, owner, timeout (Task 3), SDK-vs-handler validation (Task 3 asserts the SDK's <code>-32602</code> text); &sect;7 data flow is the Task 3 update test; &sect;8 layout (Tasks 1-4, with <code>args.test.js</code> split out and noted); &sect;9 unit list (Tasks 1-3), e2e list (Task 4), manual gate and docs (Task 5); &sect;10 non-goals: nothing here adds HTTP, prompts, batches, reshaping or recursion.</li>
+        <li><strong>Placeholders:</strong> none; every file is given in full, every run step has its expected output.</li>
+        <li><strong>Codex plan review round 3:</strong> 1 finding: the e2e server env clears an inherited <code>TPSCLI_OWNER</code> so the no-owner checks hold on any machine.</li>
+        <li><strong>Codex plan review round 2:</strong> 3 findings: an owner string with a NUL byte is refused without being echoed (spawn's own error would have printed it); only drive-letter or UNC paths bypass root resolution (<code>\data\X.TPS</code> and <code>C:X.TPS</code> do not); and the spec's exe discovery wording was tightened to what the code does: an explicit <code>--exe</code>/<code>TPSCLI_EXE</code> is the only candidate, because falling through from a wrong explicit path to another exe would hide a misconfiguration.</li>
+        <li><strong>Codex plan review round 1:</strong> 8 findings applied: timer declared before spawn (a NUL byte in an argument made spawn throw before the timer existed), <code>--timeout</code> capped at Node's limit, root resolution accepts a candidate inside any root, a parse-only raw write keeps the write flag for its INCOMPLETE envelope, exe discovery requires a regular file, working directories stated, manual-gate block in PowerShell, and the spec's "every tool description" narrowed to exe-running tools (version and list have no dialect).</li>
+        <li><strong>Type consistency:</strong> <code>run(file, args, { timeoutMs, table? })</code> is the same in Task 2's definition, Task 3's stub and <code>invoke</code>, and Task 4's e2e (through the real server). <code>RunResult.failure.kind</code> values match between <code>runner.ts</code>, the fake's modes and <code>toResult</code>. <code>ToolResult</code> and <code>Op</code> are used identically by <code>refusal</code>, <code>toResult</code> and every tool. <code>Config</code> fields match between <code>parseArgs</code>, the test's <code>base</code> and <code>createServer</code>.</li>
+        <li><strong>Ablation:</strong> <code>ToolError</code> exists because <code>FILE_NOT_FOUND</code> and <code>NO_ROOT</code> need codes other than <code>INVALID_ARGUMENT</code> and Task 3's <code>attempt</code> is the one catch site. <code>attempt</code> and <code>invoke</code> are each called from six tools; inlining them would repeat the catch and the argv assembly six times. <code>body</code> is called from four places. The fake exe is the only way to test timeout, ceiling and kill without a real hang. <code>Run</code> as an injected function is what lets Task 3 test twelve policies without spawning anything. No config knob, interface or wrapper beyond these.</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

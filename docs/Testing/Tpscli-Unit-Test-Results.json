@@ -1,0 +1,470 @@
+{
+    "suite":  "tpscli-0-1-0",
+    "storage_key":  "uts:tpscli-0-1-0:v1",
+    "build":  "3401366",
+    "ref":  "feature/tpscli-impl",
+    "env":  "WINVMB40B / Microsoft Windows NT 10.0.26200.0 / PowerShell 5.1.26100.9457",
+    "started":  "2026-09-19T00:26:37",
+    "finished":  "2026-09-19T00:28:42",
+    "tally":  {
+                  "NA":  0,
+                  "PASS":  31,
+                  "FAIL":  0,
+                  "BLOCKED":  1
+              },
+    "cases":  [
+                  {
+                      "id":  "TC-01",
+                      "title":  "Build tpscli.exe as a console executable",
+                      "section":  "setup",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e powershell -File tools\\build.ps1 \n  Microsoft (R) Build Engine version 4.8.9221.0\n  [Microsoft .NET Framework, version 4.0.30319.42000]\n  Copyright (C) Microsoft Corporation. All rights reserved.\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.inc(73,1): warning : Redefining system intrinsic: PEEK [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.inc(73,1): warning : Redefining system intrinsic: PEEK [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(180,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(306,7): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(314,9): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(325,7): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(471,14): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(475,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(544,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(558,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(569,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(599,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(611,7): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(617,7): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(624,20): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(628,7): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(636,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(641,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(644,7): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(651,7): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(663,7): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(666,9): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(671,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(680,33): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(689,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(695,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(701,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(712,7): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(718,7): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(726,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(732,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(752,19): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(758,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(783,3): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(788,7): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(798,35): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(803,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(810,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(824,33): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(839,33): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(849,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(865,33): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(880,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(881,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(898,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(906,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(927,9): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(929,9): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(932,33): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(939,5): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(946,7): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.clw(1084,14): warning : Calling function as procedure [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  C:\\Projects\\GitHub\\tpscli\\cli\\tpsSql.inc(73,1): warning : Redefining system intrinsic: PEEK [C:\\Projects\\GitHub\\tpscli\\cli\\tpscli.cwproj]\n  subsystem=3 (console)\n  exit 0\n\u003e (Get-Item tpscli.exe).LastWriteTime = 09/19/2026 00:26:41 (1 s ago)"
+                  },
+                  {
+                      "id":  "TC-02",
+                      "title":  "Generate the test corpus with the oracle dumps",
+                      "section":  "setup",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e powershell -File tools\\build.ps1 -Proj testdata\\gen\\mkcorpus.cwproj\n  Microsoft (R) Build Engine version 4.8.9221.0\n  [Microsoft .NET Framework, version 4.0.30319.42000]\n  Copyright (C) Microsoft Corporation. All rights reserved.\n  subsystem=3 (console)\n  exit 0\n\u003e testdata\\gen\\mkcorpus.exe\n  exit 0\n\u003e Get-ChildItem testdata\\*.TPS, testdata\\expected\\*.json -\u003e ALLTYPES.TPS, GROUPS.TPS, KEYS.TPS, MEMOS.TPS, NOKEY.TPS, SECRET.TPS, ALLTYPES.json, GROUPS.json, KEYS.json, MEMOS.json, NOKEY.json, SECRET.json"
+                  },
+                  {
+                      "id":  "TC-03",
+                      "title":  "--version prints the version object and exits 0",
+                      "section":  "setup",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe --version\n  { \"ok\": true, \"op\": null, \"version\": \"0.1.0\", \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-04",
+                      "title":  "No statement given is a SYNTAX error with exit 1",
+                      "section":  "setup",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe \n  { \"ok\": false, \"op\": null, \"error\": { \"code\": \"SYNTAX\", \"message\": \"No SQL statement given. Pass it as the first argument or on stdin.\" }, \"complete\": true }\n  exit 1"
+                  },
+                  {
+                      "id":  "TC-05",
+                      "title":  "A missing file is FILE_NOT_FOUND with exit 2",
+                      "section":  "setup",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe SELECT * FROM [testdata\\NOPE.TPS]\n  { \"ok\": false, \"op\": \"select\", \"error\": { \"code\": \"FILE_NOT_FOUND\", \"message\": \"File not found: testdata\\\\NOPE.TPS\" }, \"complete\": true }\n  exit 2"
+                  },
+                  {
+                      "id":  "TC-06",
+                      "title":  "--parse-only validates without touching data",
+                      "section":  "setup",
+                      "priority":  "MED",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe --parse-only INSERT INTO [testdata\\ALLTYPES.TPS] (ID, B) VALUES (12, 300)\n  { \"ok\": false, \"op\": \"insert\", \"error\": { \"code\": \"VALUE_OUT_OF_RANGE\", \"message\": \"B value 300 is outside the range of BYTE\", \"position\": 57, \"token\": \"300\", \"column\": \"B\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 3\n\u003e tpscli.exe DESCRIBE [testdata\\ALLTYPES.TPS]\n  { \"ok\": true, \"op\": \"describe\", \"file\": \"testdata\\\\ALLTYPES.TPS\", \"encrypted\": false, \"records\": 3, \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"B\",\"type\":\"BYTE\"},{\"name\":\"S\",\"type\":\"SHORT\"},{\"name\":\"US\",\"type\":\"USHORT\"},{\"name\":\"UL\",\"type\":\"ULONG\"},{\"name\":\"SR\",\"type\":\"SREAL\"},{\"name\":\"R\",\"type\":\"REAL\"},{\"name\":\"D\",\"type\":\"DECIMAL\",\"size\":7,\"places\":2},{\"name\":\"DT\",\"type\":\"DATE\"},{\"name\":\"TM\",\"type\":\"TIME\"},{\"name\":\"STR\",\"type\":\"STRING\",\"size\":20},{\"name\":\"CSTR\",\"type\":\"CSTRING\",\"size\":21},{\"name\":\"PSTR\",\"type\":\"PSTRING\",\"size\":21},{\"name\":\"PIC\",\"type\":\"STRING\",\"size\":9},{\"name\":\"ARR\",\"type\":\"SHORT\",\"dim\":4}], \"keys\": [{\"name\":\"IDKEY\",\"primary\":true,\"unique\":true,\"components\":[{\"col\":\"ID\",\"asc\":true}]}], \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-07",
+                      "title":  "DESCRIBE reports fields, keys and the record count",
+                      "section":  "describe",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe DESCRIBE [testdata\\KEYS.TPS]\n  { \"ok\": true, \"op\": \"describe\", \"file\": \"testdata\\\\KEYS.TPS\", \"encrypted\": false, \"records\": 5, \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"NAME\",\"type\":\"STRING\",\"size\":30},{\"name\":\"CODE\",\"type\":\"STRING\",\"size\":4},{\"name\":\"AMOUNT\",\"type\":\"DECIMAL\",\"size\":9,\"places\":2}], \"keys\": [{\"name\":\"PKEY\",\"primary\":true,\"unique\":true,\"components\":[{\"col\":\"ID\",\"asc\":true}]},{\"name\":\"DUPKEY\",\"primary\":false,\"unique\":false,\"nocase\":true,\"components\":[{\"col\":\"NAME\",\"asc\":true}]},{\"name\":\"OPTKEY\",\"primary\":false,\"unique\":true,\"optional\":true,\"components\":[{\"col\":\"CODE\",\"asc\":true}]},{\"name\":\"DESCKEY\",\"primary\":false,\"unique\":false,\"components\":[{\"col\":\"AMOUNT\",\"asc\":false},{\"col\":\"ID\",\"asc\":true}]},{\"name\":\"IDX\",\"primary\":false,\"unique\":false,\"components\":[{\"col\":\"NAME\",\"asc\":true}]}], \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-08",
+                      "title":  "Encrypted file requires --owner and never echoes it",
+                      "section":  "describe",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe DESCRIBE [testdata\\SECRET.TPS]\n  { \"ok\": false, \"op\": \"describe\", \"error\": { \"code\": \"OWNER_REQUIRED\", \"message\": \"Not a plain TopSpeed file; if it is encrypted pass --owner\" }, \"complete\": true }\n  exit 2\n\u003e tpscli.exe --owner s3cret DESCRIBE [testdata\\SECRET.TPS]\n  { \"ok\": true, \"op\": \"describe\", \"file\": \"testdata\\\\SECRET.TPS\", \"encrypted\": true, \"records\": 2, \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"NOTE\",\"type\":\"STRING\",\"size\":40}], \"keys\": [{\"name\":\"IDKEY\",\"primary\":true,\"unique\":true,\"components\":[{\"col\":\"ID\",\"asc\":true}]}], \"complete\": true }\n  exit 0\n\u003e both outputs searched for s3cret"
+                  },
+                  {
+                      "id":  "TC-09",
+                      "title":  "DESCRIBE output matches the DynFile oracle dump",
+                      "section":  "describe",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e powershell -File tests\\describe.ps1 \n  exit 0"
+                  },
+                  {
+                      "id":  "TC-10",
+                      "title":  "SELECT a column list with WHERE on the primary key",
+                      "section":  "select",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe SELECT ID, STR, D, DT, TM, ARR[2] FROM [testdata\\ALLTYPES.TPS] WHERE ID = 1\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"STR\",\"type\":\"STRING\"},{\"name\":\"D\",\"type\":\"DECIMAL\"},{\"name\":\"DT\",\"type\":\"DATE\"},{\"name\":\"TM\",\"type\":\"TIME\"},{\"name\":\"ARR[2]\",\"type\":\"SHORT\"}], \"rows\": [[1,\"alpha\",\"12345.67\",\"2026-09-15\",\"13:45:30.00\",20]], \"row_count\": 1, \"truncated\": false, \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-11",
+                      "title":  "Nested GROUP paths and DIM\u0027d group leaves are readable",
+                      "section":  "select",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe SELECT ADDR.CITY FROM [testdata\\GROUPS.TPS] WHERE ID = 1\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ADDR.CITY\",\"type\":\"STRING\"}], \"rows\": [[\"Springfield\"]], \"row_count\": 1, \"truncated\": false, \"complete\": true }\n  exit 0\n\u003e tpscli.exe SELECT PHONES[2].EXT[2] FROM [testdata\\GROUPS.TPS] WHERE ID = 1\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"PHONES[2].EXT[2]\",\"type\":\"STRING\"}], \"rows\": [[\"b2\"]], \"row_count\": 1, \"truncated\": false, \"complete\": true }\n  exit 0\n\u003e tpscli.exe SELECT * FROM [testdata\\GROUPS.TPS] ORDER BY ID LIMIT 1\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"ADDR.LINE1\",\"type\":\"STRING\"},{\"name\":\"ADDR.CITY\",\"type\":\"STRING\"},{\"name\":\"ADDR.GEO.LAT\",\"type\":\"REAL\"},{\"name\":\"ADDR.GEO.LON\",\"type\":\"REAL\"},{\"name\":\"PHONES[1].KIND\",\"type\":\"STRING\"},{\"name\":\"PHONES[1].NUMBER\",\"type\":\"STRING\"},{\"name\":\"PHONES[1].EXT[1]\",\"type\":\"STRING\"},{\"name\":\"PHONES[1].EXT[2]\",\"type\":\"STRING\"},{\"name\":\"PHONES[2].KIND\",\"type\":\"STRING\"},{\"name\":\"PHONES[2].NUMBER\",\"type\":\"STRING\"},{\"name\":\"PHONES[2].EXT[1]\",\"type\":\"STRING\"},{\"name\":\"PHONES[2].EXT[2]\",\"type\":\"STRING\"},{\"name\":\"RAW\",\"type\":\"STRING\"},{\"name\":\"RAWL\",\"type\":\"LONG\"},{\"name\":\"GRID[1]\",\"type\":\"SHORT\"},{\"name\":\"GRID[2]\",\"type\":\"SHORT\"},{\"name\":\"GRID[3]\",\"type\":\"SHORT\"},{\"name\":\"GRID[4]\",\"type\":\"SHORT\"},{\"name\":\"GRID[5]\",\"type\":\"SHORT\"},{\"name\":\"GRID[6]\",\"type\":\"SHORT\"}], \"rows\": [[1,\"One Main St\",\"Springfield\",39.78,-89.65,\"H\",\"555-1000\",\"a1\",\"a2\",\"M\",\"555-2000\",\"b1\",\"b2\",\"xV4\\u0012\",305419896,1,2,3,4,5,6]], \"row_count\": 1, \"truncated\": true, \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-12",
+                      "title":  "WHERE and ORDER BY on a leaf inside a DIM\u0027d GROUP are refused",
+                      "section":  "select",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe SELECT ID FROM [testdata\\GROUPS.TPS] WHERE PHONES[2].KIND = \u0027M\u0027 ORDER BY ID\n  { \"ok\": false, \"op\": \"select\", \"error\": { \"code\": \"UNSUPPORTED\", \"message\": \"Array elements in WHERE are not supported for a leaf inside a DIM\u0027d GROUP (PHONES[2].KIND)\", \"position\": 44, \"token\": \"PHONES[2].KIND\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 1\n\u003e tpscli.exe SELECT ID FROM [testdata\\GROUPS.TPS] ORDER BY PHONES[2].KIND\n  { \"ok\": false, \"op\": \"select\", \"error\": { \"code\": \"UNSUPPORTED\", \"message\": \"ORDER BY is not supported for a leaf inside a DIM\u0027d GROUP (PHONES[2].KIND)\", \"position\": 47, \"token\": \"PHONES[2].KIND\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 1"
+                  },
+                  {
+                      "id":  "TC-13",
+                      "title":  "ORDER BY, LIMIT and OFFSET with the truncated flag",
+                      "section":  "select",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe SELECT ID FROM [testdata\\KEYS.TPS] ORDER BY ID LIMIT 2 OFFSET 1\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"}], \"rows\": [[2],[3]], \"row_count\": 2, \"truncated\": true, \"complete\": true }\n  exit 0\n\u003e tpscli.exe SELECT ID FROM [testdata\\KEYS.TPS] LIMIT 5\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"}], \"rows\": [[1],[2],[3],[4],[5]], \"row_count\": 5, \"truncated\": false, \"complete\": true }\n  exit 0\n\u003e tpscli.exe SELECT ID FROM [testdata\\KEYS.TPS] WHERE ID \u003e 999\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"}], \"rows\": [], \"row_count\": 0, \"truncated\": false, \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-14",
+                      "title":  "LIKE, IN and a DESC sort served by a matching key",
+                      "section":  "select",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe SELECT ID FROM [testdata\\KEYS.TPS] WHERE NAME LIKE \u0027%a%\u0027 ORDER BY AMOUNT DESC, ID\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"}], \"rows\": [[2],[3],[4]], \"row_count\": 3, \"truncated\": false, \"complete\": true }\n  exit 0\n\u003e tpscli.exe SELECT ID, NAME FROM [testdata\\KEYS.TPS] WHERE CODE IN (\u0027A\u0027,\u0027E\u0027) ORDER BY NAME\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"NAME\",\"type\":\"STRING\"}], \"rows\": [[1,\"Able\"],[5,\"Echo\"]], \"row_count\": 2, \"truncated\": false, \"complete\": true }\n  exit 0\n\u003e tpscli.exe SELECT ID, CODE FROM [testdata\\KEYS.TPS] ORDER BY CODE\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"CODE\",\"type\":\"STRING\"}], \"rows\": [[2,\"\"],[4,\"\"],[1,\"A\"],[3,\"C\"],[5,\"E\"]], \"row_count\": 5, \"truncated\": false, \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-15",
+                      "title":  "MEMO, BINARY MEMO and BLOB columns are returned as valid JSON",
+                      "section":  "select",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe SELECT ID, NOTES, BIN, PIC FROM [testdata\\MEMOS.TPS] WHERE ID = 1\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"NOTES\",\"type\":\"MEMO\"},{\"name\":\"BIN\",\"type\":\"MEMO\"},{\"name\":\"PIC\",\"type\":\"BLOB\"}], \"rows\": [[1,\"line one\\r\\nline two\",\"x\\u0000y\\u00ff\",\"UE5HPw==\"]], \"row_count\": 1, \"truncated\": false, \"complete\": true }\n  exit 0\n\u003e ConvertFrom-Json OK: NOTES=line one\\r\\nline two BIN length 4 PIC=UE5HPw=="
+                  },
+                  {
+                      "id":  "TC-16",
+                      "title":  "--table renders an aligned grid with a summary line",
+                      "section":  "select",
+                      "priority":  "MED",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe SELECT ID, NAME, CODE, AMOUNT FROM [testdata\\KEYS.TPS] ORDER BY ID --table\n  ID  NAME     CODE  AMOUNT\n  --  -------  ----  ------\n   1  Able     A          5\n   2  baker               4\n   3  Charlie  C          3\n   4  delta               2\n   5  Echo     E          1\n  (5 rows)\n  exit 0\n\u003e tpscli.exe SELECT ID FROM [testdata\\NOPE.TPS] --table\n  FILE_NOT_FOUND: File not found: testdata\\NOPE.TPS\n  exit 2"
+                  },
+                  {
+                      "id":  "TC-17",
+                      "title":  "INSERT typed literals and read the row back",
+                      "section":  "insert",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e (CP-3) Copy-Item testdata\\ALLTYPES.TPS testdata\\work\\ALLTYPES.TPS -Force\n\u003e tpscli.exe INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, STR, D, DT, TM, ARR[3]) VALUES (9, \u0027nine\u0027, 9.995, \u00272026-01-31\u0027, \u002723:59:59\u0027, 7)\n  { \"ok\": true, \"op\": \"insert\", \"affected\": 1, \"complete\": true }\n  exit 0\n\u003e tpscli.exe SELECT ID, STR, D, DT, TM, ARR[3] FROM [testdata\\work\\ALLTYPES.TPS] WHERE ID = 9\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"STR\",\"type\":\"STRING\"},{\"name\":\"D\",\"type\":\"DECIMAL\"},{\"name\":\"DT\",\"type\":\"DATE\"},{\"name\":\"TM\",\"type\":\"TIME\"},{\"name\":\"ARR[3]\",\"type\":\"SHORT\"}], \"rows\": [[9,\"nine\",\"10\",\"2026-01-31\",\"23:59:59.00\",7]], \"row_count\": 1, \"truncated\": false, \"complete\": true }\n  exit 0\n\u003e tpscli.exe DESCRIBE [testdata\\work\\ALLTYPES.TPS]\n  { \"ok\": true, \"op\": \"describe\", \"file\": \"testdata\\\\work\\\\ALLTYPES.TPS\", \"encrypted\": false, \"records\": 4, \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"B\",\"type\":\"BYTE\"},{\"name\":\"S\",\"type\":\"SHORT\"},{\"name\":\"US\",\"type\":\"USHORT\"},{\"name\":\"UL\",\"type\":\"ULONG\"},{\"name\":\"SR\",\"type\":\"SREAL\"},{\"name\":\"R\",\"type\":\"REAL\"},{\"name\":\"D\",\"type\":\"DECIMAL\",\"size\":7,\"places\":2},{\"name\":\"DT\",\"type\":\"DATE\"},{\"name\":\"TM\",\"type\":\"TIME\"},{\"name\":\"STR\",\"type\":\"STRING\",\"size\":20},{\"name\":\"CSTR\",\"type\":\"CSTRING\",\"size\":21},{\"name\":\"PSTR\",\"type\":\"PSTRING\",\"size\":21},{\"name\":\"PIC\",\"type\":\"STRING\",\"size\":9},{\"name\":\"ARR\",\"type\":\"SHORT\",\"dim\":4}], \"keys\": [{\"name\":\"IDKEY\",\"primary\":true,\"unique\":true,\"components\":[{\"col\":\"ID\",\"asc\":true}]}], \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-18",
+                      "title":  "Duplicate primary key is DUPLICATE_KEY with outcome none",
+                      "section":  "insert",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID) VALUES (9)\n  { \"ok\": false, \"op\": \"insert\", \"error\": { \"code\": \"DUPLICATE_KEY\", \"message\": \"Duplicate value for key IDKEY\", \"key\": \"IDKEY\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 3\n\u003e tpscli.exe DESCRIBE [testdata\\work\\ALLTYPES.TPS]\n  { \"ok\": true, \"op\": \"describe\", \"file\": \"testdata\\\\work\\\\ALLTYPES.TPS\", \"encrypted\": false, \"records\": 4, \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"B\",\"type\":\"BYTE\"},{\"name\":\"S\",\"type\":\"SHORT\"},{\"name\":\"US\",\"type\":\"USHORT\"},{\"name\":\"UL\",\"type\":\"ULONG\"},{\"name\":\"SR\",\"type\":\"SREAL\"},{\"name\":\"R\",\"type\":\"REAL\"},{\"name\":\"D\",\"type\":\"DECIMAL\",\"size\":7,\"places\":2},{\"name\":\"DT\",\"type\":\"DATE\"},{\"name\":\"TM\",\"type\":\"TIME\"},{\"name\":\"STR\",\"type\":\"STRING\",\"size\":20},{\"name\":\"CSTR\",\"type\":\"CSTRING\",\"size\":21},{\"name\":\"PSTR\",\"type\":\"PSTRING\",\"size\":21},{\"name\":\"PIC\",\"type\":\"STRING\",\"size\":9},{\"name\":\"ARR\",\"type\":\"SHORT\",\"dim\":4}], \"keys\": [{\"name\":\"IDKEY\",\"primary\":true,\"unique\":true,\"components\":[{\"col\":\"ID\",\"asc\":true}]}], \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-19",
+                      "title":  "String overflow truncates with a warning; bad values are VALUE_OUT_OF_RANGE",
+                      "section":  "insert",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true,
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, STR) VALUES (10, \u0027this string is far longer than twenty characters\u0027)\n  { \"ok\": true, \"op\": \"insert\", \"affected\": 1, \"warnings\": [{ \"code\": \"STRING_TRUNCATED\", \"column\": \"STR\", \"message\": \"Value truncated to 20 characters\" }], \"complete\": true }\n  exit 0\n\u003e tpscli.exe INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, DT) VALUES (11, \u00272026-02-30\u0027)\n  { \"ok\": false, \"op\": \"insert\", \"error\": { \"code\": \"VALUE_OUT_OF_RANGE\", \"message\": \"Invalid date \u00272026-02-30\u0027 for column DT\", \"position\": 63, \"token\": \"2026-02-30\", \"column\": \"DT\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 3\n\u003e tpscli.exe INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, B) VALUES (12, 300)\n  { \"ok\": false, \"op\": \"insert\", \"error\": { \"code\": \"VALUE_OUT_OF_RANGE\", \"message\": \"B value 300 is outside the range of BYTE\", \"position\": 62, \"token\": \"300\", \"column\": \"B\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 3\n\u003e tpscli.exe INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, S) VALUES (13, 1.5)\n  { \"ok\": false, \"op\": \"insert\", \"error\": { \"code\": \"VALUE_OUT_OF_RANGE\", \"message\": \"S does not accept a fraction\", \"position\": 62, \"token\": \"1.5\", \"column\": \"S\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 3\n\u003e tpscli.exe INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, D) VALUES (14, 123456.78)\n  { \"ok\": false, \"op\": \"insert\", \"error\": { \"code\": \"VALUE_OUT_OF_RANGE\", \"message\": \"D value 123456.78 overflows DECIMAL(7,2)\", \"position\": 62, \"token\": \"123456.78\", \"column\": \"D\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 3\n\u003e tpscli.exe DESCRIBE [testdata\\work\\ALLTYPES.TPS]\n  { \"ok\": true, \"op\": \"describe\", \"file\": \"testdata\\\\work\\\\ALLTYPES.TPS\", \"encrypted\": false, \"records\": 5, \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"B\",\"type\":\"BYTE\"},{\"name\":\"S\",\"type\":\"SHORT\"},{\"name\":\"US\",\"type\":\"USHORT\"},{\"name\":\"UL\",\"type\":\"ULONG\"},{\"name\":\"SR\",\"type\":\"SREAL\"},{\"name\":\"R\",\"type\":\"REAL\"},{\"name\":\"D\",\"type\":\"DECIMAL\",\"size\":7,\"places\":2},{\"name\":\"DT\",\"type\":\"DATE\"},{\"name\":\"TM\",\"type\":\"TIME\"},{\"name\":\"STR\",\"type\":\"STRING\",\"size\":20},{\"name\":\"CSTR\",\"type\":\"CSTRING\",\"size\":21},{\"name\":\"PSTR\",\"type\":\"PSTRING\",\"size\":21},{\"name\":\"PIC\",\"type\":\"STRING\",\"size\":9},{\"name\":\"ARR\",\"type\":\"SHORT\",\"dim\":4}], \"keys\": [{\"name\":\"IDKEY\",\"primary\":true,\"unique\":true,\"components\":[{\"col\":\"ID\",\"asc\":true}]}], \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-20",
+                      "title":  "A STRING with a picture refuses a literal the picture cannot read",
+                      "section":  "insert",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e (CP-3) Copy-Item testdata\\ALLTYPES.TPS testdata\\work\\ALLTYPES.TPS -Force\n\u003e tpscli.exe INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, PIC) VALUES (20, \u0027rrr\u0027)\n  { \"ok\": false, \"op\": \"insert\", \"error\": { \"code\": \"VALUE_OUT_OF_RANGE\", \"message\": \"PIC does not match picture @N9.2\", \"column\": \"PIC\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 3\n\u003e tpscli.exe INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, PIC) VALUES (21, \u00277\u0027)\n  { \"ok\": true, \"op\": \"insert\", \"affected\": 1, \"complete\": true }\n  exit 0\n\u003e tpscli.exe SELECT ID, PIC FROM [testdata\\work\\ALLTYPES.TPS] WHERE ID \u003e 19\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"PIC\",\"type\":\"STRING\"}], \"rows\": [[21,\"00007.00\"]], \"row_count\": 1, \"truncated\": false, \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-21",
+                      "title":  "BLOB round trip, including a value over 4 KB of base64",
+                      "section":  "insert",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e (CP-3) Copy-Item testdata\\MEMOS.TPS testdata\\work\\MEMOS.TPS -Force\n\u003e tpscli.exe INSERT INTO [testdata\\work\\MEMOS.TPS] (ID, TITLE, PIC) VALUES (3, \u0027blobtest\u0027, \u0027UE5HPw==\u0027)\n  { \"ok\": true, \"op\": \"insert\", \"affected\": 1, \"complete\": true }\n  exit 0\n\u003e tpscli.exe SELECT ID, TITLE, PIC FROM [testdata\\work\\MEMOS.TPS] WHERE ID = 3\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"TITLE\",\"type\":\"STRING\"},{\"name\":\"PIC\",\"type\":\"BLOB\"}], \"rows\": [[3,\"blobtest\",\"UE5HPw==\"]], \"row_count\": 1, \"truncated\": false, \"complete\": true }\n  exit 0\n\u003e $b = base64 of 3150 bytes (4200 chars)\n\u003e tpscli.exe INSERT INTO [testdata\\work\\MEMOS.TPS] (ID, TITLE, PIC) VALUES (4, \u0027bigblob\u0027, \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\u0027)\n  { \"ok\": true, \"op\": \"insert\", \"affected\": 1, \"complete\": true }\n  exit 0\n\u003e tpscli.exe SELECT PIC FROM [testdata\\work\\MEMOS.TPS] WHERE ID = 4\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"PIC\",\"type\":\"BLOB\"}], \"rows\": [[\"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\"]], \"row_count\": 1, \"truncated\": false, \"complete\": true }\n  exit 0\n\u003e ($out | ConvertFrom-Json).rows[0][0] -eq $b -\u003e True"
+                  },
+                  {
+                      "id":  "TC-22",
+                      "title":  "UPDATE that creates a duplicate on a unique key rolls back every row",
+                      "section":  "mutate",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e (CP-3) Copy-Item testdata\\KEYS.TPS testdata\\work\\KEYS.TPS -Force\n\u003e tpscli.exe UPDATE [testdata\\work\\KEYS.TPS] SET CODE = \u0027Z\u0027 WHERE CODE = \u0027\u0027\n  { \"ok\": false, \"op\": \"update\", \"error\": { \"code\": \"DUPLICATE_KEY\", \"message\": \"Creates Duplicate Key at 4\", \"row\": \"4\" }, \"outcome\": \"rolled_back\", \"matched\": 2, \"affected\": 0, \"complete\": true }\n  exit 3\n\u003e tpscli.exe SELECT ID, CODE FROM [testdata\\work\\KEYS.TPS] WHERE ID IN (2,4) ORDER BY ID\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"CODE\",\"type\":\"STRING\"}], \"rows\": [[2,\"\"],[4,\"\"]], \"row_count\": 2, \"truncated\": false, \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-23",
+                      "title":  "Multi-row UPDATE, key-component UPDATE and DELETE report matched and affected",
+                      "section":  "mutate",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true,
+                                    true,
+                                    true,
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe UPDATE [testdata\\work\\KEYS.TPS] SET NAME = \u0027zulu\u0027 WHERE CODE = \u0027\u0027\n  { \"ok\": true, \"op\": \"update\", \"matched\": 2, \"affected\": 2, \"complete\": true }\n  exit 0\n\u003e tpscli.exe SELECT ID FROM [testdata\\work\\KEYS.TPS] WHERE NAME = \u0027zulu\u0027 ORDER BY ID\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"}], \"rows\": [[2],[4]], \"row_count\": 2, \"truncated\": false, \"complete\": true }\n  exit 0\n\u003e tpscli.exe UPDATE [testdata\\work\\KEYS.TPS] SET AMOUNT = 100 WHERE ID = 1\n  { \"ok\": true, \"op\": \"update\", \"matched\": 1, \"affected\": 1, \"complete\": true }\n  exit 0\n\u003e tpscli.exe UPDATE [testdata\\work\\KEYS.TPS] SET ID = 2 WHERE ID = 3\n  { \"ok\": false, \"op\": \"update\", \"error\": { \"code\": \"DUPLICATE_KEY\", \"message\": \"Creates Duplicate Key at 3\", \"row\": \"3\" }, \"outcome\": \"rolled_back\", \"matched\": 1, \"affected\": 0, \"complete\": true }\n  exit 3\n\u003e tpscli.exe DELETE FROM [testdata\\work\\KEYS.TPS] WHERE AMOUNT \u003c 3\n  { \"ok\": true, \"op\": \"delete\", \"matched\": 2, \"affected\": 2, \"complete\": true }\n  exit 0\n\u003e tpscli.exe DESCRIBE [testdata\\work\\KEYS.TPS]\n  { \"ok\": true, \"op\": \"describe\", \"file\": \"testdata\\\\work\\\\KEYS.TPS\", \"encrypted\": false, \"records\": 3, \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"NAME\",\"type\":\"STRING\",\"size\":30},{\"name\":\"CODE\",\"type\":\"STRING\",\"size\":4},{\"name\":\"AMOUNT\",\"type\":\"DECIMAL\",\"size\":9,\"places\":2}], \"keys\": [{\"name\":\"PKEY\",\"primary\":true,\"unique\":true,\"components\":[{\"col\":\"ID\",\"asc\":true}]},{\"name\":\"DUPKEY\",\"primary\":false,\"unique\":false,\"nocase\":true,\"components\":[{\"col\":\"NAME\",\"asc\":true}]},{\"name\":\"OPTKEY\",\"primary\":false,\"unique\":true,\"optional\":true,\"components\":[{\"col\":\"CODE\",\"asc\":true}]},{\"name\":\"DESCKEY\",\"primary\":false,\"unique\":false,\"components\":[{\"col\":\"AMOUNT\",\"asc\":false},{\"col\":\"ID\",\"asc\":true}]},{\"name\":\"IDX\",\"primary\":false,\"unique\":false,\"components\":[{\"col\":\"NAME\",\"asc\":true}]}], \"complete\": true }\n  exit 0\n\u003e tpscli.exe DELETE FROM [testdata\\work\\KEYS.TPS] WHERE 1 = 1\n  { \"ok\": true, \"op\": \"delete\", \"matched\": 3, \"affected\": 3, \"complete\": true }\n  exit 0\n\u003e tpscli.exe DESCRIBE [testdata\\work\\KEYS.TPS]\n  { \"ok\": true, \"op\": \"describe\", \"file\": \"testdata\\\\work\\\\KEYS.TPS\", \"encrypted\": false, \"records\": 0, \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"NAME\",\"type\":\"STRING\",\"size\":30},{\"name\":\"CODE\",\"type\":\"STRING\",\"size\":4},{\"name\":\"AMOUNT\",\"type\":\"DECIMAL\",\"size\":9,\"places\":2}], \"keys\": [{\"name\":\"PKEY\",\"primary\":true,\"unique\":true,\"components\":[{\"col\":\"ID\",\"asc\":true}]},{\"name\":\"DUPKEY\",\"primary\":false,\"unique\":false,\"nocase\":true,\"components\":[{\"col\":\"NAME\",\"asc\":true}]},{\"name\":\"OPTKEY\",\"primary\":false,\"unique\":true,\"optional\":true,\"components\":[{\"col\":\"CODE\",\"asc\":true}]},{\"name\":\"DESCKEY\",\"primary\":false,\"unique\":false,\"components\":[{\"col\":\"AMOUNT\",\"asc\":false},{\"col\":\"ID\",\"asc\":true}]},{\"name\":\"IDX\",\"primary\":false,\"unique\":false,\"components\":[{\"col\":\"NAME\",\"asc\":true}]}], \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-24",
+                      "title":  "UPDATE and DELETE refuse a missing WHERE, LIMIT and non-literal values",
+                      "section":  "mutate",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e (CP-3) Copy-Item testdata\\KEYS.TPS testdata\\work\\KEYS.TPS -Force\n\u003e tpscli.exe DELETE FROM [testdata\\work\\KEYS.TPS]\n  { \"ok\": false, \"op\": \"delete\", \"error\": { \"code\": \"WHERE_REQUIRED\", \"message\": \"DELETE without WHERE is refused. Use WHERE 1 = 1 to delete every row.\", \"position\": 37, \"token\": \"\u003ceof\u003e\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 1\n\u003e tpscli.exe UPDATE [testdata\\work\\KEYS.TPS] SET NAME = \u0027x\u0027 WHERE ID \u003e 0 LIMIT 1\n  { \"ok\": false, \"op\": \"update\", \"error\": { \"code\": \"UNSUPPORTED\", \"message\": \"LIMIT is not supported on UPDATE\", \"position\": 61, \"token\": \"LIMIT\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 1\n\u003e tpscli.exe UPDATE [testdata\\work\\KEYS.TPS] SET NAME = NAME WHERE ID = 1\n  { \"ok\": false, \"op\": \"update\", \"error\": { \"code\": \"SYNTAX\", \"message\": \"Expected a literal value\", \"position\": 44, \"token\": \"NAME\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 1\n\u003e tpscli.exe DESCRIBE [testdata\\work\\KEYS.TPS]\n  { \"ok\": true, \"op\": \"describe\", \"file\": \"testdata\\\\work\\\\KEYS.TPS\", \"encrypted\": false, \"records\": 5, \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"NAME\",\"type\":\"STRING\",\"size\":30},{\"name\":\"CODE\",\"type\":\"STRING\",\"size\":4},{\"name\":\"AMOUNT\",\"type\":\"DECIMAL\",\"size\":9,\"places\":2}], \"keys\": [{\"name\":\"PKEY\",\"primary\":true,\"unique\":true,\"components\":[{\"col\":\"ID\",\"asc\":true}]},{\"name\":\"DUPKEY\",\"primary\":false,\"unique\":false,\"nocase\":true,\"components\":[{\"col\":\"NAME\",\"asc\":true}]},{\"name\":\"OPTKEY\",\"primary\":false,\"unique\":true,\"optional\":true,\"components\":[{\"col\":\"CODE\",\"asc\":true}]},{\"name\":\"DESCKEY\",\"primary\":false,\"unique\":false,\"components\":[{\"col\":\"AMOUNT\",\"asc\":false},{\"col\":\"ID\",\"asc\":true}]},{\"name\":\"IDX\",\"primary\":false,\"unique\":false,\"components\":[{\"col\":\"NAME\",\"asc\":true}]}], \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-25",
+                      "title":  "A record held by another process makes DELETE roll back with RECORD_HELD",
+                      "section":  "mutate",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e (CP-3) Copy-Item testdata\\KEYS.TPS testdata\\work\\KEYS.TPS -Force\n\u003e (CP-4) Start-Process tests\\hold.exe (attempt 1, pid 16164)\n\u003e waited for testdata\\work\\held.flag -\u003e True\n\u003e tpscli.exe DELETE FROM [testdata\\work\\KEYS.TPS] WHERE ID \u003e 0\n  { \"ok\": false, \"op\": \"delete\", \"error\": { \"code\": \"RECORD_HELD\", \"message\": \"Record held by another process (2). Statement rolled back.\", \"row\": \"2\" }, \"outcome\": \"rolled_back\", \"matched\": 5, \"affected\": 0, \"complete\": true }\n  exit 3\n\u003e tpscli.exe DESCRIBE [testdata\\work\\KEYS.TPS]\n  { \"ok\": true, \"op\": \"describe\", \"file\": \"testdata\\\\work\\\\KEYS.TPS\", \"encrypted\": false, \"records\": 5, \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"NAME\",\"type\":\"STRING\",\"size\":30},{\"name\":\"CODE\",\"type\":\"STRING\",\"size\":4},{\"name\":\"AMOUNT\",\"type\":\"DECIMAL\",\"size\":9,\"places\":2}], \"keys\": [{\"name\":\"PKEY\",\"primary\":true,\"unique\":true,\"components\":[{\"col\":\"ID\",\"asc\":true}]},{\"name\":\"DUPKEY\",\"primary\":false,\"unique\":false,\"nocase\":true,\"components\":[{\"col\":\"NAME\",\"asc\":true}]},{\"name\":\"OPTKEY\",\"primary\":false,\"unique\":true,\"optional\":true,\"components\":[{\"col\":\"CODE\",\"asc\":true}]},{\"name\":\"DESCKEY\",\"primary\":false,\"unique\":false,\"components\":[{\"col\":\"AMOUNT\",\"asc\":false},{\"col\":\"ID\",\"asc\":true}]},{\"name\":\"IDX\",\"primary\":false,\"unique\":false,\"components\":[{\"col\":\"NAME\",\"asc\":true}]}], \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-26",
+                      "title":  "The five test suites pass",
+                      "section":  "gate",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e powershell -File tests\\describe.ps1 \n  exit 0\n\u003e powershell -File tests\\parser.ps1 \n  parser.ps1: OK (143 source lines)\n  exit 0\n\u003e powershell -File tests\\select.ps1 \n  select.ps1: OK (17 cases)\n  exit 0\n\u003e powershell -File tests\\insert.ps1 \n  insert.ps1: OK\n  exit 0\n\u003e powershell -File tests\\update.ps1 \n  update.ps1: OK\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-27",
+                      "title":  "verify.ps1 passes on the corpus and declares the skipped steps",
+                      "section":  "gate",
+                      "priority":  "CORE",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e powershell -File verify.ps1 \n  tpscli verify - corpus \u0027testdata\u0027\n  PASS  step 1 build + corpus - 3 projects rebuilt, corpus regenerated\n  PASS  step 2 tests\\describe.ps1 - exit 0\n  PASS  step 2 tests\\parser.ps1 - exit 0\n  PASS  step 2 tests\\select.ps1 - exit 0\n  PASS  step 2 tests\\insert.ps1 - exit 0\n  PASS  step 2 tests\\update.ps1 - exit 0\n  note  ALLTYPES : PIC not written (STRING with picture @N9.2)\n  PASS  step 3 round trip ALLTYPES - 17 leaves written, records back to 3\n  note  GROUPS : PHONES.KIND not written (leaf inside a DIM\u0027d GROUP)\n  note  GROUPS : PHONES.NUMBER not written (leaf inside a DIM\u0027d GROUP)\n  note  GROUPS : PHONES.EXT[1] not written (leaf inside a DIM\u0027d GROUP)\n  note  GROUPS : PHONES.EXT[2] not written (leaf inside a DIM\u0027d GROUP)\n  note  GROUPS : RAWL not written (OVER side of an overlay pair)\n  PASS  step 3 round trip GROUPS - 12 leaves written, records back to 2\n  PASS  step 3 round trip KEYS - 4 leaves written, records back to 5\n  PASS  step 3 round trip MEMOS - 5 leaves written, records back to 2\n  PASS  step 3 round trip NOKEY - 2 leaves written, records back to 3\n  PASS  step 3 round trip SECRET - 2 leaves written, records back to 2\n  SKIP  step 4 dictionary parity - no -Expected folder given\n  PASS  step 5 key walk ALLTYPES - 1 key(s) walked in order against 3 records\n  PASS  step 5 key walk GROUPS - 1 key(s) walked in order against 2 records\n  note  KEYS : INDEX IDX walks 0 rows (never BUILT); count check skipped\n  PASS  step 5 key walk KEYS - 5 key(s) walked in order against 5 records\n  PASS  step 5 key walk MEMOS - 1 key(s) walked in order against 2 records\n  PASS  step 5 key walk NOKEY - 0 key(s) walked in order against 3 records\n  PASS  step 5 key walk SECRET - 1 key(s) walked in order against 2 records\n  SKIP  step 5 TPSFix log - no -Extra folder given\n  PASS  step 6 shared access - read succeeded, write reported RECORD_HELD and rolled back\n  PASS  step 7 performance - median 71 ms on KEYS (key PKEY); runs 80/75/71/70/67\n  7 note(s) above\n  verify.ps1: all steps PASS (2 skipped - not a release qualification)\n  exit 0\n\u003e counted PASS=20 SKIP=2 FAIL=0"
+                  },
+                  {
+                      "id":  "TC-28",
+                      "title":  "Release qualification against real dtpos files (dev-supplied input)",
+                      "section":  "gate",
+                      "priority":  "HIGH",
+                      "verdict":  "BLOCKED",
+                      "steps":  [
+                                    false,
+                                    false,
+                                    false
+                                ],
+                      "notes":  "Dev-supplied -Extra/-Expected/-TpsFixLog inputs are not available in this repository.",
+                      "evidence":  "\u003e BLOCKED: -Extra, -Expected and -TpsFixLog inputs (copied dtpos files, oracle JSON, TPSFix log) are dev-supplied and not present in this repository; verify.ps1 -Extra was not run."
+                  },
+                  {
+                      "id":  "TC-29",
+                      "title":  "A two-column ORDER BY served by a key walked in reverse",
+                      "section":  "select",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe SELECT ID FROM [testdata\\KEYS.TPS] ORDER BY AMOUNT ASC, ID DESC\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"}], \"rows\": [[5],[4],[3],[2],[1]], \"row_count\": 5, \"truncated\": false, \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-30",
+                      "title":  "A DECIMAL literal that needs the field\u0027s full declared width is accepted",
+                      "section":  "insert",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e (CP-3) Copy-Item testdata\\ALLTYPES.TPS testdata\\work\\ALLTYPES.TPS -Force\n\u003e tpscli.exe INSERT INTO [testdata\\work\\ALLTYPES.TPS] (ID, D) VALUES (50, 54321.99)\n  { \"ok\": true, \"op\": \"insert\", \"affected\": 1, \"complete\": true }\n  exit 0\n\u003e tpscli.exe SELECT ID, D FROM [testdata\\work\\ALLTYPES.TPS] WHERE ID = 50\n  { \"ok\": true, \"op\": \"select\", \"columns\": [{\"name\":\"ID\",\"type\":\"LONG\"},{\"name\":\"D\",\"type\":\"DECIMAL\"}], \"rows\": [[50,\"54321.99\"]], \"row_count\": 1, \"truncated\": false, \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-31",
+                      "title":  "UPDATE with no matching row reports matched 0 and opens no transaction",
+                      "section":  "mutate",
+                      "priority":  "MED",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e (CP-3) Copy-Item testdata\\KEYS.TPS testdata\\work\\KEYS.TPS -Force\n\u003e tpscli.exe UPDATE [testdata\\work\\KEYS.TPS] SET NAME = \u0027nobody\u0027 WHERE ID = 999\n  { \"ok\": true, \"op\": \"update\", \"matched\": 0, \"affected\": 0, \"complete\": true }\n  exit 0"
+                  },
+                  {
+                      "id":  "TC-32",
+                      "title":  "Unsupported SQL constructs are refused with UNSUPPORTED",
+                      "section":  "setup",
+                      "priority":  "HIGH",
+                      "verdict":  "PASS",
+                      "steps":  [
+                                    true,
+                                    true,
+                                    true,
+                                    true,
+                                    true
+                                ],
+                      "notes":  "Automated run 2026-09-19 00:26: every check passed.",
+                      "evidence":  "\u003e tpscli.exe --parse-only SELECT COUNT(*) FROM [testdata\\KEYS.TPS]\n  { \"ok\": false, \"op\": \"select\", \"error\": { \"code\": \"UNSUPPORTED\", \"message\": \"Aggregate functions are not supported (COUNT)\", \"position\": 8, \"token\": \"COUNT\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 1\n\u003e tpscli.exe --parse-only SELECT ID FROM [testdata\\KEYS.TPS] WHERE CODE IS NULL\n  { \"ok\": false, \"op\": \"select\", \"error\": { \"code\": \"UNSUPPORTED\", \"message\": \"IS NULL is not supported; TPS has no NULL\", \"position\": 47, \"token\": \"IS\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 1\n\u003e tpscli.exe --parse-only SELECT ID FROM [testdata\\KEYS.TPS] GROUP BY CODE\n  { \"ok\": false, \"op\": \"select\", \"error\": { \"code\": \"UNSUPPORTED\", \"message\": \"GROUP BY is not supported\", \"position\": 36, \"token\": \"GROUP\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 1\n\u003e tpscli.exe --parse-only SELECT ID FROM [testdata\\KEYS.TPS] WHERE AMOUNT + 1 = 5\n  { \"ok\": false, \"op\": \"select\", \"error\": { \"code\": \"UNSUPPORTED\", \"message\": \"Arithmetic expressions are not supported\", \"position\": 49, \"token\": \"+\" }, \"outcome\": \"none\", \"complete\": true }\n  exit 1"
+                  }
+              ]
+}

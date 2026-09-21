@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roots at runtime, reads that leave no mark</title>
+<style>
+  :root{
+    --paper:#f4efe1; --ink:#221f18; --maroon:#8a2b27; --meta-bg:#e9e1cd;
+    --label:#6d5f4e; --value:#2b2820; --amber:#a8762b;
+    --rule:#cbbfa5; --rule-soft:#ddd3bd; --dim:#5a5145; --ok:#4f6b3a;
+    --serif:Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);
+       font-family:var(--serif);padding:3.5rem 2rem;}
+  .wrap{max-width:880px;margin:0 auto;}
+
+  /* ---- ONE MEASURE (do not narrow, do not widen past the wrap) ---- */
+  main p,main ul,main ol{max-width:84ch;}
+  main pre{max-width:100%;overflow-x:auto;}
+
+  /* ---- FIXED masthead (do not restyle) ---- */
+  .eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.35em;
+           font-size:.8rem;font-weight:700;color:var(--maroon);margin:0 0 1.1rem;}
+  h1{font-family:var(--serif);font-weight:700;font-size:clamp(2.6rem,6vw,4rem);
+     line-height:1.04;letter-spacing:-.01em;margin:0 0 .9rem;}
+  .subtitle{font-family:var(--serif);font-style:italic;font-weight:700;
+            font-size:clamp(1.25rem,2.4vw,1.7rem);line-height:1.3;
+            margin:0 0 1.9rem;max-width:46ch;}
+  .meta-card{display:grid;grid-template-columns:max-content 1fr;column-gap:1.75rem;
+             row-gap:.55rem;align-items:baseline;background:var(--meta-bg);
+             border-radius:14px;border-left:6px solid var(--maroon);padding:1.4rem 1.85rem;}
+  .meta-card dt{font-family:var(--mono);color:var(--label);font-size:.95rem;font-weight:400;}
+  .meta-card dd{font-family:var(--mono);color:var(--value);font-size:.95rem;margin:0;word-break:break-word;}
+  .status-pill{display:inline-block;border:1px solid var(--amber);color:var(--amber);
+               border-radius:999px;padding:.12rem .75rem;font-size:.82rem;letter-spacing:.08em;
+               text-transform:uppercase;line-height:1.45;background:transparent;}
+
+  /* ---- BODY (same house rules as the 2026-09-19 MCP spec) ---- */
+  main{margin-top:3.25rem;}
+  main section{padding-top:2.6rem;margin-top:2.6rem;border-top:1px solid var(--rule);}
+  main section:first-child{border-top:none;margin-top:0;padding-top:0;}
+
+  main h2{font-family:var(--serif);font-size:1.95rem;line-height:1.15;
+          letter-spacing:-.005em;margin:0 0 1.1rem;font-weight:700;}
+  main h2 .num{font-family:var(--mono);font-size:.78rem;font-weight:700;color:var(--maroon);
+                letter-spacing:.2em;display:block;margin-bottom:.5rem;text-transform:uppercase;}
+  main h3{font-family:var(--mono);font-size:.9rem;text-transform:uppercase;letter-spacing:.14em;
+          color:var(--maroon);margin:2.1rem 0 .8rem;font-weight:700;}
+  main p{font-size:1.06rem;line-height:1.65;margin:0 0 1.05rem;}
+  main ul,main ol{font-size:1.06rem;line-height:1.65;padding-left:1.3rem;margin:0 0 1.05rem;}
+  main li{margin-bottom:.45rem;}
+  main li::marker{color:var(--maroon);}
+  strong{font-weight:700;}
+  main a{color:var(--maroon);}
+
+  code{font-family:var(--mono);font-size:.88em;background:var(--meta-bg);
+       padding:.1em .38em;border-radius:4px;}
+  pre{font-family:var(--mono);font-size:.83rem;line-height:1.55;background:var(--meta-bg);
+      border-left:4px solid var(--rule);border-radius:8px;padding:1.1rem 1.3rem;
+      overflow-x:auto;margin:0 0 1.2rem;}
+  pre code{background:none;padding:0;font-size:inherit;}
+
+  table{border-collapse:collapse;width:100%;margin:0 0 1.3rem;font-size:.96rem;}
+  th,td{text-align:left;padding:.6rem .8rem;border-bottom:1px solid var(--rule-soft);
+        vertical-align:top;line-height:1.5;}
+  th{font-family:var(--mono);font-size:.76rem;text-transform:uppercase;letter-spacing:.12em;
+     color:var(--label);border-bottom:1.5px solid var(--rule);font-weight:700;}
+  td code{font-size:.84em;white-space:nowrap;}
+  tbody tr:last-child td{border-bottom:none;}
+
+  .callout{background:var(--meta-bg);border-radius:12px;border-left:6px solid var(--amber);
+           padding:1.15rem 1.5rem;margin:0 0 1.3rem;}
+  .callout p{margin:0 0 .6rem;}
+  .callout p:last-child{margin:0;}
+  .callout .tag{font-family:var(--mono);font-size:.74rem;text-transform:uppercase;
+                letter-spacing:.16em;color:var(--amber);font-weight:700;display:block;margin-bottom:.5rem;}
+  .callout.ok{border-left-color:var(--ok);}
+  .callout.ok .tag{color:var(--ok);}
+
+  /* signature: three deliverables side by side */
+  .trio{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.8rem;margin:1.4rem 0 1.8rem;
+        font-family:var(--mono);font-size:.82rem;}
+  .trio .box{background:var(--meta-bg);border:1px solid var(--rule);border-radius:10px;padding:.9rem 1rem;}
+  .trio .box b{display:block;font-size:.95rem;color:var(--maroon);margin-bottom:.4rem;letter-spacing:.04em;}
+  .trio .box span{display:block;color:var(--dim);line-height:1.5;}
+  @media (max-width:720px){ .trio{grid-template-columns:1fr;} }
+
+  .check{list-style:none;padding-left:0;}
+  .check li{padding-left:1.6rem;position:relative;}
+  .check li::before{content:"\2713";position:absolute;left:0;color:var(--ok);font-weight:700;}
+
+  @media (max-width:640px){
+    body{padding:2.25rem 1.1rem;}
+    .meta-card{grid-template-columns:1fr;row-gap:.2rem;}
+    .meta-card dt{margin-top:.6rem;}
+  }
+  @media (prefers-reduced-motion:no-preference){
+    main section{animation:rise .5s ease-out both;}
+    @keyframes rise{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+  }
+  a:focus-visible{outline:2px solid var(--maroon);outline-offset:3px;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <p class="eyebrow">Spec &middot; Design</p>
+      <h1>Roots at runtime, reads that leave no mark</h1>
+      <p class="subtitle">A tool that changes the server's roots while it runs, a file listing for any folder, and reads that leave the file's modified time alone.</p>
+      <dl class="meta-card">
+        <dt>Date</dt><dd>2026-09-20</dd>
+        <dt>Branch</dt><dd>feature/tpscli-mcp</dd>
+        <dt>Status</dt><dd><span class="status-pill">Design &mdash; Awaiting Plan + Impl</span></dd>
+        <dt>Source</dt><dd>Tickets <code>docs/tickets/2026-09-19-tps-list-files-without-root.md</code> and <code>docs/tickets/2026-09-20-reads-open-read-write.md</code>, plus the request to change the root without restarting the server. Brainstormed 2026-09-20.</dd>
+      </dl>
+    </header>
+
+    <main>
+      <section>
+        <h2><span class="num">1 &middot; Overview</span>Three small changes, one plan</h2>
+        <p>The MCP server (<code>mcp/</code>) takes its root folders once, from <code>--root</code> on the command line, and a server registered without any (the plain <code>claude mcp add -s user tpscli -- node ...\dist\server.js --allow-writes</code>) answers <code>tps_list_files</code> with <code>NO_ROOT</code> for the whole session. Changing the folder the model works in means re-registering the server and starting a new session. Separately, the CLI (<code>cli/</code>) opens every file with <code>SHARE()</code> (ReadWrite + DenyNone) whether the statement reads or writes, so a <code>DESCRIBE</code> or a <code>SELECT</code> moves the file's <code>LastWriteTime</code> without changing a byte.</p>
+        <p>This spec fixes all three. It is an addendum to the 2026-09-19 MCP design (<code>docs/mySuperpower/specs/2026-09-19-tpscli-mcp-design.html</code>) and supersedes, in that spec, the eight-tool inventory, the <code>tps_version</code> result, the <code>tps_list_files</code> contract, the startup-only meaning of roots and the <code>NO_ROOT</code> code. The earlier spec is history and is not edited; the active documents (READMEs, guides, tests, instruments) describe the replacement behaviour. Everything else in that spec stands.</p>
+
+        <div class="trio">
+          <div class="box"><b>tps_set_roots</b><span>ninth tool<br>replaces the root set for this session<br>validated like --root, all-or-nothing</span></div>
+          <div class="box"><b>tps_list_files + directory</b><span>lists any folder in one call<br>roots when omitted<br>NO_ROOT retired</span></div>
+          <div class="box"><b>tpsSchema.Open(writing)</b><span>DESCRIBE / SELECT open ReadOnly<br>INSERT / UPDATE / DELETE keep SHARE<br>mtime untouched by a read</span></div>
+        </div>
+
+        <h3>Success looks like</h3>
+        <ul>
+          <li>In a running session the model is told "work in <code>C:\...\CONFIG</code>", calls <code>tps_set_roots</code>, and from then on lists that folder and opens files by bare name; no re-registration, no new session.</li>
+          <li><code>tps_list_files({ directory })</code> lists a folder on a server that has no roots at all.</li>
+          <li>A folder of production copies hashes and timestamps the same after a describe-and-select pass as before it, and a read works on a folder the account can only read.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="num">2 &middot; Decisions</span>What was chosen and why</h2>
+        <table>
+          <thead><tr><th>Question</th><th>Decision</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>How the root changes</td><td>A new tool, <code>tps_set_roots</code>, that replaces the whole set</td><td>One call, one concept. Add/remove pairs mean more state to explain in every result; a <code>set_root</code> flag on <code>tps_list_files</code> makes a listing tool mutate server state.</td></tr>
+            <tr><td>Startup roots after a change</td><td>Replaced, not merged. <code>[]</code> clears the set.</td><td>Owner's choice (2026-09-20). The result always shows the full current set, so nothing is hidden.</td></tr>
+            <tr><td>Persistence</td><td>Session only; a restart returns to the <code>--root</code> flags</td><td>Nothing to store, nothing to reset, nothing that can go stale in a state file. The registration stays the source of truth for a fresh session.</td></tr>
+            <tr><td>Does changing roots need <code>--allow-writes</code>?</td><td>No</td><td>Roots were never a fence: every tool takes an absolute path anywhere. Setting them changes what bare names mean and what gets listed, not what can be reached.</td></tr>
+            <tr><td>Keep the ticket's <code>directory</code> argument?</td><td>Yes, alongside <code>tps_set_roots</code></td><td>Owner's choice (2026-09-20). <code>directory</code> is the one-off look; <code>tps_set_roots</code> is the working folder. Both retire <code>NO_ROOT</code>.</td></tr>
+            <tr><td><code>directory</code> outside a root</td><td>Allowed</td><td>Changed from the ticket. Refusing an absolute folder would make roots a fence in exactly one place; the file tools accept any absolute path, so the listing does too.</td></tr>
+            <tr><td>MCP client roots (<code>roots/list</code>)</td><td>Not used</td><td>Client-driven; cannot be changed from the conversation, and the client's support is not something this repository can verify.</td></tr>
+            <tr><td>How the CLI knows a statement reads</td><td><code>tpsSchema.Open</code> takes a <code>writing</code> flag; the two call sites in <code>tpscli.clw</code> pass it from <code>Stmt.Op</code></td><td>The op is already known at both call sites (lines 189 and 224); a flag is smaller than a second method and keeps one error mapping.</td></tr>
+            <tr><td>One spec or two</td><td>One spec, one plan; the CLI task first, then the MCP tasks</td><td>The CLI change is one method and two call sites. The exe must be rebuilt before the MCP end-to-end suite runs, so the order is fixed anyway.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2><span class="num">3 &middot; tps_set_roots</span>The ninth tool</h2>
+        <table>
+          <thead><tr><th>Field</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>Title</td><td>Set root folders</td></tr>
+            <tr><td>Input</td><td><code>roots: string[]</code>, required. Empty array clears the set.</td></tr>
+            <tr><td>Result</td><td><code>{ roots: string[] }</code>, the set now in force, resolved and in order.</td></tr>
+            <tr><td>Exe</td><td>None. No file is opened.</td></tr>
+            <tr><td>Gate</td><td>None. Allowed on a read-only server.</td></tr>
+            <tr><td>Log</td><td>One stderr line, <code>tpscli-mcp tps_set_roots 2 root(s): C:\a; D:\b</code> (or <code>0 root(s)</code>), matching the per-run lines. Folder paths already appear in the ready line, so this logs nothing new in kind.</td></tr>
+          </tbody>
+        </table>
+        <p>Validation runs over the whole array before anything changes, so a bad entry leaves the current set exactly as it was (all-or-nothing). Each entry must be fully qualified by the same test the file argument uses (<code>FULLY_QUALIFIED</code>: a drive letter followed by a separator, or a UNC path); a relative root would resolve against the server process's working directory, which the model cannot see. Each entry is then <code>path.resolve</code>d and must exist and be a directory, the same check <code>parseArgs</code> applies to <code>--root</code>. Duplicates after resolution are dropped, compared case-insensitively because the file system is; the first occurrence keeps its place. The array then replaces the server's root state. That state is the server's own: <code>createServer</code> copies <code>config.roots</code> at construction and never writes back to the <code>Config</code> it was given (the unit tests build several servers from one shared <code>base</code> object, so a setter that wrote through would leak into other tests). <code>resolveFile</code> and <code>tps_list_files</code> read that state at the start of every call, so bare-name resolution follows the new set from the next call on.</p>
+        <p>Two existing strings speak of startup flags and become false once roots can change: the resolver's no-roots refusal (<code>server.ts</code> line 85, "the server was started without --root folders") becomes <em>X is not an absolute path and the server currently has no root folders; call tps_set_roots or pass an absolute path</em>, and <code>FILE_ARG</code>'s description (line 71) says bare names resolve inside the server's current root folders. The assertion on that message in <code>server.test.js</code> (line 80, <code>/--root/</code>) follows.</p>
+        <p>The tool description, which is what the model reads, says: <em>Replaces the server's root folders for this session: where bare file names resolve and what tps_list_files lists by default. Absolute paths; each must be an existing folder. Pass [] to clear. Roots are a convenience, not a fence: every tool accepts an absolute path regardless. A restart returns to the --root flags.</em></p>
+        <p><code>tps_version</code>'s successful result gains <code>roots: string[]</code> beside <code>server</code> and <code>exe</code>, snapshotted when the call starts, so the current set can be read without changing it. On failure the existing error result is returned without <code>roots</code>: the exe's error passthrough, or the server's <code>INCOMPLETE</code> envelope on a timeout or a bad exit; the resolver's own <code>FILE_NOT_FOUND</code> for a bare name still names the current roots or their absence (an exe-generated <code>FILE_NOT_FOUND</code> passes through unchanged, as today). The startup ready line is unchanged; it reports the flags the server was started with.</p>
+        <p>Validation and replacement run synchronously, without yielding, so no call can observe a half-built set. A call already in flight keeps the path it resolved before it awaited the exe. The SDK does not serialise handlers, so a client must await a successful <code>tps_set_roots</code> reply before issuing the calls that depend on it; requests in flight at the same time have no guaranteed order relative to the setter.</p>
+      </section>
+
+      <section>
+        <h2><span class="num">4 &middot; tps_list_files</span>Any folder, one level deep</h2>
+        <table>
+          <thead><tr><th>Call</th><th>Behaviour</th></tr></thead>
+          <tbody>
+            <tr><td><code>{}</code>, roots set</td><td>As today: every root, one level deep, sorted by path.</td></tr>
+            <tr><td><code>{ directory }</code></td><td>That folder only, one level deep. Allowed whether or not the server has roots and whether or not the folder is inside one. <code>directory</code> must be fully qualified and an existing folder, else <code>INVALID_ARGUMENT</code> naming the value.</td></tr>
+            <tr><td><code>{}</code>, no roots</td><td><code>INVALID_ARGUMENT</code>: <em>The server has no root folders; pass directory, or call tps_set_roots first.</em> Replaces <code>NO_ROOT</code>, which is removed from the server, the tests and the active documents; the 2026-09-19 spec stays as section 1 says.</td></tr>
+            <tr><td><code>pattern</code></td><td>Unchanged; applies in both modes.</td></tr>
+          </tbody>
+        </table>
+        <p>The result shape does not change: <code>{ files: [{ name, path, size, modified }] }</code>. The description becomes: <em>Lists the .TPS files directly inside a folder (no recursion): name, path, size and modified time. With directory, that folder; without it, the server's root folders (see tps_set_roots).</em></p>
+        <p>Validation (<code>existsSync</code>, <code>statSync</code>) and enumeration (<code>readdirSync</code>, the per-entry <code>statSync</code>) can throw: access denied, a folder removed between the check and the read, an entry removed mid-listing. Today those exceptions escape <code>attempt</code>, which only envelopes <code>InvalidArgument</code> and <code>ToolError</code>; the SDK then returns a text-only tool error without the structured envelope, which the model cannot read by code. Both tools catch them and answer <code>INVALID_ARGUMENT</code> with the path and the OS message (<em>cannot list C:\x: EPERM ...</em>); a listing that fails part-way returns no partial result, and a root validation that fails leaves the set unchanged. Two unit tests: a <code>directory</code> that names a file exercises validation (<code>isDirectory()</code> false); a server constructed with a root that names a regular file (the tests build servers from a <code>Config</code> directly, bypassing <code>parseArgs</code>) makes <code>readdirSync</code> throw inside <code>tps_list_files {}</code> and must yield the structured <code>INVALID_ARGUMENT</code> envelope, which proves the catch is there.</p>
+        <p><code>INVALID_ARGUMENT</code> rather than <code>FILE_NOT_FOUND</code> for a missing folder keeps one rule: <code>FILE_NOT_FOUND</code> is for a file the exe or the resolver could not find, <code>INVALID_ARGUMENT</code> is for an argument the server refused before looking. <code>tps_set_roots</code> uses the same code for the same reason.</p>
+      </section>
+
+      <section>
+        <h2><span class="num">5 &middot; CLI</span>Reads open ReadOnly</h2>
+        <p><code>tpsSchema.Open</code> becomes <code>Open PROCEDURE(BYTE writing),LONG</code> in <code>cli/tpsSchema.inc</code> and <code>cli/tpsSchema.clw</code>. With <code>writing = 0</code> it runs <code>OPEN(SELF.F, 40h)</code> (ReadOnly + DenyNone); with <code>writing = 1</code> it runs <code>SHARE(SELF.F)</code> as today (ReadWrite + DenyNone, 42h). The <code>CASE ERRORCODE()</code> mapping that follows the open (47 to <code>DEFINITION_MISMATCH</code>, 2/3 to <code>FILE_NOT_FOUND</code>, else <code>DRIVER</code>) and the field-number mapping into <code>Who</code> are unchanged.</p>
+        <table>
+          <thead><tr><th>Call site in <code>cli/tpscli.clw</code></th><th>Passes</th></tr></thead>
+          <tbody>
+            <tr><td>Line 189, the <code>DESCRIBE</code> branch (also serves <code>--walk-key</code>)</td><td><code>0</code></td></tr>
+            <tr><td>Line 224, after <code>ParseBody</code>, for <code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code></td><td><code>CHOOSE(Stmt.Op = OP:Select, 0, 1)</code></td></tr>
+          </tbody>
+        </table>
+        <p><code>--parse-only</code> halts before the second call site (line 218 is after <code>ParseBody</code>), so <code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code> and <code>DELETE</code> with <code>--parse-only</code> never open the file; <code>DESCRIBE --parse-only</code> takes the first call site and does open it, ReadOnly after this change, so the ticket's expectation for <code>--parse-only</code> is met by the DESCRIBE branch and needs no code of its own. <code>tpsSchema.Load</code> reads the file's bytes through StringTheory's <code>LoadFile</code>, a plain read, and is not the cause of the timestamp move; it stays as it is. <code>--dump-schema</code> halts after <code>Parse</code>, before <code>Open</code>, and is unaffected.</p>
+        <div class="callout">
+          <span class="tag">Watch-point for the first CLI task</span>
+          <p>The TopSpeed driver's behaviour on a ReadOnly open of a structure the CLI reconstructed from the file is the one thing this spec has not observed. The plan's first step is the failing test below; if the driver refuses a ReadOnly open (error 47 or a driver error where <code>SHARE</code> succeeds), the implementer reports it with the exact codes and the fallback is chosen from evidence (for example ReadOnly + DenyWrite), not assumed here.</p>
+        </div>
+        <p>Documentation follows the behaviour: <code>cli/README.md</code> line 126 ("The file is opened with <code>SHARE()</code>") and the CLI user guide's tip at <code>docs/UserGuide/Tpscli-IT-Support-User-Guide.html</code> line 209 say that reads open ReadOnly and shared, writes ReadWrite and shared, and that a read leaves the modified time alone. <code>RECORD_HELD</code> wording is unchanged: it belongs to writes.</p>
+      </section>
+
+      <section>
+        <h2><span class="num">6 &middot; Error handling</span>Codes and messages</h2>
+        <table>
+          <thead><tr><th>Situation</th><th>Code</th><th>Message says</th></tr></thead>
+          <tbody>
+            <tr><td><code>tps_set_roots</code>, an entry is not fully qualified</td><td><code>INVALID_ARGUMENT</code></td><td><code>roots[2] "data" must be an absolute path</code>; the set is unchanged.</td></tr>
+            <tr><td><code>tps_set_roots</code>, an entry is not an existing folder</td><td><code>INVALID_ARGUMENT</code></td><td><code>C:\nope is not a folder</code>; the set is unchanged.</td></tr>
+            <tr><td><code>tps_list_files</code>, no <code>directory</code>, no roots</td><td><code>INVALID_ARGUMENT</code></td><td>pass <code>directory</code>, or call <code>tps_set_roots</code> first.</td></tr>
+            <tr><td><code>tps_list_files</code>, <code>directory</code> relative or missing</td><td><code>INVALID_ARGUMENT</code></td><td>the value and which rule it broke.</td></tr>
+            <tr><td>Bare name not in any root, or no roots</td><td><code>FILE_NOT_FOUND</code></td><td>Unchanged; the message lists the folders searched, now the current set.</td></tr>
+            <tr><td>Read on a folder the account cannot write</td><td>none</td><td>Succeeds after this change; before it the driver's open failed.</td></tr>
+            <tr><td>Write on a folder the account cannot write</td><td><code>DRIVER</code> (exe)</td><td>Unchanged.</td></tr>
+          </tbody>
+        </table>
+        <p>Both tools run under <code>attempt(null, false, ...)</code>, so a refusal wears the existing envelope from <code>refusal()</code> (<code>server.ts</code> line 42): <code>{ ok: false, complete: true, op: null, error: { code, message } }</code> with <code>isError</code> set and no <code>outcome</code>, because neither tool writes. Arguments that fail the zod schema (a non-array <code>roots</code>) never reach the handler: the SDK answers a text tool error prefixed <code>MCP error -32602:</code>, as <code>server.test.js</code> line 162 asserts for the other tools. <code>NO_ROOT</code> no longer exists.</p>
+      </section>
+
+      <section>
+        <h2><span class="num">7 &middot; Data flow</span>A session that changes folder</h2>
+<pre><code>tps_version            -&gt; { server: "0.2.0", exe: {...}, roots: [] }
+tps_list_files {}      -&gt; INVALID_ARGUMENT  (no roots; pass directory or call tps_set_roots)
+tps_list_files { directory: "C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG" }
+                       -&gt; { files: [ ...64 entries... ] }
+tps_set_roots { roots: ["C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG"] }
+                       -&gt; { roots: ["C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG"] }
+tps_list_files {}      -&gt; { files: [ ...the same 64... ] }
+tps_describe { file: "OPTIONS.TPS" }
+                       -&gt; exe runs DESCRIBE [C:\Projects\GitLab\POS\dtpos_404_data\CONFIG\OPTIONS.TPS]
+                          file opened ReadOnly; LastWriteTime unchanged afterwards
+tps_set_roots { roots: [] }
+                       -&gt; { roots: [] }
+tps_describe { file: "OPTIONS.TPS" }
+                       -&gt; FILE_NOT_FOUND (not absolute, server has no roots)</code></pre>
+      </section>
+
+      <section>
+        <h2><span class="num">8 &middot; Testing</span>What green means</h2>
+        <h3>CLI (<code>cli/tests/readonly.ps1</code>, new; added to the suite list in <code>cli/verify.ps1</code> step 2)</h3>
+        <ul>
+          <li>Copy <code>testdata\KEYS.TPS</code> to <code>testdata\work\</code>; record <code>LastWriteTime</code>; run <code>DESCRIBE</code> then a full <code>SELECT</code>; assert the time is unchanged and the SHA-256 is unchanged. Then run one <code>UPDATE</code> and assert the time moved, so the check is known to detect a regression.</li>
+          <li>Copy <code>KEYS.TPS</code> into <code>testdata\work\ro\</code> and put a deny-write ACE on the file itself (<code>icacls &lt;file&gt; /deny "&lt;user&gt;:(W)"</code>, where the user is <code>$env:USERDOMAIN\$env:USERNAME</code>). Control first: run one <code>UPDATE</code> and assert it fails (non-zero exit, <code>DRIVER</code>), which proves the ACE reaches the file; then run <code>SELECT</code> and assert exit 0 with rows. Remove the ACE in <code>finally</code> (<code>/remove:d</code>) and treat a failed removal as a test failure. An <code>icacls</code> that cannot apply the ACE is a failure too, not a skip: <code>verify.ps1</code> step 2 knows only the suite's exit code, so a suite that prints SKIP and exits 0 would read as PASS.</li>
+          <li>The existing suites (<code>describe</code>, <code>parser</code>, <code>select</code>, <code>insert</code>, <code>update</code>) and <code>verify.ps1</code> stay green; step 6's shared-access check (<code>Step6-SharedAccess</code>) still reports the read succeeding and the write as <code>RECORD_HELD</code>.</li>
+        </ul>
+        <h3>Server unit (<code>mcp/test/server.test.js</code>, no Clarion needed)</h3>
+        <ul>
+          <li><code>tps_set_roots</code> with two folders: result lists both resolved, in order; a bare name then resolves inside the second; <code>tps_list_files {}</code> lists both.</li>
+          <li>A relative entry, and a missing folder, each return <code>INVALID_ARGUMENT</code> and leave <code>tps_version.roots</code> as it was.</li>
+          <li>Duplicates differing only in case collapse to one.</li>
+          <li><code>[]</code> clears; a bare name is then <code>FILE_NOT_FOUND</code>; <code>tps_list_files {}</code> is <code>INVALID_ARGUMENT</code>.</li>
+          <li><code>tps_list_files { directory }</code> on a root-less server lists the folder; with roots set and a folder outside them it still lists; with <code>pattern</code> it filters; relative or missing <code>directory</code> is <code>INVALID_ARGUMENT</code>.</li>
+          <li>Existing assertions that necessarily change: the tool inventory (line 47, now exactly nine names with <code>tps_set_roots</code>), the exact <code>tps_version</code> result (line 221, gains <code>roots</code>), the no-roots message match (line 80), and the <code>NO_ROOT</code> case (line 198 onward), which is replaced rather than kept beside the new one.</li>
+          <li>Two servers built from the same <code>base</code> config: setting roots on one leaves the other's unchanged.</li>
+        </ul>
+        <h3>End to end and the instruments</h3>
+        <ul>
+          <li><code>mcp/test/e2e.test.js</code>: one case that sets the roots to the fixture folder, describes a bare name, and confirms the fixture's <code>LastWriteTime</code> did not move (this exercises the rebuilt exe through the server).</li>
+          <li><code>docs/Testing/TpscliMcp-Unit-Test-Cases.html</code>: the <code>NO_ROOT</code> case becomes the <code>directory</code> and <code>tps_set_roots</code> cases; <code>mcp/tests/run-instrument.ps1</code> follows and the run is re-recorded. This is the one place an existing runner file changes, because the behaviour it asserts is gone.</li>
+          <li><code>docs/Testing/TpscliMcpConfig-Unit-Test-Cases.html</code>: TC-03 (currently the <code>NO_ROOT</code> case) becomes <code>tps_set_roots</code> to the CONFIG folder followed by a bare-name describe; TC-09's wording gains "and LastWriteTime unchanged". Re-run from a Claude Code session as before.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="num">9 &middot; Documents and tickets</span>Everything that names the old behaviour</h2>
+        <table>
+          <thead><tr><th>File</th><th>Change</th></tr></thead>
+          <tbody>
+            <tr><td><code>mcp/README.md</code></td><td>Tool table gains <code>tps_set_roots</code>; <code>tps_list_files</code> row gets <code>directory?</code>; <code>--root</code> row says it can be changed at runtime; <code>NO_ROOT</code> row removed; the "no roots" paragraph near line 30 rewritten.</td></tr>
+            <tr><td><code>README.md</code> (root)</td><td>Tool table gains the ninth tool; the <code>--root</code> sentence near line 28.</td></tr>
+            <tr><td><code>docs/UserGuide/TpscliMcp-IT-Support-User-Guide.html</code></td><td>Overview bullet on roots, flag table, tool table, error list, troubleshooting row for <code>NO_ROOT</code> (removed) and a new procedure "Change the working folder without restarting"; version bump in the chip if the server's version changes.</td></tr>
+            <tr><td><code>docs/UserGuide/Tpscli-IT-Support-User-Guide.html</code></td><td>The shared-mode tip (line 209).</td></tr>
+            <tr><td><code>cli/README.md</code></td><td>Line 126 and the Deviations / behaviour notes.</td></tr>
+            <tr><td><code>docs/mySuperpower/specs/2026-09-19-tpscli-mcp-design.html</code></td><td>Untouched; this spec supersedes its <code>tps_list_files</code> row and the <code>NO_ROOT</code> code, and says so in section 1.</td></tr>
+            <tr><td><code>docs/tickets/2026-09-19-tps-list-files-without-root.md</code>, <code>docs/tickets/2026-09-20-reads-open-read-write.md</code></td><td>Status set to closed with the closing commit and a pointer to this spec. The first ticket's "outside a root is refused" line is noted as changed by decision, not silently.</td></tr>
+          </tbody>
+        </table>
+        <p>The server's version moves from 0.1.0 to 0.2.0: a new tool and a removed error code are an interface change. The CLI's version is unchanged; opening mode is not part of its response contract.</p>
+      </section>
+
+      <section>
+        <h2><span class="num">10 &middot; Risks and non-goals</span>Known and accepted</h2>
+        <ul>
+          <li><strong>ReadOnly open refused by the driver.</strong> Covered by the watch-point in section 5: the first CLI test decides, and the fallback is picked from the observed error, not here.</li>
+          <li><strong>A deny-write ACL test on a developer machine.</strong> <code>icacls</code> deny entries apply to administrators too, so the test is meaningful, and the <code>UPDATE</code> control proves the ACE took before the <code>SELECT</code> is credited. The <code>finally</code> removal keeps a failed run from leaving <code>testdata\work\ro</code> locked; a machine whose policy blocks <code>icacls</code> fails the suite, visibly.</li>
+          <li><strong>The model sets a root and forgets.</strong> Roots are session state; a successful <code>tps_version</code> reports them and the resolver's <code>FILE_NOT_FOUND</code> for a bare name lists the folders searched, so the state is one call away whenever the exe answers.</li>
+          <li><strong>Roots as a fence.</strong> They are not, before or after this change; the guide's caution stays as written. Anyone who needs a fence uses the account's permissions, which a ReadOnly open now respects for reads.</li>
+        </ul>
+        <h3>Non-goals</h3>
+        <ul>
+          <li>Persisting roots across restarts, or writing to the client's registration.</li>
+          <li>Add/remove semantics, recursive listing, or a <code>--lock-roots</code> flag.</li>
+          <li>Changing <code>--allow-writes</code>, <code>--owner</code>, <code>--exe</code> or <code>--timeout</code> at runtime. Only roots were asked for, and only roots are safe to change without a policy decision by the person who registered the server.</li>
+          <li>Any change to the CLI's JSON contract or exit codes.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="num">11 &middot; Self-review</span>Checked before hand-off</h2>
+        <ul class="check">
+          <li>No placeholders: the tool has its schema, result, gate and log line; every refusal has a code and a message; both call sites and the open modes are named with their line numbers, read from the files on 2026-09-20.</li>
+          <li>Consistency: <code>NO_ROOT</code> is retired in sections 1, 4, 6, 8 and 9 alike; <code>directory</code> outside a root is allowed in sections 2, 4 and 8; <code>tps_set_roots</code> needs no write gate in sections 2, 3 and 10; the version bump in section 9 matches the data-flow example in section 7.</li>
+          <li>Scope: one plan. The CLI task (one method, two call sites, one test script) comes first because the end-to-end suite and the instruments run the rebuilt exe.</li>
+          <li>Reviewed by Codex (round 1, 11 findings; round 2, 6 findings; round 3, 1 finding): all accepted; two resolved by narrowing the promise rather than widening the code (a failed <code>tps_version</code> carries no <code>roots</code>; an <code>icacls</code> failure fails the suite instead of skipping).</li>
+          <li>Ambiguity resolved: replace-not-merge and keep-<code>directory</code> are owner decisions recorded in section 2; duplicates collapse case-insensitively; a missing folder is <code>INVALID_ARGUMENT</code> on both tools; <code>--parse-only</code> reaches <code>Open</code> only through the DESCRIBE branch, and <code>--dump-schema</code> never does.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

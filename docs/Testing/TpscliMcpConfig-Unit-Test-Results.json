@@ -1,0 +1,272 @@
+{
+  "suite": "tpscli-mcp-config-0-2-0",
+  "storage_key": "uts:tpscli-mcp-config-0-2-0:v1",
+  "runner": "Claude Code session (mcp__tpscli tools)",
+  "build": "be95a64",
+  "ref": "feature/tpscli-mcp",
+  "env": "WINVMB40B / Microsoft Windows NT 10.0.26200.0 / PowerShell 7.6.0 / node v20.18.1 / Claude Code (Opus 5)",
+  "started": "2026-09-20T19:19:50",
+  "finished": "2026-09-20T19:37:21",
+  "tally": {
+    "PASS": 17,
+    "FAIL": 0,
+    "BLOCKED": 1,
+    "NA": 0
+  },
+  "cases": [
+    {
+      "id": "TC-01",
+      "title": "The registered server is connected and the session sees its nine tools",
+      "section": "setup",
+      "priority": "CORE",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true,
+        true
+      ],
+      "notes": "every check matched: nine tools loaded (tps_set_roots among them), server 0.2.0 / exe 0.1.0, roots []",
+      "evidence": "PowerShell: claude mcp list 2>&1 | Select-String tpscli; \"node $(node --version) / $env:COMPUTERNAME / $([System.Environment]::OSVersion.VersionString) / PowerShell $($PSVersionTable.PSVersion)\"; Get-Date -Format s; \"OWNER set: $([bool]$env:TPSCLI_OWNER)\"\ntpscli: node C:\\Projects\\GitHub\\tpscli\\mcp\\dist\\server.js --allow-writes - √ Connected\nnode v20.18.1 / WINVMB40B / Microsoft Windows NT 10.0.26200.0 / PowerShell 7.6.0\n2026-09-20T19:19:50\nOWNER set: False\n\nAssistant answer after /mcp reconnected tpscli (this session): the loaded mcp__tpscli__* schemas are tps_version, tps_list_files, tps_set_roots, tps_describe, tps_select, tps_insert, tps_update, tps_delete and tps_query (nine).\n\nTool call: tps_version {}\n{\"server\":\"0.2.0\",\"exe\":{\"ok\":true,\"op\":null,\"version\":\"0.1.0\",\"complete\":true},\"roots\":[]}"
+    },
+    {
+      "id": "TC-02",
+      "title": "Fresh work copy of the CONFIG folder",
+      "section": "setup",
+      "priority": "CORE",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true
+      ],
+      "notes": "every check matched",
+      "evidence": "PowerShell: New-Item -ItemType Directory -Force 'C:\\Projects\\GitHub\\tpscli\\mcp\\work\\config' | Out-Null ; Copy-Item 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\*.TPS' 'C:\\Projects\\GitHub\\tpscli\\mcp\\work\\config\\' -Force ; (Get-ChildItem 'C:\\Projects\\GitHub\\tpscli\\mcp\\work\\config\\*.TPS').Count\n64\n\nTool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\"}\n{\"ok\":true,\"op\":\"describe\",\"file\":\"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\",\"encrypted\":false,\"records\":407,\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\",\"size\":32},{\"name\":\"MODULE\",\"type\":\"STRING\",\"size\":32},{\"name\":\"VARIABLE\",\"type\":\"STRING\",\"size\":32},{\"name\":\"VALUE\",\"type\":\"STRING\",\"size\":64},{\"name\":\"ENTRYPICTURE\",\"type\":\"STRING\",\"size\":20},{\"name\":\"DESCRIPTION\",\"type\":\"STRING\",\"size\":50},{\"name\":\"COMMENTS\",\"type\":\"STRING\",\"size\":1024}],\"keys\":[{\"name\":\"OPTKEY\",\"primary\":false,\"unique\":true,\"nocase\":true,\"components\":[{\"col\":\"CUSTOMER\",\"asc\":true},{\"col\":\"MODULE\",\"asc\":true},{\"col\":\"VARIABLE\",\"asc\":true}]},{\"name\":\"DESCRIPTKEY\",\"primary\":false,\"unique\":false,\"nocase\":true,\"optional\":true,\"components\":[{\"col\":\"CUSTOMER\",\"asc\":true},{\"col\":\"MODULE\",\"asc\":true},{\"col\":\"DESCRIPTION\",\"asc\":true}]}],\"complete\":true}"
+    },
+    {
+      "id": "TC-03",
+      "title": "Listing without a root: tps_list_files by directory, then tps_set_roots makes CONFIG the root",
+      "section": "read",
+      "priority": "CORE",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "notes": "every check matched: directory listing 64 entries; tps_set_roots replaced the (empty) set; the bare name resolved in the new root; the bare listing gave the same 64 entries. OPTIONS.TPS modified stamp unchanged across the describe (06:23:55.647Z before and after).",
+      "evidence": "Tool call: tps_list_files {\"directory\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\"}\n{\"files\":[{\"name\":\"ACCESS.TPS\",\"path\":\"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\ACCESS.TPS\",\"size\":62208,\"modified\":\"2026-09-16T14:08:19.354Z\"},{\"name\":\"BAUDRATE.TPS\",\"path\":\"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\BAUDRATE.TPS\",\"size\":1024,\"modified\":\"2026-09-20T05:18:01.936Z\"}, ... {\"name\":\"OPTIONS.TPS\",\"path\":\"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\",\"size\":118016,\"modified\":\"2026-09-20T06:23:55.647Z\"}, ... {\"name\":\"WSFILESX.TPS\",\"path\":\"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\WSFILESX.TPS\",\"size\":1536,\"modified\":\"2026-09-20T05:18:04.849Z\"}]}\n(abridged: 64 entries, every path under C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG)\n\nPowerShell: (Get-ChildItem 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\*.TPS').Count ; (Get-Item 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS').Length\n64\n118016\n\nTool call: tps_set_roots {\"roots\": [\"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\"]}\n{\"roots\":[\"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\"]}\n\nTool call: tps_describe {\"file\": \"OPTIONS.TPS\"}\n{\"ok\":true,\"op\":\"describe\",\"file\":\"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\",\"encrypted\":false,\"records\":407,\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\",\"size\":32},{\"name\":\"MODULE\",\"type\":\"STRING\",\"size\":32},{\"name\":\"VARIABLE\",\"type\":\"STRING\",\"size\":32},{\"name\":\"VALUE\",\"type\":\"STRING\",\"size\":64},{\"name\":\"ENTRYPICTURE\",\"type\":\"STRING\",\"size\":20},{\"name\":\"DESCRIPTION\",\"type\":\"STRING\",\"size\":50},{\"name\":\"COMMENTS\",\"type\":\"STRING\",\"size\":1024}],\"keys\":[{\"name\":\"OPTKEY\",\"primary\":false,\"unique\":true,\"nocase\":true,\"components\":[{\"col\":\"CUSTOMER\",\"asc\":true},{\"col\":\"MODULE\",\"asc\":true},{\"col\":\"VARIABLE\",\"asc\":true}]},{\"name\":\"DESCRIPTKEY\",\"primary\":false,\"unique\":false,\"nocase\":true,\"optional\":true,\"components\":[{\"col\":\"CUSTOMER\",\"asc\":true},{\"col\":\"MODULE\",\"asc\":true},{\"col\":\"DESCRIPTION\",\"asc\":true}]}],\"complete\":true}\n\nTool call: tps_list_files {}\n{\"files\":[{\"name\":\"ACCESS.TPS\",\"path\":\"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\ACCESS.TPS\",\"size\":62208,\"modified\":\"2026-09-16T14:08:19.354Z\"},{\"name\":\"BAUDRATE.TPS\",\"path\":\"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\BAUDRATE.TPS\",\"size\":1024,\"modified\":\"2026-09-20T05:18:01.936Z\"}, ... {\"name\":\"OPTIONS.TPS\",\"path\":\"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\",\"size\":118016,\"modified\":\"2026-09-20T06:23:55.647Z\"}, ... {\"name\":\"WSFILESX.TPS\",\"path\":\"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\WSFILESX.TPS\",\"size\":1536,\"modified\":\"2026-09-20T05:18:04.849Z\"}]}\n(abridged: 64 entries, every path under C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG)"
+    },
+    {
+      "id": "TC-04",
+      "title": "Describe OPTIONS.TPS",
+      "section": "read",
+      "priority": "CORE",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true
+      ],
+      "notes": "every check matched: seven STRING columns 32/32/32/64/20/50/1024; OPTKEY unique nocase (CUSTOMER, MODULE, VARIABLE); DESCRIPTKEY non-unique nocase optional (CUSTOMER, MODULE, DESCRIPTION); neither primary",
+      "evidence": "Tool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\"}\n{\"ok\":true,\"op\":\"describe\",\"file\":\"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\",\"encrypted\":false,\"records\":407,\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\",\"size\":32},{\"name\":\"MODULE\",\"type\":\"STRING\",\"size\":32},{\"name\":\"VARIABLE\",\"type\":\"STRING\",\"size\":32},{\"name\":\"VALUE\",\"type\":\"STRING\",\"size\":64},{\"name\":\"ENTRYPICTURE\",\"type\":\"STRING\",\"size\":20},{\"name\":\"DESCRIPTION\",\"type\":\"STRING\",\"size\":50},{\"name\":\"COMMENTS\",\"type\":\"STRING\",\"size\":1024}],\"keys\":[{\"name\":\"OPTKEY\",\"primary\":false,\"unique\":true,\"nocase\":true,\"components\":[{\"col\":\"CUSTOMER\",\"asc\":true},{\"col\":\"MODULE\",\"asc\":true},{\"col\":\"VARIABLE\",\"asc\":true}]},{\"name\":\"DESCRIPTKEY\",\"primary\":false,\"unique\":false,\"nocase\":true,\"optional\":true,\"components\":[{\"col\":\"CUSTOMER\",\"asc\":true},{\"col\":\"MODULE\",\"asc\":true},{\"col\":\"DESCRIPTION\",\"asc\":true}]}],\"complete\":true}"
+    },
+    {
+      "id": "TC-05",
+      "title": "Select option rows by module and by full key",
+      "section": "read",
+      "priority": "CORE",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true,
+        true
+      ],
+      "notes": "every check matched",
+      "evidence": "Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\", \"VARIABLE\", \"VALUE\"], \"where\": \"MODULE = 'Tenders'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\"},{\"name\":\"VARIABLE\",\"type\":\"STRING\"},{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"JDA\",\"Accept All Manual Credit Cards\",\"N\"],[\"JDA\",\"EBT Default Expiration\",\"1249\"],[\"DLT\",\"EnableQuickCash\",\"N\"],[\"DLT\",\"QuickCashMode\",\"I\"],[\"DLT\",\"AmountOKThreshold\",\"999.99\"],[\"DLT\",\"AmountOKCashBack\",\"N\"]],\"row_count\":6,\"truncated\":false,\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"VARIABLE\", \"VALUE\"], \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'BOPIS'\", \"order_by\": \"VARIABLE\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"VARIABLE\",\"type\":\"STRING\"},{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"CheckInterval\",\"10\"],[\"Enabled\",\"N\"],[\"Path\",\"C:\\\\JDA\\\\BOPIS\\\\JSON\"],[\"UnprocessedPath\",\"C:\\\\JDA\\\\BOPIS\\\\Unprocessed\"],[\"ValidTypes\",\"1,2,3\"],[\"WarningThreshold\",\"20\"]],\"row_count\":6,\"truncated\":false,\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\"], \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"I\"]],\"row_count\":1,\"truncated\":false,\"complete\":true}"
+    },
+    {
+      "id": "TC-06",
+      "title": "Order, page and cap the 407 option rows, and read them as a table",
+      "section": "read",
+      "priority": "HIGH",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "notes": "every check matched",
+      "evidence": "Tool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\", \"MODULE\", \"VARIABLE\", \"VALUE\"], \"order_by\": \"CUSTOMER, MODULE, VARIABLE\", \"limit\": 12}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\"},{\"name\":\"MODULE\",\"type\":\"STRING\"},{\"name\":\"VARIABLE\",\"type\":\"STRING\"},{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"DLT\",\"AssociateSale\",\"DefaultAllowPurchase\",\"Y\"],[\"DLT\",\"AssociateSale\",\"ReportDayofWeek\",\"2\"],[\"DLT\",\"BOPIS\",\"CheckInterval\",\"10\"],[\"DLT\",\"BOPIS\",\"Enabled\",\"N\"],[\"DLT\",\"BOPIS\",\"Path\",\"C:\\\\JDA\\\\BOPIS\\\\JSON\"],[\"DLT\",\"BOPIS\",\"UnprocessedPath\",\"C:\\\\JDA\\\\BOPIS\\\\Unprocessed\"],[\"DLT\",\"BOPIS\",\"ValidTypes\",\"1,2,3\"],[\"DLT\",\"BOPIS\",\"WarningThreshold\",\"20\"],[\"DLT\",\"BottleDeposit\",\"INVColor\",\"00999\"],[\"DLT\",\"Canada\",\"GSTOnlyTaxCode\",\"GST\"],[\"DLT\",\"Canada\",\"PrintShelfTagUOM\",\"N\"],[\"DLT\",\"Canada\",\"ShelfTagPriceChangeDept\",\"010,012,014\"]],\"row_count\":12,\"truncated\":true,\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\", \"MODULE\", \"VARIABLE\", \"VALUE\"], \"order_by\": \"CUSTOMER, MODULE, VARIABLE\", \"limit\": 12, \"offset\": 12}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\"},{\"name\":\"MODULE\",\"type\":\"STRING\"},{\"name\":\"VARIABLE\",\"type\":\"STRING\"},{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"DLT\",\"Device\",\"Serial Secondary Scanner Port\",\"COM7\"],[\"DLT\",\"EOD\",\"AutoCloseTSP\",\"Y\"],[\"DLT\",\"EOD\",\"AutoEODEndTime\",\"3:00:00\"],[\"DLT\",\"EOD\",\"AutoEODStartDelay\",\"30\"],[\"DLT\",\"EOD\",\"AutoEODStartTime\",\"21:00:00\"],[\"DLT\",\"EOD\",\"PurgeDefaultEmployeesinDays\",\"90\"],[\"DLT\",\"GiftCard\",\"CashOutMaxAmount\",\"15.00\"],[\"DLT\",\"GiftCard\",\"EnableIncommProcessing\",\"N\"],[\"DLT\",\"GiftCard\",\"GiftCardDepartment\",\"EG\"],[\"DLT\",\"GiftCard\",\"GiftCardMaximum\",\"100.00\"],[\"DLT\",\"GiftCard\",\"GiftCardMinimum\",\"5.00\"],[\"DLT\",\"GiftCard\",\"GiftCardType\",\"00950\"]],\"row_count\":12,\"truncated\":true,\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\"], \"limit\": 0}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\"}],\"rows\":[[\"JDA\"],[\"JDA\"], ... ,[\"DLT\"],[\"DLT\"]],\"row_count\":407,\"truncated\":false,\"complete\":true}\n(abridged: 407 rows)\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\", \"MODULE\", \"VARIABLE\"], \"order_by\": \"CUSTOMER, MODULE, VARIABLE\", \"limit\": 3, \"format\": \"table\"}\nCUSTOMER  MODULE         VARIABLE            \n--------  -------------  --------------------\nDLT       AssociateSale  DefaultAllowPurchase\nDLT       AssociateSale  ReportDayofWeek     \nDLT       BOPIS          CheckInterval       \n(3 rows, truncated by LIMIT)"
+    },
+    {
+      "id": "TC-07",
+      "title": "Every CONFIG file with compressed pages describes (regression for the DeRle fix)",
+      "section": "read",
+      "priority": "CORE",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true
+      ],
+      "notes": "every check matched: CACODE 107/7, COMNDMST 97/50, CRPCMCFG 42/4, EODMNT 133/10, ERRORMSG 247/3, INCOMMCC 56/8, keybrdrv 67/7, OPTIONS 407/7, PMINTHDR 137/8, RPTDEF 12/14; SCRFIELD gives the documented multi-table limit",
+      "evidence": "Ten tool calls tps_describe {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\NAME.TPS\"}; records / columns from each result (full JSON in the session transcript):\nCACODE 107 / 7 (ok true)\nCOMNDMST 97 / 50 (ok true)\nCRPCMCFG 42 / 4 (ok true)\nEODMNT 133 / 10 (ok true)\nERRORMSG 247 / 3 (ok true)\nINCOMMCC 56 / 8 (ok true)\nkeybrdrv 67 / 7 (ok true)\nOPTIONS 407 / 7 (ok true)\nPMINTHDR 137 / 8 (ok true)\nRPTDEF 12 / 14 (ok true)\n\nTool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\SCRFIELD.TPS\"}\n{\"ok\":false,\"op\":\"describe\",\"error\":{\"code\":\"DEFINITION_UNREADABLE\",\"message\":\"File holds more than one table (1 and 17669); multi-table TPS files are not supported\"},\"complete\":true}"
+    },
+    {
+      "id": "TC-08",
+      "title": "Encrypted CONFIG files need the owner string from the environment",
+      "section": "read",
+      "priority": "MED",
+      "verdict": "BLOCKED",
+      "steps": [
+        true,
+        false,
+        false
+      ],
+      "notes": "owner string not available ($env:TPSCLI_OWNER not set on this machine); step 1 matched, steps 2 and 3 not performed",
+      "evidence": "Tool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\ACCESS.TPS\"}\n{\"ok\":false,\"op\":\"describe\",\"error\":{\"code\":\"OWNER_REQUIRED\",\"message\":\"Not a plain TopSpeed file; if it is encrypted pass --owner\"},\"complete\":true}"
+    },
+    {
+      "id": "TC-09",
+      "title": "Reading the real OPTIONS.TPS leaves its content unchanged",
+      "section": "read",
+      "priority": "HIGH",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true,
+        true
+      ],
+      "notes": "every check matched: SHA-256 and LastWriteTimeUtc identical before and after the describe and the uncapped select (reads open ReadOnly)",
+      "evidence": "PowerShell: $h1 = (Get-FileHash 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS').Hash ; $m1 = (Get-Item 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS').LastWriteTimeUtc ; $h1 ; $m1\n2A48EF8633B1ED990952EE36F4FCDF0D7949A5BA7079759922EFB4EF7DA40E7E\n2026-09-20T06:23:55.6467310Z\n\nTool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\"}\n{\"ok\":true,\"op\":\"describe\",\"file\":\"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\",\"encrypted\":false,\"records\":407,\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\",\"size\":32},{\"name\":\"MODULE\",\"type\":\"STRING\",\"size\":32},{\"name\":\"VARIABLE\",\"type\":\"STRING\",\"size\":32},{\"name\":\"VALUE\",\"type\":\"STRING\",\"size\":64},{\"name\":\"ENTRYPICTURE\",\"type\":\"STRING\",\"size\":20},{\"name\":\"DESCRIPTION\",\"type\":\"STRING\",\"size\":50},{\"name\":\"COMMENTS\",\"type\":\"STRING\",\"size\":1024}],\"keys\":[{\"name\":\"OPTKEY\",\"primary\":false,\"unique\":true,\"nocase\":true,\"components\":[{\"col\":\"CUSTOMER\",\"asc\":true},{\"col\":\"MODULE\",\"asc\":true},{\"col\":\"VARIABLE\",\"asc\":true}]},{\"name\":\"DESCRIPTKEY\",\"primary\":false,\"unique\":false,\"nocase\":true,\"optional\":true,\"components\":[{\"col\":\"CUSTOMER\",\"asc\":true},{\"col\":\"MODULE\",\"asc\":true},{\"col\":\"DESCRIPTION\",\"asc\":true}]}],\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\"], \"limit\": 0}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\"}],\"rows\":[[\"JDA\"],[\"JDA\"], ... ,[\"DLT\"],[\"DLT\"]],\"row_count\":407,\"truncated\":false,\"complete\":true}\n(abridged: 407 rows)\n\nPowerShell: $h2 = (Get-FileHash 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS').Hash ; $m2 = (Get-Item 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS').LastWriteTimeUtc ; ($h1 -eq $h2) ; ($m1 -eq $m2)\n2A48EF8633B1ED990952EE36F4FCDF0D7949A5BA7079759922EFB4EF7DA40E7E\n2026-09-20T06:23:55.6467310Z\nTrue\nTrue"
+    },
+    {
+      "id": "TC-10",
+      "title": "Dry run an UPDATE against the real OPTIONS.TPS: validated, nothing written",
+      "section": "gate",
+      "priority": "CORE",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "notes": "every check matched: parse_only true, no matched/affected; value still I; hash unchanged",
+      "evidence": "PowerShell: $h1 = (Get-FileHash 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS').Hash ; $h1\n2A48EF8633B1ED990952EE36F4FCDF0D7949A5BA7079759922EFB4EF7DA40E7E\n\nTool call: tps_query {\"sql\": \"UPDATE [C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS] SET VALUE = 'C' WHERE CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\", \"parse_only\": true}\n{\"ok\":true,\"op\":\"update\",\"parse_only\":true,\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\"], \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"I\"]],\"row_count\":1,\"truncated\":false,\"complete\":true}\n\nPowerShell: $h2 = (Get-FileHash 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS').Hash ; $h1 -eq $h2\n2A48EF8633B1ED990952EE36F4FCDF0D7949A5BA7079759922EFB4EF7DA40E7E\nTrue"
+    },
+    {
+      "id": "TC-11",
+      "title": "Insert an option row into the copy and read it back",
+      "section": "write",
+      "priority": "CORE",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true,
+        true
+      ],
+      "notes": "every check matched",
+      "evidence": "Tool call: tps_insert {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"values\": {\"CUSTOMER\": \"UTS\", \"MODULE\": \"Test\", \"VARIABLE\": \"InsertedByMcp\", \"VALUE\": \"yes\", \"ENTRYPICTURE\": \"@s64\", \"DESCRIPTION\": \"Inserted by the unit-test instrument\", \"COMMENTS\": \"TC-11\"}}\n{\"ok\":true,\"op\":\"insert\",\"affected\":1,\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"where\": \"CUSTOMER = 'UTS'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\"},{\"name\":\"MODULE\",\"type\":\"STRING\"},{\"name\":\"VARIABLE\",\"type\":\"STRING\"},{\"name\":\"VALUE\",\"type\":\"STRING\"},{\"name\":\"ENTRYPICTURE\",\"type\":\"STRING\"},{\"name\":\"DESCRIPTION\",\"type\":\"STRING\"},{\"name\":\"COMMENTS\",\"type\":\"STRING\"}],\"rows\":[[\"UTS\",\"Test\",\"InsertedByMcp\",\"yes\",\"@s64\",\"Inserted by the unit-test instrument\",\"TC-11\"]],\"row_count\":1,\"truncated\":false,\"complete\":true}\n\nTool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\"}\n{\"ok\":true,\"op\":\"describe\",\"file\":\"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\",\"encrypted\":false,\"records\":408,\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\",\"size\":32},{\"name\":\"MODULE\",\"type\":\"STRING\",\"size\":32},{\"name\":\"VARIABLE\",\"type\":\"STRING\",\"size\":32},{\"name\":\"VALUE\",\"type\":\"STRING\",\"size\":64},{\"name\":\"ENTRYPICTURE\",\"type\":\"STRING\",\"size\":20},{\"name\":\"DESCRIPTION\",\"type\":\"STRING\",\"size\":50},{\"name\":\"COMMENTS\",\"type\":\"STRING\",\"size\":1024}],\"keys\":[{\"name\":\"OPTKEY\",\"primary\":false,\"unique\":true,\"nocase\":true,\"components\":[{\"col\":\"CUSTOMER\",\"asc\":true},{\"col\":\"MODULE\",\"asc\":true},{\"col\":\"VARIABLE\",\"asc\":true}]},{\"name\":\"DESCRIPTKEY\",\"primary\":false,\"unique\":false,\"nocase\":true,\"optional\":true,\"components\":[{\"col\":\"CUSTOMER\",\"asc\":true},{\"col\":\"MODULE\",\"asc\":true},{\"col\":\"DESCRIPTION\",\"asc\":true}]}],\"complete\":true}"
+    },
+    {
+      "id": "TC-12",
+      "title": "Duplicate key is refused, in any letter case, and the select still shows one row",
+      "section": "write",
+      "priority": "CORE",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true,
+        true
+      ],
+      "notes": "every check matched",
+      "evidence": "Tool call: tps_insert {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"values\": {\"CUSTOMER\": \"UTS\", \"MODULE\": \"Test\", \"VARIABLE\": \"InsertedByMcp\", \"VALUE\": \"again\"}}\n{\"ok\":false,\"op\":\"insert\",\"error\":{\"code\":\"DUPLICATE_KEY\",\"message\":\"Duplicate value for key OPTKEY\",\"key\":\"OPTKEY\"},\"outcome\":\"none\",\"complete\":true}\n\nTool call: tps_insert {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"values\": {\"CUSTOMER\": \"uts\", \"MODULE\": \"test\", \"VARIABLE\": \"insertedbymcp\", \"VALUE\": \"again\"}}\n{\"ok\":false,\"op\":\"insert\",\"error\":{\"code\":\"DUPLICATE_KEY\",\"message\":\"Duplicate value for key OPTKEY\",\"key\":\"OPTKEY\"},\"outcome\":\"none\",\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\"], \"where\": \"CUSTOMER = 'UTS'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"yes\"]],\"row_count\":1,\"truncated\":false,\"complete\":true}"
+    },
+    {
+      "id": "TC-13",
+      "title": "Update the inserted row and read it back",
+      "section": "write",
+      "priority": "CORE",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true
+      ],
+      "notes": "every check matched",
+      "evidence": "Tool call: tps_update {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"set\": {\"VALUE\": \"no\", \"COMMENTS\": \"TC-13 updated\"}, \"where\": \"CUSTOMER = 'UTS' AND VARIABLE = 'InsertedByMcp'\"}\n{\"ok\":true,\"op\":\"update\",\"matched\":1,\"affected\":1,\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\", \"COMMENTS\", \"DESCRIPTION\"], \"where\": \"CUSTOMER = 'UTS'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"VALUE\",\"type\":\"STRING\"},{\"name\":\"COMMENTS\",\"type\":\"STRING\"},{\"name\":\"DESCRIPTION\",\"type\":\"STRING\"}],\"rows\":[[\"no\",\"TC-13 updated\",\"Inserted by the unit-test instrument\"]],\"row_count\":1,\"truncated\":false,\"complete\":true}"
+    },
+    {
+      "id": "TC-14",
+      "title": "Change a real option value on the copy, verify it, restore it, verify again",
+      "section": "write",
+      "priority": "CORE",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "notes": "every check matched",
+      "evidence": "Tool call: tps_update {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"set\": {\"VALUE\": \"C\"}, \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\"}\n{\"ok\":true,\"op\":\"update\",\"matched\":1,\"affected\":1,\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\"], \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"C\"]],\"row_count\":1,\"truncated\":false,\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"columns\": [\"CUSTOMER\", \"VARIABLE\", \"VALUE\"], \"where\": \"MODULE = 'Tenders'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\"},{\"name\":\"VARIABLE\",\"type\":\"STRING\"},{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"JDA\",\"Accept All Manual Credit Cards\",\"N\"],[\"JDA\",\"EBT Default Expiration\",\"1249\"],[\"DLT\",\"EnableQuickCash\",\"N\"],[\"DLT\",\"QuickCashMode\",\"C\"],[\"DLT\",\"AmountOKThreshold\",\"999.99\"],[\"DLT\",\"AmountOKCashBack\",\"N\"]],\"row_count\":6,\"truncated\":false,\"complete\":true}\n\nTool call: tps_update {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"set\": {\"VALUE\": \"I\"}, \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\"}\n{\"ok\":true,\"op\":\"update\",\"matched\":1,\"affected\":1,\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\"], \"where\": \"CUSTOMER = 'DLT' AND MODULE = 'Tenders' AND VARIABLE = 'QuickCashMode'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"I\"]],\"row_count\":1,\"truncated\":false,\"complete\":true}"
+    },
+    {
+      "id": "TC-15",
+      "title": "An over-length value is stored truncated with a warning, and the select shows the stored text",
+      "section": "write",
+      "priority": "HIGH",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true
+      ],
+      "notes": "every check matched",
+      "evidence": "Tool call: tps_update {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"set\": {\"VALUE\": \"0123456789012345678901234567890123456789012345678901234567890123456789\"}, \"where\": \"CUSTOMER = 'UTS'\"}\n{\"ok\":true,\"op\":\"update\",\"matched\":1,\"affected\":1,\"warnings\":[{\"code\":\"STRING_TRUNCATED\",\"column\":\"VALUE\",\"message\":\"Value truncated to 64 characters\"}],\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"columns\": [\"VALUE\"], \"where\": \"CUSTOMER = 'UTS'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"0123456789012345678901234567890123456789012345678901234567890123\"]],\"row_count\":1,\"truncated\":false,\"complete\":true}"
+    },
+    {
+      "id": "TC-16",
+      "title": "Delete the inserted row, verified by select and record count",
+      "section": "write",
+      "priority": "CORE",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true,
+        true
+      ],
+      "notes": "every check matched",
+      "evidence": "Tool call: tps_delete {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"where\": \"CUSTOMER = 'UTS'\"}\n{\"ok\":true,\"op\":\"delete\",\"matched\":1,\"affected\":1,\"complete\":true}\n\nTool call: tps_select {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\", \"where\": \"CUSTOMER = 'UTS'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\"},{\"name\":\"MODULE\",\"type\":\"STRING\"},{\"name\":\"VARIABLE\",\"type\":\"STRING\"},{\"name\":\"VALUE\",\"type\":\"STRING\"},{\"name\":\"ENTRYPICTURE\",\"type\":\"STRING\"},{\"name\":\"DESCRIPTION\",\"type\":\"STRING\"},{\"name\":\"COMMENTS\",\"type\":\"STRING\"}],\"rows\":[],\"row_count\":0,\"truncated\":false,\"complete\":true}\n\nTool call: tps_describe {\"file\": \"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\"}\n{\"ok\":true,\"op\":\"describe\",\"file\":\"C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS\",\"encrypted\":false,\"records\":407,\"columns\":[{\"name\":\"CUSTOMER\",\"type\":\"STRING\",\"size\":32},{\"name\":\"MODULE\",\"type\":\"STRING\",\"size\":32},{\"name\":\"VARIABLE\",\"type\":\"STRING\",\"size\":32},{\"name\":\"VALUE\",\"type\":\"STRING\",\"size\":64},{\"name\":\"ENTRYPICTURE\",\"type\":\"STRING\",\"size\":20},{\"name\":\"DESCRIPTION\",\"type\":\"STRING\",\"size\":50},{\"name\":\"COMMENTS\",\"type\":\"STRING\",\"size\":1024}],\"keys\":[{\"name\":\"OPTKEY\",\"primary\":false,\"unique\":true,\"nocase\":true,\"components\":[{\"col\":\"CUSTOMER\",\"asc\":true},{\"col\":\"MODULE\",\"asc\":true},{\"col\":\"VARIABLE\",\"asc\":true}]},{\"name\":\"DESCRIPTKEY\",\"primary\":false,\"unique\":false,\"nocase\":true,\"optional\":true,\"components\":[{\"col\":\"CUSTOMER\",\"asc\":true},{\"col\":\"MODULE\",\"asc\":true},{\"col\":\"DESCRIPTION\",\"asc\":true}]}],\"complete\":true}"
+    },
+    {
+      "id": "TC-17",
+      "title": "Raw statement on the copy: dry run, then update, verify and restore",
+      "section": "raw",
+      "priority": "HIGH",
+      "verdict": "PASS",
+      "steps": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "notes": "every check matched",
+      "evidence": "Tool call: tps_query {\"sql\": \"UPDATE [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] SET VALUE = '15' WHERE CUSTOMER = 'DLT' AND MODULE = 'BOPIS' AND VARIABLE = 'CheckInterval'\", \"parse_only\": true}\n{\"ok\":true,\"op\":\"update\",\"parse_only\":true,\"complete\":true}\n\nTool call: tps_query {\"sql\": \"SELECT VALUE FROM [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] WHERE CUSTOMER = 'DLT' AND MODULE = 'BOPIS' AND VARIABLE = 'CheckInterval'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"10\"]],\"row_count\":1,\"truncated\":false,\"complete\":true}\n\nTool call: tps_query {\"sql\": \"UPDATE [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] SET VALUE = '15' WHERE CUSTOMER = 'DLT' AND MODULE = 'BOPIS' AND VARIABLE = 'CheckInterval'\"}\n{\"ok\":true,\"op\":\"update\",\"matched\":1,\"affected\":1,\"complete\":true}\n\nTool call: tps_query {\"sql\": \"SELECT VALUE FROM [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] WHERE CUSTOMER = 'DLT' AND MODULE = 'BOPIS' AND VARIABLE = 'CheckInterval'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"15\"]],\"row_count\":1,\"truncated\":false,\"complete\":true}\n\nTool call: tps_query {\"sql\": \"UPDATE [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] SET VALUE = '10' WHERE CUSTOMER = 'DLT' AND MODULE = 'BOPIS' AND VARIABLE = 'CheckInterval'\"}\n{\"ok\":true,\"op\":\"update\",\"matched\":1,\"affected\":1,\"complete\":true}\n\nTool call: tps_query {\"sql\": \"SELECT VALUE FROM [C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\\\\config\\\\OPTIONS.TPS] WHERE CUSTOMER = 'DLT' AND MODULE = 'BOPIS' AND VARIABLE = 'CheckInterval'\"}\n{\"ok\":true,\"op\":\"select\",\"columns\":[{\"name\":\"VALUE\",\"type\":\"STRING\"}],\"rows\":[[\"10\"]],\"row_count\":1,\"truncated\":false,\"complete\":true}"
+    },
+    {
+      "id": "TC-18",
+      "title": "Larger and wider CONFIG files read completely",
+      "section": "read",
+      "priority": "MED",
+      "verdict": "PASS",
+      "steps": [
+        true
+      ],
+      "notes": "every check matched: PMINTDTL 926/4/926/false, PDCONFIG 1/43/1/false, CPSTATE 68/3/68/false, REFSMTBL 268/3/268/false; row_count equals records for every file",
+      "evidence": "Per file: tps_describe {\"file\": \"C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\NAME.TPS\"} then tps_select {\"file\": \"...\\\\NAME.TPS\", \"limit\": 0} (one narrow column for the three larger files; full JSON in the session transcript):\nPMINTDTL: records 926, columns 4 (FORMATID, FIELDNAME, STARTPOS, DATALENGTH); select row_count 926, truncated false\nPDCONFIG: records 1, columns 43; select row_count 1, truncated false, rows [[\"W\",0,\"\",\"\",\"\",\"\",0,0,\"\",\"\",\"\",0,\"\",\"\",\"\",0,\"1\",\"2\",1,\"1\",\"1\",\"1\",\"\",\"1\",\"\",\"\",\"0\",\"\",\"\",\"1\",\"1\",\"0\",\"1\",\"1\",5,\"1\",\"2\",\"1\",\"1\",\"1\",\"1\",\"1\",\"MMS\"]]\nCPSTATE: records 68, columns 3 (StId, StName, StCode); select row_count 68, truncated false\nREFSMTBL: records 268, columns 3 (CURSTATE, COMMAND, NEXTSTATE); select row_count 268, truncated false\n\nPowerShell: (Get-FileHash 'C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS').Hash ; (Get-Item ...).LastWriteTimeUtc   # after all 18 cases\n2A48EF8633B1ED990952EE36F4FCDF0D7949A5BA7079759922EFB4EF7DA40E7E\n2026-09-20T06:23:55.6467310Z\n\nTool call: tps_set_roots {\"roots\": []}\n{\"roots\":[]}   (session returned to its registered state: no roots)"
+    }
+  ]
+}

@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roots at runtime, read-only reads, and a release</title>
+<style>
+  :root{
+    --paper:#f4efe1; --ink:#221f18; --maroon:#8a2b27; --meta-bg:#e9e1cd;
+    --label:#6d5f4e; --value:#2b2820; --amber:#a8762b;
+    --rule:#cbbfa5; --soft:#ece5d3; --code-bg:#2b2820; --code-ink:#efe8d6;
+    --serif:Georgia,'Times New Roman',serif;
+    --mono:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);padding:3.5rem 2rem;line-height:1.55;}
+  .wrap{max-width:880px;margin:0 auto;}
+  main p,main ul,main ol{max-width:84ch;}
+  main ol.steps{max-width:none;}
+  main pre{max-width:100%;overflow-x:auto;}
+
+  /* ---- FIXED masthead (do not restyle) ---- */
+  .eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.35em;font-size:.8rem;font-weight:700;color:var(--maroon);margin:0 0 1.1rem;}
+  h1{font-family:var(--serif);font-weight:700;font-size:clamp(2.6rem,6vw,4rem);line-height:1.04;letter-spacing:-.01em;margin:0 0 .9rem;}
+  .subtitle{font-family:var(--serif);font-style:italic;font-weight:700;font-size:clamp(1.25rem,2.4vw,1.7rem);line-height:1.3;margin:0 0 1.9rem;max-width:52ch;}
+  .meta-card{display:grid;grid-template-columns:max-content 1fr;column-gap:1.75rem;row-gap:.55rem;align-items:baseline;background:var(--meta-bg);border-radius:14px;border-left:6px solid var(--maroon);padding:1.4rem 1.85rem;}
+  .meta-card dt{font-family:var(--mono);color:var(--label);font-size:.95rem;font-weight:400;}
+  .meta-card dd{font-family:var(--mono);color:var(--value);font-size:.95rem;margin:0;word-break:break-word;}
+  .agentic-note{background:var(--meta-bg);border-radius:14px;padding:1.25rem 1.85rem;margin-top:1rem;font-family:var(--mono);color:var(--value);font-size:.92rem;line-height:1.6;}
+
+  /* ---- BODY (same hooks as the 2026-09-19 plan) ---- */
+  main{margin-top:3rem;}
+  main h2{font-family:var(--serif);font-size:1.8rem;line-height:1.15;margin:2.4rem 0 .8rem;padding-top:1.6rem;border-top:1px solid var(--rule);}
+  main h2:first-child{border-top:none;padding-top:0;margin-top:0;}
+  main h3{font-family:var(--mono);font-size:.85rem;text-transform:uppercase;letter-spacing:.14em;color:var(--maroon);margin:1.6rem 0 .6rem;}
+  main p{margin:0 0 .9rem;}
+  main li::marker{color:var(--maroon);}
+  .constraints li{margin:.25rem 0;}
+  section.task{margin:0 0 1.2rem;padding:.2rem 0;}
+  .tasknum{font-family:var(--mono);font-size:.8rem;color:var(--amber);font-weight:700;}
+  .files{background:var(--soft);border-left:4px solid var(--amber);border-radius:0 10px 10px 0;padding:.7rem 1.1rem;margin:.7rem 0 1rem;font-family:var(--mono);font-size:.86rem;line-height:1.7;}
+  .files .k{color:var(--maroon);font-weight:700;text-transform:uppercase;font-size:.72rem;letter-spacing:.05em;}
+  ol.steps{list-style:none;counter-reset:step;padding-left:0;margin:.6rem 0;}
+  ol.steps>li.step{position:relative;padding:.15rem 0 .6rem 2.2rem;margin:0;}
+  ol.steps>li.step::before{content:"";position:absolute;left:0;top:.18rem;width:1.15rem;height:1.15rem;border:2px solid var(--maroon);border-radius:4px;background:transparent;}
+  ol.steps>li.step::after{counter-increment:step;content:counter(step);position:absolute;left:1.55rem;top:.05rem;font-family:var(--mono);font-size:.72rem;color:var(--amber);font-weight:700;}
+  li.step .t{font-weight:700;}
+  pre{font-family:var(--mono);font-size:.76rem;line-height:1.5;background:var(--code-bg);color:var(--code-ink);border-radius:10px;padding:1rem 1.2rem;overflow-x:auto;margin:.6rem 0;white-space:pre-wrap;overflow-wrap:anywhere;}
+  pre code{background:none;padding:0;font-size:1em;color:inherit;}
+  code{font-family:var(--mono);font-size:.88em;background:var(--soft);padding:.06rem .35rem;border-radius:5px;}
+  .expect{font-family:var(--mono);font-size:.8rem;color:var(--label);margin:.3rem 0;}
+  table{border-collapse:collapse;width:100%;margin:.6rem 0 1.2rem;font-size:.95rem;}
+  th,td{text-align:left;padding:.5rem .7rem;border-bottom:1px solid var(--rule);vertical-align:top;}
+  th{font-family:var(--mono);font-size:.74rem;text-transform:uppercase;letter-spacing:.12em;color:var(--label);}
+  blockquote{margin:1rem 0;padding:.6rem 1.2rem;border-left:4px solid var(--amber);background:var(--soft);font-style:italic;border-radius:0 8px 8px 0;}
+  @media (max-width:640px){
+    body{padding:2.25rem 1.1rem;}
+    .meta-card{grid-template-columns:1fr;row-gap:.2rem;}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <p class="eyebrow">Plan &middot; Implementation</p>
+      <h1>Roots at runtime, read-only reads, and a release</h1>
+      <p class="subtitle">TDD: one CLI method, one new tool and one widened tool, the documents and instruments that name them, and a zip that installs by unzipping.</p>
+      <dl class="meta-card">
+        <dt>Date</dt><dd>2026-09-20</dd>
+        <dt>Branch</dt><dd>feature/tpscli-mcp</dd>
+        <dt>Spec</dt><dd>docs/mySuperpower/specs/2026-09-20-tpscli-mcp-roots-and-readonly-design.html</dd>
+      </dl>
+      <p class="agentic-note">REQUIRED SUB-SKILL: execute task-by-task with TDD (red &rarr; green &rarr; commit) using subagent-driven-development (recommended) or executing-plans. Codex review of this plan + spec before implementation; per-task two-stage review. Steps are checkbox-styled; track progress with your task tools, not by editing this file.</p>
+    </header>
+
+    <main>
+      <h2>Overview</h2>
+      <p><strong>Goal:</strong> the MCP server's root folders can be replaced while it runs (<code>tps_set_roots</code>), <code>tps_list_files</code> lists any folder with or without roots (<code>NO_ROOT</code> retired), <code>DESCRIBE</code> and <code>SELECT</code> open the file ReadOnly so a read leaves its modified time alone, and a tagged push produces a zip on a GitHub Release that installs by unzipping.</p>
+      <p><strong>Architecture:</strong> the CLI change is one method (<code>tpsSchema.Open</code> gains a <code>writing</code> flag) and two call sites. The server keeps its roots as its own state inside <code>createServer</code>, copied from the <code>Config</code> at construction, so a setter tool and the resolver share one array and the caller's config is never written back. Folder validation and the filesystem-exception guard are two small closures shared by <code>tps_set_roots</code> and <code>tps_list_files</code>. The release is one PowerShell script (<code>tools\release.ps1</code>: <code>cli\verify.ps1</code>, <code>npm ci/build/test</code>, stage, zip) that a workflow on a self-hosted Windows runner calls when a <code>v*</code> tag is pushed; the same script runs by hand.</p>
+      <p><strong>Tech stack:</strong> Clarion 12.0.14000 (<code>cli/</code>), Node 20 + TypeScript 5 + <code>@modelcontextprotocol/sdk</code> 1.30 + <code>zod</code> 3.25 (<code>mcp/</code>), Windows PowerShell 5.1 for the scripts, <code>gh</code> 2.101 and GitHub Actions for the release. No new dependency.</p>
+      <p><strong>Spec:</strong> <code>docs/mySuperpower/specs/2026-09-20-tpscli-mcp-roots-and-readonly-design.html</code> (0b693a1). Section numbers below refer to it. The release (Task 6) is an addition the owner asked for after the spec was signed off: "include a plan to create some sort of release that people can pull, if we are not using npm", shape chosen 2026-09-20: GitHub Actions on a tag push. The spec does not cover it; Task 6 is complete on its own.</p>
+
+      <h3>Global constraints</h3>
+      <ul class="constraints">
+        <li>Working directories: CLI commands run in <code>C:\Projects\GitHub\tpscli\cli</code>, <code>npm</code>/<code>node</code> commands in <code>C:\Projects\GitHub\tpscli\mcp</code>, <code>git</code> and <code>tools\release.ps1</code> at the repository root <code>C:\Projects\GitHub\tpscli</code>. Staged paths below are root-relative.</li>
+        <li>Build the exe with <code>powershell -NoProfile -ExecutionPolicy Bypass -File tools\build.ps1</code> from <code>cli\</code> (it runs MSBuild and checks the console subsystem). Success is the exe's timestamp advancing and zero <code>error</code> lines, not the exit code alone.</li>
+        <li>Line endings: every <code>.clw</code>, <code>.inc</code>, <code>.ps1</code>, <code>.ts</code>, <code>.js</code>, <code>.cjs</code>, <code>.json</code> (except <code>package-lock.json</code>), <code>.md</code>, <code>.yml</code> and <code>.html</code> you write is CRLF with lone-LF 0. Write with binary mode or <code>newline='\r\n'</code>; after every scripted edit run:<pre><code>python -c &quot;import sys; b=open(sys.argv[1],&#x27;rb&#x27;).read(); c=b.count(b&#x27;\r\n&#x27;); print(sys.argv[1],&#x27;CRLF&#x27;,c,&#x27;lone-LF&#x27;,b.count(b&#x27;\n&#x27;)-c)&quot; &lt;file&gt;</code></pre>A <code>git diff --stat</code> showing a whole-file rewrite for a small edit is line-ending damage, not the edit.</li>
+        <li>Never write to <code>cli\testdata\*.TPS</code> or to anything under <code>C:\Projects\GitLab\POS\dtpos_404_data</code>. Tests work on copies under <code>cli\testdata\work\</code> (gitignored) and <code>mcp\work\</code>.</li>
+        <li>Never run the exe without a timeout: the suites use <code>Invoke-Tpscli_Bounded</code>; ad-hoc probes use <code>timeout 20 .\tpscli.exe ...</code> in Git Bash or the bounded helper. A crashed Clarion exe blocks behind a modal dialog.</li>
+        <li>Never echo or log the owner string. Nothing in this plan touches owner handling.</li>
+        <li>Stage files by name (<code>git add path ...</code>); never <code>git add -A</code> or <code>git add .</code>. Commit messages end with the two attribution lines shown in every commit step.</li>
+        <li>Do not run <code>claude mcp add</code>/<code>remove</code>: the owner's registration (<code>tpscli</code>, user scope, <code>--allow-writes</code>, no <code>--root</code>) stays as it is. A running Claude Code session picks up a rebuilt <code>dist\server.js</code> only after <code>/mcp</code> reconnect or a new session.</li>
+        <li>Version: <code>mcp\package.json</code> goes 0.1.0 &rarr; 0.2.0 in Task 2 (new tool, removed error code). The CLI stays 0.1.0. The release tag is <code>v0.2.0</code>, the server's number.</li>
+        <li>Implementation notes: <code>docs\mySuperpower\implementation-notes\2026-09-20-tpscli-mcp-roots.html</code> is controller-owned (created in Task 1 from the 2026-09-19 notes file's head and masthead, title "Roots at runtime, read-only reads, and a release: implementation notes", date 2026-09-20, an empty "Implementation Log" list). Implementers put decisions the spec did not make, changes and tradeoffs in their task reports; the controller moves them into the notes file after each task.</li>
+        <li>Facts read from the tree on 2026-09-20 that the steps rely on: <code>Sc.Open()</code> is called at <code>cli\tpscli.clw</code> lines 189 and 224 only; <code>tpsSchema.Open</code> is at <code>cli\tpsSchema.clw</code> line 665 and declared at <code>cli\tpsSchema.inc</code> line 98; <code>cli\verify.ps1</code> line 364 lists the step-2 suites; <code>mcp\test\server.test.js</code> has 12 <code>test()</code> blocks, its shared config is <code>base</code> (line 35) and its fixtures are <code>rootA</code>, <code>rootB</code>, <code>tmp</code> with <code>notes.txt</code> above the roots; KEYS.TPS has columns <code>ID, NAME, CODE, AMOUNT</code> and 5 records, ID 1 exists.</li>
+      </ul>
+
+      <h3>File structure</h3>
+      <table>
+        <thead><tr><th>File</th><th>Responsibility</th><th>Task</th></tr></thead>
+        <tbody>
+          <tr><td><code>cli/tpsSchema.inc</code>, <code>cli/tpsSchema.clw</code></td><td><code>Open(BYTE writing)</code>: <code>OPEN(F, 40h)</code> for reads, <code>SHARE(F)</code> for writes.</td><td>1</td></tr>
+          <tr><td><code>cli/tpscli.clw</code></td><td>The two call sites pass the flag.</td><td>1</td></tr>
+          <tr><td><code>cli/tests/readonly.ps1</code> (new), <code>cli/verify.ps1</code></td><td>Modified-time, hash and deny-write ACL cases; suite added to step 2.</td><td>1</td></tr>
+          <tr><td><code>cli/README.md</code>, <code>docs/UserGuide/Tpscli-IT-Support-User-Guide.html</code></td><td>Open-mode wording.</td><td>1</td></tr>
+          <tr><td><code>mcp/src/server.ts</code></td><td>Roots as server state; <code>folderArg</code>, <code>fsGuard</code>; <code>tps_set_roots</code>; <code>tps_version.roots</code>; new messages; <code>tps_list_files</code> with <code>directory</code>.</td><td>2, 3</td></tr>
+          <tr><td><code>mcp/test/server.test.js</code>, <code>mcp/test/e2e.test.js</code></td><td>Unit cases for the setter and the listing; one end-to-end case through the rebuilt exe.</td><td>2, 3</td></tr>
+          <tr><td><code>mcp/package.json</code>, <code>mcp/package-lock.json</code></td><td>0.2.0.</td><td>2</td></tr>
+          <tr><td><code>mcp/tools/call.js</code></td><td>Several tools in one server process (<code>tool,tool</code>), so the instrument can set roots and then list.</td><td>3</td></tr>
+          <tr><td><code>mcp/README.md</code>, <code>README.md</code>, <code>docs/UserGuide/TpscliMcp-IT-Support-User-Guide.html</code>, <code>docs/tickets/*.md</code></td><td>Tool tables, flag tables, error lists, a new procedure, tickets closed.</td><td>4</td></tr>
+          <tr><td><code>docs/Testing/TpscliMcp-Unit-Test-Cases.html</code>, <code>mcp/tests/run-instrument.ps1</code>, results JSON + PDF</td><td>Corpus instrument: TC-04/TC-05/TC-10 follow the new behaviour; re-recorded.</td><td>5</td></tr>
+          <tr><td><code>docs/Testing/TpscliMcpConfig-Unit-Test-Cases.html</code>, <code>mcp/tests/run-config-instrument.ps1</code></td><td>CONFIG instrument: TC-03 uses <code>directory</code> and <code>tps_set_roots</code>, TC-09 checks LastWriteTime; re-run from a session (owner gate).</td><td>5</td></tr>
+          <tr><td><code>tools/release.ps1</code> (new), <code>.github/workflows/release.yml</code> (new), <code>.gitignore</code></td><td>Build, qualify, stage, zip, checksum, notes; the workflow calls the script on a tag and publishes with <code>gh</code>.</td><td>6</td></tr>
+        </tbody>
+      </table>
+      <section class="task">
+        <h2>Task 1 <span class="tasknum">&middot; CLI: reads open ReadOnly</span></h2>
+        <p>Deliverable: a rebuilt <code>tpscli.exe</code> whose <code>DESCRIBE</code> and <code>SELECT</code> leave a file's LastWriteTime and bytes alone and succeed on a file the account cannot write; <code>cli\tests\readonly.ps1</code> proves both and <code>verify.ps1</code> runs it. Spec &sect;5 and &sect;8.</p>
+        <div class="files">
+          <div><span class="k">Create</span> <code>cli\tests\readonly.ps1</code>, <code>docs\mySuperpower\implementation-notes\2026-09-20-tpscli-mcp-roots.html</code></div>
+          <div><span class="k">Modify</span> <code>cli\tpsSchema.inc:98</code>, <code>cli\tpsSchema.clw:665-672</code>, <code>cli\tpscli.clw:189,224</code>, <code>cli\verify.ps1:364</code>, <code>cli\README.md:126-127</code>, <code>docs\UserGuide\Tpscli-IT-Support-User-Guide.html:209</code></div>
+          <div><span class="k">Produces</span> <code>tpsSchema.Open PROCEDURE(BYTE writing),LONG</code>; a rebuilt exe that Task 3's e2e case and Task 5's instruments run.</div>
+        </div>
+        <ol class="steps">
+<li class="step"><span class="t">Write the failing suite.</span> <code>cli\tests\readonly.ps1</code> (CRLF):<pre><code>param()
+$ErrorActionPreference = &#x27;Stop&#x27;
+$root = Split-Path -Parent $PSScriptRoot
+$exe = Join-Path $root &#x27;tpscli.exe&#x27;
+. (Join-Path $PSScriptRoot &#x27;TestHelpers.ps1&#x27;)
+
+# DESCRIBE and SELECT open the file ReadOnly + DenyNone (OPEN 40h), so a read leaves the modified
+# time and the bytes alone and works on a file the account cannot write; INSERT, UPDATE and DELETE
+# keep SHARE (42h). Ticket docs\tickets\2026-09-20-reads-open-read-write.md. Works on copies under
+# testdata\work (gitignored), never on the fixtures.
+$workDir = Join-Path $root &#x27;testdata\work&#x27;
+$roDir = Join-Path $workDir &#x27;ro&#x27;
+New-Item -ItemType Directory -Force -Path $roDir | Out-Null
+$copy = Join-Path $workDir &#x27;KEYS_RO.TPS&#x27;
+$locked = Join-Path $roDir &#x27;KEYS.TPS&#x27;
+Copy-Item (Join-Path $root &#x27;testdata\KEYS.TPS&#x27;) $copy -Force
+Copy-Item (Join-Path $root &#x27;testdata\KEYS.TPS&#x27;) $locked -Force
+
+$timeoutMs = 20000
+$failures = 0
+
+function Run([string]$Sql) {
+    $r = Invoke-Tpscli_Bounded -FilePath $script:exe -ArgumentList @($Sql) -WorkingDirectory $script:root -TimeoutMs $script:timeoutMs
+    if ($r.TimedOut) { throw &quot;readonly.ps1: timeout running &#x27;$Sql&#x27;&quot; }
+    return $r
+}
+function Check([bool]$Cond, [string]$What) {
+    if ($Cond) { Write-Host &quot;readonly.ps1: ok   $What&quot; } else { Write-Host &quot;readonly.ps1: FAIL $What&quot;; $script:failures++ }
+}
+function Stamp([string]$Path) { (Get-Item $Path).LastWriteTimeUtc.Ticks }
+function Hash([string]$Path) { (Get-FileHash $Path -Algorithm SHA256).Hash }
+
+# ---- 1. a read leaves the modified time and the bytes alone; a write moves the time ----
+$t0 = Stamp $copy; $h0 = Hash $copy
+$d = Run &quot;DESCRIBE [testdata\work\KEYS_RO.TPS]&quot;
+Check ($d.ExitCode -eq 0) &quot;DESCRIBE exit 0 (got $($d.ExitCode): $($d.StdOut)$($d.StdErr))&quot;
+$s = Run &quot;SELECT * FROM [testdata\work\KEYS_RO.TPS] LIMIT 0&quot;
+Check ($s.ExitCode -eq 0) &quot;SELECT exit 0 (got $($s.ExitCode): $($s.StdOut)$($s.StdErr))&quot;
+Check ((Stamp $copy) -eq $t0) &#x27;LastWriteTime unchanged after DESCRIBE and SELECT&#x27;
+Check ((Hash $copy) -eq $h0) &#x27;SHA-256 unchanged after DESCRIBE and SELECT&#x27;
+Start-Sleep -Milliseconds 1200    # a second of margin so the write below lands on a later stamp
+$u = Run &quot;UPDATE [testdata\work\KEYS_RO.TPS] SET NAME = &#x27;zulu&#x27; WHERE ID = 1&quot;
+Check ($u.ExitCode -eq 0) &quot;UPDATE exit 0 (got $($u.ExitCode): $($u.StdOut)$($u.StdErr))&quot;
+Check ((Stamp $copy) -ne $t0) &#x27;LastWriteTime moved after UPDATE (so the unchanged check above can detect a regression)&#x27;
+
+# ---- 2. a read works on a file the account cannot write; the UPDATE control proves the ACE took ----
+$who = &quot;$env:USERDOMAIN\$env:USERNAME&quot;
+$hadDeny = $false
+try {
+    icacls $locked /deny &quot;${who}:(W)&quot; | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw &quot;readonly.ps1: icacls could not add the deny entry ($LASTEXITCODE)&quot; }
+    $hadDeny = $true
+    $w = Run &quot;UPDATE [testdata\work\ro\KEYS.TPS] SET NAME = &#x27;zulu&#x27; WHERE ID = 1&quot;
+    $wj = try { $w.StdOut | ConvertFrom-Json } catch { $null }
+    Check ($w.ExitCode -eq 2 -and $wj -and $wj.ok -eq $false -and $wj.error.code -eq &#x27;DRIVER&#x27;) &quot;control: UPDATE on the write-denied file is refused by the driver, exit 2 (got exit $($w.ExitCode): $($w.StdOut)$($w.StdErr))&quot;
+    $r = Run &quot;SELECT ID, NAME FROM [testdata\work\ro\KEYS.TPS] WHERE ID = 1&quot;
+    Check ($r.ExitCode -eq 0) &quot;SELECT on the write-denied file exits 0 (got $($r.ExitCode): $($r.StdOut)$($r.StdErr))&quot;
+    Check ($r.StdOut -like &#x27;*&quot;row_count&quot;: 1*&#x27;) &#x27;SELECT on the write-denied file returns the row&#x27;
+} finally {
+    if ($hadDeny) {
+        icacls $locked /remove:d $who | Out-Null
+        if ($LASTEXITCODE -ne 0) { Write-Host &quot;readonly.ps1: FAIL could not remove the deny entry from $locked&quot;; $failures++ }
+    }
+}
+
+if ($failures -gt 0) {
+    Write-Host &quot;readonly.ps1: $failures check(s) FAILED&quot;
+    exit 1
+} else {
+    Write-Host &quot;readonly.ps1: OK&quot;
+    exit 0
+}</code></pre></li><li class="step"><span class="t">Run it to see it fail.</span> <pre><code>powershell -NoProfile -ExecutionPolicy Bypass -File tests\readonly.ps1</code></pre><p class="expect">Expected: "FAIL LastWriteTime unchanged after DESCRIBE and SELECT" (the SHARE open moves the stamp), "FAIL SELECT on the write-denied file exits 0" (the SHARE open is refused, exit 2 with a DRIVER error), the UPDATE control passes (exit 2, ok false, error.code DRIVER: the SHARE open is refused by the ACE), the deny entry is removed (icacls ... /remove:d printed nothing and the finally ran), exit 1. If the corpus is missing (no testdata\KEYS.TPS) run verify.ps1 once first; it generates it.</p></li><li class="step"><span class="t">Declare the flag.</span> <code>cli\tpsSchema.inc</code> line 98 becomes:<pre><code>Open         PROCEDURE(BYTE writing),LONG    ! 0: OPEN(F,40h) ReadOnly+DenyNone; 1: SHARE(F). Maps field numbers to WHAT() indexes into Who</code></pre></li><li class="step"><span class="t">Open by mode.</span> <code>cli\tpsSchema.clw</code> lines 665-672: the header and the open statement become:<pre><code>tpsSchema.Open PROCEDURE(BYTE writing)
+rec   &amp;GROUP
+n     LONG
+i     LONG
+j     LONG
+full  STRING(80)
+  CODE
+  ! Reads open ReadOnly + DenyNone (40h) so a DESCRIBE or SELECT leaves the file&#x27;s modified time
+  ! alone and works on a folder the account can only read; writes keep SHARE (ReadWrite + DenyNone,
+  ! 42h). Ticket docs\tickets\2026-09-20-reads-open-read-write.md.
+  IF writing
+    SHARE(SELF.F)
+  ELSE
+    OPEN(SELF.F, 40h)
+  END
+  CASE ERRORCODE()</code></pre>Everything from <code>CASE ERRORCODE()</code> on is unchanged.</li><li class="step"><span class="t">Pass the flag at both call sites.</span> <code>cli\tpscli.clw</code> line 189 (the DESCRIBE branch):<pre><code>    IF rc = 0 THEN rc = Sc.Open(0).</code></pre>line 224 (after ParseBody):<pre><code>  IF rc = 0 THEN rc = Sc.Open(CHOOSE(Stmt.Op = OP:Select, 0, 1)).</code></pre><code>OP:Select</code> is <code>EQUATE(2)</code> in <code>cli\tpsSql.inc</code> line 14. Confirm with <code>grep -n &quot;Sc.Open(&quot; tpscli.clw</code> that these are the only two calls.</li><li class="step"><span class="t">Rebuild.</span> <pre><code>powershell -NoProfile -ExecutionPolicy Bypass -File tools\build.ps1</code></pre><p class="expect">Expected: MSBuild prints no error lines; "subsystem=3 (console)"; tpscli.exe timestamp is now.</p></li><li class="step"><span class="t">Run the suite to see it pass.</span> <pre><code>powershell -NoProfile -ExecutionPolicy Bypass -File tests\readonly.ps1</code></pre><p class="expect">Expected: every line "ok", "readonly.ps1: OK", exit 0.</p>If the driver refuses the ReadOnly open instead (DESCRIBE exits 2 with DEFINITION_MISMATCH or a DRIVER error whose text names the open), stop: this is the spec's &sect;5 watch-point. Report the exact error text and codes with status BLOCKED; the controller chooses the fallback from that evidence (the spec names ReadOnly + DenyWrite, 20h, as the first candidate).</li><li class="step"><span class="t">Add the suite to the gate and run the other suites.</span> <code>cli\verify.ps1</code> line 364:<pre><code>    foreach ($t in @(&#x27;describe&#x27;,&#x27;parser&#x27;,&#x27;select&#x27;,&#x27;insert&#x27;,&#x27;update&#x27;,&#x27;readonly&#x27;)) {</code></pre>Then:<pre><code>powershell -NoProfile -ExecutionPolicy Bypass -File verify.ps1</code></pre><p class="expect">Expected: "step 2 tests\readonly.ps1 ... exit 0" among the PASS lines; step 6 still reports the read succeeding and the write as RECORD_HELD; "verify.ps1: all steps PASS (N skipped - not a release qualification)" where N is the number of -Extra/-Expected/-TpsFixLog steps a default run skips, as before this change.</p></li><li class="step"><span class="t">Documentation follows the behaviour.</span> <code>cli\README.md</code> lines 126-127: replace "The file is opened with `SHARE()`; records are taken with `HOLD(file, 1)` and there are no retries." with:<pre><code>`DESCRIBE` and `SELECT` open the file ReadOnly and shared (`OPEN(file, 40h)`), so a read leaves its
+modified time alone and works in a folder the account can only read; `INSERT`, `UPDATE` and
+`DELETE` open it with `SHARE()`. Records are taken with `HOLD(file, 1)` and there are no retries.</code></pre><code>docs\UserGuide\Tpscli-IT-Support-User-Guide.html</code> line 209, the tip, becomes:<pre><code>  &lt;div class=&quot;callout tip&quot;&gt;&lt;b&gt;Tip&lt;/b&gt;tpscli opens the data file in shared mode, so it can be run while the owning application has the file open: reads (DESCRIBE, SELECT) open it read-only and leave its modified time alone, writes open it read/write. A row that application is holding at that moment is reported as &lt;code&gt;RECORD_HELD&lt;/code&gt;; rerun after the hold clears.&lt;/div&gt;</code></pre></li><li class="step"><span class="t">Start the implementation notes.</span> Create <code>docs\mySuperpower\implementation-notes\2026-09-20-tpscli-mcp-roots.html</code>: copy the <code>&lt;head&gt;</code> and masthead of <code>docs\mySuperpower\implementation-notes\2026-09-19-tpscli-mcp.html</code>, title "Roots at runtime, read-only reads, and a release: implementation notes", date 2026-09-20, an empty Task Status table and an empty Implementation Log list. The controller fills it from the task reports.</li><li class="step"><span class="t">Line endings and commit.</span> CRLF check on the .inc, .clw, .ps1, verify.ps1, README.md, the guide and the notes file: lone-LF 0 each.<pre><code>git add cli/tpsSchema.inc cli/tpsSchema.clw cli/tpscli.clw cli/tests/readonly.ps1 cli/verify.ps1 cli/README.md docs/UserGuide/Tpscli-IT-Support-User-Guide.html docs/mySuperpower/implementation-notes/2026-09-20-tpscli-mcp-roots.html
+git commit -F - &lt;&lt;&#x27;EOF&#x27;
+cli: DESCRIBE and SELECT open the file ReadOnly (40h); writes keep SHARE; readonly.ps1 suite
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+Claude-Session: https://claude.ai/code/session_01ND3nU1mjop1vRk5BYdANtF
+EOF</code></pre></li>        </ol>
+      </section>
+      <section class="task">
+        <h2>Task 2 <span class="tasknum">&middot; server: roots as session state, tps_set_roots, version 0.2.0</span></h2>
+        <p>Deliverable: nine tools; <code>tps_set_roots</code> replaces the set for the session with all-or-nothing validation; <code>tps_version</code> reports the current roots; the resolver's no-roots message no longer speaks of startup flags; the shared test config is never written to. Spec &sect;3, &sect;6, &sect;8.</p>
+        <div class="files">
+          <div><span class="k">Modify</span> <code>mcp\src\server.ts</code> (createServer: lines 82-96 resolveFile, 71 FILE_ARG, 131-139 tps_version, 141-165 tps_list_files), <code>mcp\test\server.test.js</code> (lines 47-50, 78-80, 198-214, 216-224), <code>mcp\package.json:3</code>, <code>mcp\package-lock.json:3,9</code></div>
+          <div><span class="k">Produces</span> inside createServer: <code>let roots: string[]</code>; <code>folderArg(label, value): string</code>; <code>fsGuard&lt;T&gt;(what, fn): T</code>; tool <code>tps_set_roots({ roots: string[] }) -&gt; { roots }</code>; <code>tps_version -&gt; { server, exe, roots }</code>. Task 3 uses <code>folderArg</code>, <code>fsGuard</code> and <code>roots</code>.</div>
+        </div>
+        <ol class="steps">
+<li class="step"><span class="t">Bump the version by hand (npm would rewrite package.json with LF).</span> In <code>mcp\package.json</code> line 3 and <code>mcp\package-lock.json</code> lines 3 and 9, change <code>&quot;version&quot;: &quot;0.1.0&quot;</code> to <code>&quot;version&quot;: &quot;0.2.0&quot;</code> (the lock file's line 9 is the root package entry; the other "version" lines are dependencies and stay). Check that <code>npm ci</code> still runs clean afterwards (the lock stays consistent because only the root version changed).</li><li class="step"><span class="t">Write the failing tests.</span> In <code>mcp\test\server.test.js</code>:<pre><code>// line 47-50: the inventory
+test(&#x27;exactly the nine tools are registered&#x27;, async () =&gt; {
+  const client = await connect(base, stub());
+  const names = (await client.listTools()).tools.map(t =&gt; t.name).sort();
+  assert.deepEqual(names, [&#x27;tps_delete&#x27;, &#x27;tps_describe&#x27;, &#x27;tps_insert&#x27;, &#x27;tps_list_files&#x27;, &#x27;tps_query&#x27;, &#x27;tps_select&#x27;, &#x27;tps_set_roots&#x27;, &#x27;tps_update&#x27;, &#x27;tps_version&#x27;]);
+});
+
+// line 80: the no-roots message names the setter, not the startup flag
+  assert.match(r.structuredContent.error.message, /currently has no root folders; call tps_set_roots or pass an absolute path/);
+
+// line 221: tps_version carries the current roots
+  assert.deepEqual(r.structuredContent, { server: &#x27;0.0.0-test&#x27;, exe: VERSION.json, roots: [rootA, rootB] });</code></pre>and a new test after the tps_version one:<pre><code>test(&#x27;tps_set_roots replaces the set, validates everything first, and leaves the config alone&#x27;, async () =&gt; {
+  const run = stub();
+  const client = await connect(base, run);
+  const two = await call(client, &#x27;tps_set_roots&#x27;, { roots: [rootB, tmp] });    // two distinct folders, new order
+  assert.equal(two.isError, false, two.content[0].text);
+  assert.deepEqual(two.structuredContent, { roots: [rootB, tmp] });
+  await call(client, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27; });
+  assert.equal(run.calls[0].opts.stdin, `DESCRIBE [${path.join(rootB, &#x27;KEYS.TPS&#x27;)}]`);   // rootB first now; rootA not searched
+  await call(client, &#x27;tps_describe&#x27;, { file: &#x27;notes.txt&#x27; });
+  assert.equal(run.calls[1].opts.stdin, `DESCRIBE [${path.join(tmp, &#x27;notes.txt&#x27;)}]`);    // resolved in the second root
+  const both = await call(client, &#x27;tps_list_files&#x27;, { pattern: &#x27;*&#x27; });
+  assert.deepEqual(both.structuredContent.files.map(f =&gt; f.name), [&#x27;KEYS.TPS&#x27;, &#x27;ONLYB.TPS&#x27;, &#x27;notes.txt&#x27;]);
+  const nope = await call(client, &#x27;tps_describe&#x27;, { file: &#x27;NOPE.TPS&#x27; });
+  assert.equal(nope.structuredContent.error.message, `NOPE.TPS not found inside ${rootB}; ${tmp}`);   // the current set, not the startup one
+  const set = await call(client, &#x27;tps_set_roots&#x27;, { roots: [rootB, rootB.toUpperCase()] });
+  assert.deepEqual(set.structuredContent, { roots: [rootB] });                 // case-insensitive duplicate dropped
+  const files = await call(client, &#x27;tps_list_files&#x27;);
+  assert.deepEqual(files.structuredContent.files.map(f =&gt; f.name), [&#x27;KEYS.TPS&#x27;, &#x27;ONLYB.TPS&#x27;]);
+  const bad = await call(client, &#x27;tps_set_roots&#x27;, { roots: [rootA, &#x27;data&#x27;] });
+  assert.equal(bad.isError, true);
+  assert.equal(bad.structuredContent.error.code, &#x27;INVALID_ARGUMENT&#x27;);
+  assert.match(bad.structuredContent.error.message, /roots\[1\] &quot;data&quot; must be an absolute path/);
+  assert.equal(bad.structuredContent.op, null);
+  assert.equal(bad.structuredContent.outcome, undefined);
+  const missing = await call(client, &#x27;tps_set_roots&#x27;, { roots: [path.join(tmp, &#x27;nope&#x27;)] });
+  assert.match(missing.structuredContent.error.message, /is not a folder/);
+  assert.deepEqual((await call(client, &#x27;tps_version&#x27;)).structuredContent.roots, [rootB]);   // untouched by the two refusals
+  const cleared = await call(client, &#x27;tps_set_roots&#x27;, { roots: [] });
+  assert.deepEqual(cleared.structuredContent, { roots: [] });
+  const gone = await call(client, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27; });
+  assert.equal(gone.structuredContent.error.code, &#x27;FILE_NOT_FOUND&#x27;);
+  assert.match(gone.structuredContent.error.message, /currently has no root folders/);
+  assert.deepEqual(base.roots, [rootA, rootB]);                               // the shared config was never written
+  const other = await connect(base, stub());
+  assert.deepEqual((await call(other, &#x27;tps_version&#x27;)).structuredContent.roots, [rootA, rootB]);
+  const notArray = await call(client, &#x27;tps_set_roots&#x27;, { roots: &#x27;C:\\x&#x27; });
+  assert.equal(notArray.isError, true);
+  assert.match(notArray.content[0].text, /Invalid arguments for tool tps_set_roots/);
+});</code></pre></li><li class="step"><span class="t">Run them to see them fail.</span> <pre><code>npm test</code></pre><p class="expect">Expected: server.test.js: the inventory test fails (eight names), the message test fails (no "currently has"), the tps_version deepEqual fails (no roots), the new test fails on "Tool tps_set_roots not found" (the SDK's text error, isError true). The other suites pass; e2e still passes because tps_version there only checks v.server.</p></li><li class="step"><span class="t">Roots become server state; two shared helpers.</span> In <code>mcp\src\server.ts</code>, directly after <code>const server = new McpServer({ name: &#x27;tpscli-mcp&#x27;, version: config.version });</code> (line 80) insert:<pre><code>  // The roots are the server&#x27;s own state: tps_set_roots replaces them for the session, and the
+  // Config it was built from is never written back (the tests share one config across servers).
+  let roots: string[] = [...config.roots];
+
+  // existsSync/statSync/readdirSync can throw (access denied, a folder removed between the check
+  // and the read); the model needs the structured envelope, not the SDK&#x27;s text-only error.
+  const fsGuard = &lt;T&gt;(what: string, fn: () =&gt; T): T =&gt; {
+    try {
+      return fn();
+    } catch (e) {
+      throw new InvalidArgument(`cannot ${what}: ${(e as Error).message}`);
+    }
+  };
+
+  // One rule for a folder argument, shared by tps_set_roots and tps_list_files: fully qualified
+  // (a relative folder would resolve against the server&#x27;s cwd, which the model cannot see) and an
+  // existing directory. Returns the resolved path.
+  const folderArg = (label: string, value: string): string =&gt; {
+    if (!FULLY_QUALIFIED.test(value)) throw new InvalidArgument(`${label} &quot;${value}&quot; must be an absolute path`);
+    const full = path.resolve(value);
+    if (!fsGuard(`check ${full}`, () =&gt; existsSync(full) &amp;&amp; statSync(full).isDirectory())) throw new InvalidArgument(`${full} is not a folder`);
+    return full;
+  };</code></pre>Then in <code>resolveFile</code> replace all four <code>config.roots</code> with <code>roots</code> (lines 84, 91, 93 and the <code>${config.roots.join(&#x27;; &#x27;)}</code> in the final FILE_NOT_FOUND message at line 96, which must name the current set) and the no-roots throw with:<pre><code>    if (roots.length === 0) {
+      throw new ToolError(&#x27;FILE_NOT_FOUND&#x27;, `${file} is not an absolute path and the server currently has no root folders; call tps_set_roots or pass an absolute path`);
+    }</code></pre>and in <code>tps_list_files</code> replace both <code>config.roots</code> with <code>roots</code> (its NO_ROOT branch stays until Task 3). Line 71:<pre><code>const FILE_ARG = z.string().min(1).describe(&#x27;Path to the .TPS file: absolute, or a bare name resolved inside the server\&#x27;s current root folders (--root at startup, or tps_set_roots).&#x27;);</code></pre></li><li class="step"><span class="t">tps_version reports the roots; tps_set_roots is registered.</span> Replace the tps_version handler body (lines 134-139):<pre><code>  }, async () =&gt; {
+    const snapshot = [...roots];   // the set as it was when the call started
+    const r = await run(config.exe, [&#x27;--version&#x27;], { timeoutMs: config.timeoutMs });
+    process.stderr.write(`tpscli-mcp tps_version ${r.durationMs}ms exit ${r.exitCode}${r.failure ? ` ${r.failure.kind}` : &#x27;&#x27;}\n`);
+    const res = toResult(r, null, false, false);
+    return res.isError ? res : body({ server: config.version, exe: r.json!, roots: snapshot }, false);
+  });
+
+  server.registerTool(&#x27;tps_set_roots&#x27;, {
+    title: &#x27;Set root folders&#x27;,
+    description: &#x27;Replaces the server\&#x27;s root folders for this session: where bare file names resolve and what tps_list_files lists by default. Absolute paths; each must be an existing folder. Pass [] to clear. Roots are a convenience, not a fence: every tool accepts an absolute path regardless. A restart returns to the --root flags.&#x27;,
+    inputSchema: { roots: z.array(z.string().min(1)).describe(&#x27;The whole new set, in lookup order; [] clears it.&#x27;) },
+  }, async ({ roots: wanted }) =&gt; attempt(null, false, async () =&gt; {
+    // Validate everything before changing anything, so a bad entry leaves the set as it was.
+    const next: string[] = [];
+    wanted.forEach((r, i) =&gt; {
+      const full = folderArg(`roots[${i}]`, r);
+      if (!next.some(n =&gt; n.toLowerCase() === full.toLowerCase())) next.push(full);   // the file system compares case-insensitively
+    });
+    roots = next;
+    process.stderr.write(`tpscli-mcp tps_set_roots ${roots.length} root(s)${roots.length ? &#x27;: &#x27; + roots.join(&#x27;; &#x27;) : &#x27;&#x27;}\n`);
+    return body({ roots }, false);
+  }));</code></pre></li><li class="step"><span class="t">Run the tests to see them pass.</span> <pre><code>npm test</code></pre><p class="expect">Expected: tsc silent (folderArg and fsGuard are used: by tps_set_roots now, by tps_list_files in Task 3; if tsc reports fsGuard unused under noUnusedLocals, it is not set in tsconfig.json, so it will not); server: 13 pass; sql 10, runner 11, args 4, e2e 2; 0 fail. CRLF check on server.ts, server.test.js, package.json: lone-LF 0.</p></li><li class="step"><span class="t">Commit.</span> <pre><code>git add mcp/package.json mcp/package-lock.json mcp/src/server.ts mcp/test/server.test.js
+git commit -F - &lt;&lt;&#x27;EOF&#x27;
+mcp: tps_set_roots replaces the roots for the session; tps_version reports them; 0.2.0
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+Claude-Session: https://claude.ai/code/session_01ND3nU1mjop1vRk5BYdANtF
+EOF</code></pre></li>        </ol>
+      </section>
+      <section class="task">
+        <h2>Task 3 <span class="tasknum">&middot; server: tps_list_files for any folder, NO_ROOT retired, one e2e case</span></h2>
+        <p>Deliverable: <code>tps_list_files({ directory? })</code> per spec &sect;4 with filesystem failures inside the envelope; <code>NO_ROOT</code> gone from the code; <code>tools\call.js</code> can run several tools on one server; the end-to-end suite sets roots and confirms a read through the rebuilt exe leaves the fixture's modified time alone. Spec &sect;4, &sect;6, &sect;8.</p>
+        <div class="files">
+          <div><span class="k">Modify</span> <code>mcp\src\server.ts</code> (tps_list_files), <code>mcp\test\server.test.js</code> (the list_files test), <code>mcp\test\e2e.test.js</code> (imports; the first test), <code>mcp\tools\call.js</code></div>
+          <div><span class="k">Consumes</span> <code>roots</code>, <code>folderArg</code>, <code>fsGuard</code> from Task 2; the exe from Task 1.</div>
+          <div><span class="k">Produces</span> <code>node tools\call.js tool1,tool2 ...</code> with a JSON array on stdin, used by Task 5.</div>
+        </div>
+        <ol class="steps">
+<li class="step"><span class="t">Replace the list_files test.</span> In <code>mcp\test\server.test.js</code> the test that starts <code>test(&#x27;tps_list_files lists the roots, one level, by pattern, or NO_ROOT&#x27;</code> becomes:<pre><code>test(&#x27;tps_list_files lists the roots or one directory, one level, by pattern&#x27;, async () =&gt; {
+  const client = await connect(base, stub());
+  const all = await call(client, &#x27;tps_list_files&#x27;);
+  assert.deepEqual(all.structuredContent.files.map(f =&gt; f.path), [path.join(rootA, &#x27;KEYS.TPS&#x27;), path.join(rootB, &#x27;KEYS.TPS&#x27;), path.join(rootB, &#x27;ONLYB.TPS&#x27;)]);
+  const f = all.structuredContent.files[0];
+  assert.equal(f.name, &#x27;KEYS.TPS&#x27;);
+  assert.equal(f.size, 0);
+  assert.match(f.modified, /^\d{4}-\d{2}-\d{2}T/);
+  const one = await call(client, &#x27;tps_list_files&#x27;, { pattern: &#x27;only*&#x27; });
+  assert.deepEqual(one.structuredContent.files.map(x =&gt; x.name), [&#x27;ONLYB.TPS&#x27;]);
+  const none = await call(client, &#x27;tps_list_files&#x27;, { pattern: &#x27;k?ys.tps&#x27; });
+  assert.equal(none.structuredContent.files.length, 2);
+  const dir = await call(client, &#x27;tps_list_files&#x27;, { directory: rootB });          // one folder, the roots ignored
+  assert.deepEqual(dir.structuredContent.files.map(x =&gt; x.name), [&#x27;KEYS.TPS&#x27;, &#x27;ONLYB.TPS&#x27;]);
+  const above = await call(client, &#x27;tps_list_files&#x27;, { directory: tmp, pattern: &#x27;*.txt&#x27; });   // outside every root: still listed
+  assert.deepEqual(above.structuredContent.files.map(x =&gt; x.name), [&#x27;notes.txt&#x27;]);
+  const noRoots = await connect({ ...base, roots: [] }, stub());
+  const r = await call(noRoots, &#x27;tps_list_files&#x27;);
+  assert.equal(r.isError, true);
+  assert.equal(r.structuredContent.error.code, &#x27;INVALID_ARGUMENT&#x27;);
+  assert.match(r.structuredContent.error.message, /pass directory, or call tps_set_roots first/);
+  assert.equal((await call(noRoots, &#x27;tps_list_files&#x27;, { directory: rootA })).structuredContent.files.length, 1);
+  assert.match((await call(noRoots, &#x27;tps_list_files&#x27;, { directory: &#x27;data&#x27; })).structuredContent.error.message, /directory &quot;data&quot; must be an absolute path/);
+  assert.match((await call(noRoots, &#x27;tps_list_files&#x27;, { directory: path.join(tmp, &#x27;nope&#x27;) })).structuredContent.error.message, /is not a folder/);
+  assert.match((await call(noRoots, &#x27;tps_list_files&#x27;, { directory: path.join(tmp, &#x27;notes.txt&#x27;) })).structuredContent.error.message, /is not a folder/);
+  // A root that stopped being a folder after startup: readdirSync throws and the envelope still comes back.
+  const broken = await connect({ ...base, roots: [path.join(tmp, &#x27;notes.txt&#x27;)] }, stub());
+  const b = await call(broken, &#x27;tps_list_files&#x27;);
+  assert.equal(b.isError, true);
+  assert.equal(b.structuredContent.error.code, &#x27;INVALID_ARGUMENT&#x27;);
+  assert.match(b.structuredContent.error.message, /^cannot list /);
+  // Clearing the roots at runtime puts a server in the same state as one started without --root.
+  const cleared = await connect(base, stub());
+  await call(cleared, &#x27;tps_set_roots&#x27;, { roots: [] });
+  assert.equal((await call(cleared, &#x27;tps_list_files&#x27;)).structuredContent.error.code, &#x27;INVALID_ARGUMENT&#x27;);
+});</code></pre></li><li class="step"><span class="t">Run it to see it fail.</span> <pre><code>npm test</code></pre><p class="expect">Expected: the test stops at its first directory assertion: zod strips the unknown directory key, the roots are listed instead, and the deepEqual on names fails (KEYS.TPS, KEYS.TPS, ONLYB.TPS against KEYS.TPS, ONLYB.TPS). The later assertions are not reached in this run; after the rewrite they all run.</p></li><li class="step"><span class="t">Rewrite tps_list_files.</span> In <code>mcp\src\server.ts</code> the whole <code>server.registerTool(&#x27;tps_list_files&#x27;, ...)</code> block becomes:<pre><code>  server.registerTool(&#x27;tps_list_files&#x27;, {
+    title: &#x27;List TopSpeed files&#x27;,
+    description: &#x27;Lists the .TPS files directly inside a folder (no recursion): name, path, size and modified time. With directory, that folder; without it, the server\&#x27;s root folders (see tps_set_roots).&#x27;,
+    inputSchema: {
+      pattern: z.string().optional().describe(&#x27;Glob on the file name, case-insensitive, * and ? only. Default *.TPS.&#x27;),
+      directory: z.string().min(1).optional().describe(&#x27;Absolute path of one folder to list instead of the roots.&#x27;),
+    },
+  }, async ({ pattern, directory }) =&gt; attempt(null, false, async () =&gt; {
+    const folders = directory !== undefined ? [folderArg(&#x27;directory&#x27;, directory)] : roots;
+    if (folders.length === 0) throw new InvalidArgument(&#x27;The server has no root folders; pass directory, or call tps_set_roots first.&#x27;);
+    const glob = pattern ?? &#x27;*.TPS&#x27;;
+    const re = new RegExp(`^${glob.replace(/[.+^${}()|[\]\\]/g, &#x27;\\$&amp;&#x27;).replace(/\*/g, &#x27;.*&#x27;).replace(/\?/g, &#x27;.&#x27;)}$`, &#x27;i&#x27;);
+    const files: { name: string; path: string; size: number; modified: string }[] = [];
+    for (const folder of folders) {
+      for (const entry of fsGuard(`list ${folder}`, () =&gt; readdirSync(folder, { withFileTypes: true }))) {
+        if (!entry.isFile() || !re.test(entry.name)) continue;
+        const full = path.join(folder, entry.name);
+        const st = fsGuard(`read ${full}`, () =&gt; statSync(full));
+        files.push({ name: entry.name, path: full, size: st.size, modified: st.mtime.toISOString() });
+      }
+    }
+    files.sort((a, b) =&gt; a.path.localeCompare(b.path));
+    return body({ files }, false);
+  }));</code></pre>Then <code>rg -n NO_ROOT src test tools</code> from <code>mcp\</code> must print nothing.</li><li class="step"><span class="t">Run the tests to see them pass.</span> <pre><code>npm test</code></pre><p class="expect">Expected: server: 13 pass, 0 fail; the other suites unchanged.</p></li><li class="step"><span class="t">Let call.js run several tools on one server.</span> In <code>mcp\tools\call.js</code> the header comment gains, after the usage line:<pre><code>//   &#x27;[&lt;args&gt;, &lt;args&gt;, ...]&#x27; | node tools\call.js &lt;tool&gt;,&lt;tool&gt;,... [server flags...]
+//
+// The second form calls several tools in order on ONE server process (tps_set_roots and then
+// tps_list_files, say) and prints a JSON array of results; exit 1 when any result is an error.</code></pre>and the code from <code>const [tool, ...serverArgs]</code> to the end becomes:<pre><code>const [tool, ...serverArgs] = process.argv.slice(2);
+if (!tool) {
+  console.error(&quot;usage: &#x27;&lt;json arguments&gt;&#x27; | node tools\\call.js &lt;tool&gt;[,&lt;tool&gt;...] [server flags...]&quot;);
+  process.exit(2);
+}
+const tools = tool.split(&#x27;,&#x27;);
+
+let text = &#x27;&#x27;;
+if (!process.stdin.isTTY) for await (const chunk of process.stdin) text += chunk;
+let args;
+try {
+  args = text.trim() ? JSON.parse(text) : (tools.length &gt; 1 ? tools.map(() =&gt; ({})) : {});
+} catch (e) {
+  console.error(`arguments are not JSON: ${e.message}`);
+  process.exit(2);
+}
+if (tools.length &gt; 1 &amp;&amp; (!Array.isArray(args) || args.length !== tools.length)) {
+  console.error(`expected a JSON array of ${tools.length} argument objects, one per tool`);
+  process.exit(2);
+}
+
+const serverJs = path.resolve(path.dirname(fileURLToPath(import.meta.url)), &#x27;..&#x27;, &#x27;dist&#x27;, &#x27;server.js&#x27;);
+const client = new Client({ name: &#x27;tpscli-mcp-call&#x27;, version: &#x27;0&#x27; });
+const show = r =&gt; r.structuredContent ? JSON.stringify(r.structuredContent, null, 2) : r.content.map(c =&gt; c.text).join(&#x27;\n&#x27;);
+try {
+  // env is passed explicitly: the SDK&#x27;s default is a short allowlist that drops TPSCLI_OWNER and TPSCLI_EXE.
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [serverJs, ...serverArgs], env: { ...process.env }, stderr: &#x27;inherit&#x27; }));
+  const results = [];
+  for (const [i, name] of tools.entries()) results.push(await client.callTool({ name, arguments: tools.length &gt; 1 ? args[i] : args }));
+  if (tools.length === 1) console.log(show(results[0]));
+  else console.log(JSON.stringify(results.map(r =&gt; r.structuredContent ?? r.content.map(c =&gt; c.text).join(&#x27;\n&#x27;)), null, 2));
+  await client.close();
+  process.exit(results.some(r =&gt; r.isError) ? 1 : 0);
+} catch (e) {
+  console.error(e.message);
+  process.exit(2);
+}</code></pre>Prove both forms by hand (from <code>mcp\</code>, PowerShell; <code>mcp\work</code> must hold the six fixture copies, <code>Copy-Item ..\cli\testdata\*.TPS work\ -Force</code> if not):<pre><code>node tools\call.js tps_version
+&#x27;[{&quot;roots&quot;:[&quot;C:\\Projects\\GitHub\\tpscli\\mcp\\work&quot;]},{}]&#x27; | node tools\call.js tps_set_roots,tps_list_files ; $LASTEXITCODE
+&#x27;{&quot;directory&quot;:&quot;C:\\Projects\\GitHub\\tpscli\\mcp\\work&quot;}&#x27; | node tools\call.js tps_list_files ; $LASTEXITCODE
+node tools\call.js tps_list_files ; $LASTEXITCODE</code></pre><p class="expect">Expected: 1: { server 0.2.0, exe {... version 0.1.0 ...}, roots [] } and the ready line shows roots (none). 2: a two-element array, { roots: [C:\...\mcp\work] } then a files array of six, stderr shows "tpscli-mcp tps_set_roots 1 root(s): C:\...\mcp\work", exit 0. 3: six files, exit 0. 4: INVALID_ARGUMENT "The server has no root folders; pass directory, or call tps_set_roots first.", exit 1.</p></li><li class="step"><span class="t">One end-to-end case through the rebuilt exe.</span> In <code>mcp\test\e2e.test.js</code> line 3 add <code>statSync</code> to the <code>node:fs</code> import. In the first test, after <code>const client = await start(work);</code> and <code>t.after(...)</code> insert <code>const mtime0 = statSync(keys).mtimeMs;</code>, and after the <code>tbl</code> assertions (before the tps_query line) insert:<pre><code>  // Task 1: reads open ReadOnly, so a describe and two selects left the fixture&#x27;s stamp alone.
+  assert.equal(statSync(keys).mtimeMs, mtime0);
+
+  // Roots change at runtime; bare names follow the new set.
+  assert.deepEqual(ok(await call(client, &#x27;tps_set_roots&#x27;, { roots: [] })), { roots: [] });
+  err(await call(client, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27; }), &#x27;FILE_NOT_FOUND&#x27;);
+  assert.equal(ok(await call(client, &#x27;tps_list_files&#x27;, { directory: work })).files.length, 6);
+  assert.deepEqual(ok(await call(client, &#x27;tps_set_roots&#x27;, { roots: [work] })), { roots: [work] });
+  assert.equal(ok(await call(client, &#x27;tps_describe&#x27;, { file: &#x27;KEYS.TPS&#x27; })).records, 5);
+  assert.deepEqual(ok(await call(client, &#x27;tps_version&#x27;)).roots, [work]);</code></pre>Note <code>work</code> comes from <code>mkdtempSync</code> under <code>os.tmpdir()</code>, already resolved; if the deepEqual on <code>roots</code> fails only by drive-letter case or 8.3 form, compare <code>path.resolve(work)</code> instead and say so in the report.</li><li class="step"><span class="t">Run everything.</span> <pre><code>npm test</code></pre><p class="expect">Expected: sql 10, runner 11, server 13, args 4, e2e 2: 40 pass, 0 fail, e2e not skipped (the exe from Task 1 and cli\testdata\*.TPS exist). CRLF check on server.ts, server.test.js, e2e.test.js, call.js: lone-LF 0.</p></li><li class="step"><span class="t">Commit.</span> <pre><code>git add mcp/src/server.ts mcp/test/server.test.js mcp/test/e2e.test.js mcp/tools/call.js
+git commit -F - &lt;&lt;&#x27;EOF&#x27;
+mcp: tps_list_files takes a directory and works without roots; NO_ROOT retired; call.js runs a tool sequence
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+Claude-Session: https://claude.ai/code/session_01ND3nU1mjop1vRk5BYdANtF
+EOF</code></pre></li>        </ol>
+      </section>
+      <section class="task">
+        <h2>Task 4 <span class="tasknum">&middot; documents and tickets</span></h2>
+        <p>Deliverable: every active document names nine tools, the <code>directory</code> argument, the runtime roots and the ReadOnly reads; <code>NO_ROOT</code> appears nowhere but the two historical specs and the closed ticket; both tickets are closed. Spec &sect;9. No code changes; the check is <code>grep</code>.</p>
+        <div class="files">
+          <div><span class="k">Modify</span> <code>mcp\README.md</code>, <code>README.md</code>, <code>docs\UserGuide\TpscliMcp-IT-Support-User-Guide.html</code>, <code>docs\tickets\2026-09-19-tps-list-files-without-root.md</code>, <code>docs\tickets\2026-09-20-reads-open-read-write.md</code></div>
+          <div><span class="k">Untouched</span> <code>docs\mySuperpower\specs\2026-09-19-tpscli-mcp-design.html</code> (history; spec &sect;1 says so).</div>
+        </div>
+        <ol class="steps">
+<li class="step"><span class="t">mcp\README.md.</span> Lines 28-31, from "`--root` is optional:" to the ticket reference, become:<pre><code>`--root` is optional: `tps_set_roots` replaces the set while the server runs, and
+`tps_list_files` takes a `directory` for a one-off look at any folder. With neither roots nor
+`directory` it answers `INVALID_ARGUMENT`.</code></pre>Flag table, the `--root` row:<pre><code>| `--root &lt;dir&gt;` | none | Repeatable. Bare file names resolve inside these folders, in order; `tps_list_files` lists them. Must exist. `tps_set_roots` replaces the set for the session. |</code></pre>Tools table: the `tps_version` and `tps_list_files` rows become, and a `tps_set_roots` row follows `tps_list_files`:<pre><code>| `tps_version` | | `--version`; returns `{ server, exe, roots }` |
+| `tps_list_files` | `pattern?` (`*.TPS`), `directory?` | no exe; `{ files: [{ name, path, size, modified }] }` from `directory` or, without it, the roots, one level deep |
+| `tps_set_roots` | `roots` (string[]) | no exe; replaces the root set for this session, returns `{ roots }`; `[]` clears |</code></pre>Error table: delete the `NO_ROOT` row; the `FILE_NOT_FOUND` and `INVALID_ARGUMENT` rows become:<pre><code>| `FILE_NOT_FOUND` | A bare name not found inside the current roots (or there are none), or a path that escapes them. |
+| `INVALID_ARGUMENT` | Empty `set`/`values`, blank `where`, bad column name, `null`, exponent or unsafe number, `offset` without `limit`, `]` in a path, table format on a write, a NUL byte in the owner string; a relative or missing folder given to `tps_set_roots` or `directory`; `tps_list_files` with neither roots nor `directory`; a folder that cannot be listed. |</code></pre>Anywhere the README states the test count or "eight tools", use the number <code>npm test</code> printed in Task 3 and "nine".</li><li class="step"><span class="t">Root README.md.</span> The `mcp/` table row: "eight tools over stdio" becomes "nine tools over stdio". Line 28-30: after "`--root` (repeatable) is where bare file names resolve and what `tps_list_files` lists;" insert "it can be changed while the server runs (`tps_set_roots`), and `tps_list_files` lists any folder given as `directory`;". Tool table: the `tps_list_files` row becomes<pre><code>| `tps_list_files` | `.TPS` files under the roots, or in any `directory` |
+| `tps_set_roots` | replace the roots for this session |</code></pre></li><li class="step"><span class="t">The MCP user guide.</span> <code>docs\UserGuide\TpscliMcp-IT-Support-User-Guide.html</code>, in file order (line numbers as of 2026-09-20):<ul><li>Line 150 chip: <code>Version: 0.2.0</code>.</li><li>Line 135, the Purpose card: "eight well-defined tools (describe, select, insert, update, delete, raw query, list files, version)" becomes "nine well-defined tools (describe, select, insert, update, delete, raw query, list files, set roots, version)".</li><li>Line 162 and 236: "The eight tools" becomes "The nine tools".</li><li>Line 175, the Roots bullet, append: " The set can be replaced while the server runs with <code>tps_set_roots</code> (session only; a restart returns to the flags), and <code>tps_list_files</code> lists any folder given as <code>directory</code>."</li><li>Line 186, "Build once" step 4: the test count <code>npm test</code> printed in Task 3.</li><li>Line 227, the <code>--root</code> row: append "<code>tps_set_roots</code> replaces the set for the session."</li><li>Tools table (line 240 on): <code>tps_version</code> returns <code>{ server, exe, roots }</code>; the <code>tps_list_files</code> row becomes <code>pattern?</code>, <code>directory?</code> / "no exe; lists <code>directory</code> or, without it, the roots, one level deep: <code>name</code>, <code>path</code>, <code>size</code>, <code>modified</code>" / needs "a root or <code>directory</code>"; a new row after it: <code>tps_set_roots</code> / <code>roots</code> (string[]) / "no exe; replaces the root set for this session and returns it; <code>[]</code> clears" / needs "existing folders, absolute".</li><li>After the procedure "Let the model look at a file" (line 272-277) add:<pre><code>  &lt;h3&gt;Change the working folder without restarting&lt;/h3&gt;
+  &lt;ol class=&quot;steps&quot;&gt;
+    &lt;li&gt;Ask: &lt;em&gt;work in C:\pos\data from now on&lt;/em&gt;. The assistant calls &lt;code&gt;tps_set_roots&lt;/code&gt; with that folder; the result lists the roots now in force. Bare names such as &lt;code&gt;ITEMS.TPS&lt;/code&gt; resolve there and &lt;code&gt;tps_list_files&lt;/code&gt; lists it.&lt;/li&gt;
+    &lt;li&gt;For a one-off look at another folder ask &lt;em&gt;list the TPS files in D:\backup&lt;/em&gt;; that is &lt;code&gt;tps_list_files&lt;/code&gt; with &lt;code&gt;directory&lt;/code&gt; and leaves the roots alone.&lt;/li&gt;
+    &lt;li&gt;The change lasts for the session. A new session starts from the registration&#x27;s &lt;code&gt;--root&lt;/code&gt; flags again; &lt;code&gt;tps_version&lt;/code&gt; shows the current set at any time.&lt;/li&gt;
+  &lt;/ol&gt;</code></pre></li><li>Line 319, the server codes list: remove <code>NO_ROOT</code>; <code>FILE_NOT_FOUND</code> "(a bare name not in any current root, or a relative path that escapes the roots)"; <code>INVALID_ARGUMENT</code> gains "a relative or missing folder for <code>tps_set_roots</code> or <code>directory</code>, <code>tps_list_files</code> with neither roots nor <code>directory</code>".</li><li>Line 331, the <code>NO_ROOT</code> troubleshooting row becomes: <code>"code": "INVALID_ARGUMENT", "message": "The server has no root folders; pass directory, or call tps_set_roots first."</code> / <code>tps_list_files</code> without <code>directory</code> on a server with no roots. / Ask for the folder by name (<code>directory</code>) or have the assistant set it as a root; re-registering with <code>--root</code> is no longer needed.</li><li>Line 332, the <code>FILE_NOT_FOUND</code> row: the message example becomes <code>"NOPE.TPS not found inside C:\pos\data"</code> unchanged, the third column gains "or set the folder with <code>tps_set_roots</code>".</li><li>Line 349, the ticket reference: "closed 2026-09-20 by <code>tps_set_roots</code> and the <code>directory</code> argument" instead of "open: ...".</li><li>Any sentence saying a read moves the file's modified time (search <code>modified time</code> and <code>LastWriteTime</code>) is turned around: reads open ReadOnly and leave it alone.</li></ul></li><li class="step"><span class="t">Close the tickets.</span> In both ticket files replace <code>- Status: open</code> with <code>- Status: closed 2026-09-20 (spec docs/mySuperpower/specs/2026-09-20-tpscli-mcp-roots-and-readonly-design.html; commits in feature/tpscli-mcp)</code>. In <code>2026-09-19-tps-list-files-without-root.md</code> append under "Expected":<pre><code>- Changed at implementation (spec section 2): a `directory` outside the roots is listed, not refused; the
+  file tools accept any absolute path and the listing follows the same rule. `tps_set_roots` (same spec)
+  replaces the roots at runtime.</code></pre></li><li class="step"><span class="t">Check by grep, then commit.</span> From the repository root:<pre><code>rg -n NO_ROOT README.md mcp/README.md mcp/src mcp/test mcp/tools docs/UserGuide docs/tickets
+rg -n &quot;eight tools&quot; README.md mcp/README.md docs/UserGuide</code></pre><p class="expect">Expected: the first lists only docs/tickets/2026-09-19-tps-list-files-without-root.md (the closed ticket names the code it retired); the second prints nothing. The specs and plans under docs/mySuperpower are history and keep the word; docs/Testing is Task 5.</p>CRLF check on the five files.<pre><code>git add mcp/README.md README.md docs/UserGuide/TpscliMcp-IT-Support-User-Guide.html docs/tickets/2026-09-19-tps-list-files-without-root.md docs/tickets/2026-09-20-reads-open-read-write.md
+git commit -F - &lt;&lt;&#x27;EOF&#x27;
+docs: nine tools, tps_set_roots, directory listing and ReadOnly reads in the READMEs and the MCP guide; tickets closed
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+Claude-Session: https://claude.ai/code/session_01ND3nU1mjop1vRk5BYdANtF
+EOF</code></pre></li>        </ol>
+      </section>
+      <section class="task">
+        <h2>Task 5 <span class="tasknum">&middot; the two instruments</span></h2>
+        <p>Deliverable: the corpus instrument asserts the new behaviour and carries a fresh green run; the CONFIG instrument's cases are rewritten for <code>directory</code>, <code>tps_set_roots</code> and the untouched LastWriteTime, ready for the owner's session run. Spec &sect;8. This task edits <code>mcp\tests\run-instrument.ps1</code>, the one existing runner the spec allows to change, because the behaviour it asserts is gone.</p>
+        <div class="files">
+          <div><span class="k">Modify</span> <code>docs\Testing\TpscliMcp-Unit-Test-Cases.html</code> (title, h1, SUITE_ID, SUITE_TITLE, TC-02, TC-03, TC-04, TC-05, TC-10, preamble scope, SEED_STATE), <code>mcp\tests\run-instrument.ps1</code> (TC-02, TC-03, TC-04, TC-05, TC-10 blocks), <code>docs\Testing\TpscliMcp-Unit-Test-Results.json</code>, a new <code>docs\Testing\TpscliMcp-Unit-Test-Report-2026-09-20.pdf</code>, <code>docs\Testing\TpscliMcpConfig-Unit-Test-Cases.html</code> (title, h1, SUITE_TITLE, TC-03, TC-09), <code>mcp\tests\run-config-instrument.ps1:190</code></div>
+          <div><span class="k">Consumes</span> <code>call.js tool,tool</code> from Task 3.</div>
+        </div>
+        <ol class="steps">
+<li class="step"><span class="t">Corpus instrument: cases.</span> In <code>docs\Testing\TpscliMcp-Unit-Test-Cases.html</code> (edit in binary mode; the file is CRLF and holds a one-line <code>SEED_STATE</code>): <code>&lt;title&gt;</code> (line 12), the <code>&lt;h1&gt;</code> (line 199) and <code>SUITE_TITLE</code> (line 216) say 0.2.0 and "nine tools over stdio"; <code>SUITE_ID</code> (line 214) becomes <code>&quot;tpscli-mcp-0-2-0&quot;</code> so a browser holding the 0.1.0 run does not load it into the new step counts; the preamble scope sentence (line 433) says 0.2.0 and nine tools. TC-02 expected (line 247): "# tests 40, # pass 40". TC-03 expected (line 259): the ready line reads "tpscli-mcp 0.2.0 ready: ...". TC-04 expected: <code>{ &quot;server&quot;: &quot;0.2.0&quot;, &quot;exe&quot;: { ... &quot;version&quot;: &quot;0.1.0&quot; ... }, &quot;roots&quot;: [&quot;C:\\...\\mcp\\work&quot;] }</code> and "server 0.2.0, exe 0.1.0". TC-05 becomes:<pre><code>  { id:&quot;TC-05&quot;, section:&quot;read&quot;, priority:&quot;CORE&quot;,
+    title:&quot;tps_list_files lists the roots or a directory and filters by pattern; tps_set_roots changes the roots at runtime&quot;,
+    pre:&quot;Work copy in place (CP-3).&quot;,
+    steps:[
+      &quot;Run: node tools\\call.js tps_list_files --root work&quot;,
+      &quot;Run: &#x27;{\&quot;pattern\&quot;:\&quot;k*\&quot;}&#x27; | node tools\\call.js tps_list_files --root work&quot;,
+      &quot;Run: &#x27;{\&quot;directory\&quot;:\&quot;C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\&quot;}&#x27; | node tools\\call.js tps_list_files&quot;,
+      &quot;Run: node tools\\call.js tps_list_files ; $LASTEXITCODE&quot;,
+      &quot;Run: &#x27;[{\&quot;roots\&quot;:[\&quot;C:\\\\Projects\\\\GitHub\\\\tpscli\\\\mcp\\\\work\&quot;]},{}]&#x27; | node tools\\call.js tps_set_roots,tps_list_files&quot;,
+      &quot;Run: &#x27;{\&quot;roots\&quot;:[\&quot;work\&quot;]}&#x27; | node tools\\call.js tps_set_roots ; $LASTEXITCODE&quot;
+    ],
+    expected:&quot;Step 1: a files array with exactly six entries in path order (ALLTYPES, GROUPS, KEYS, MEMOS, NOKEY, SECRET .TPS), each with name, path (absolute, under mcp\\\\work), size (a number) and modified (an ISO date-time). Step 2: exactly one entry, KEYS.TPS (the pattern is case-insensitive). Step 3: the same six entries from a server with no roots, listed by directory. Step 4: error.code INVALID_ARGUMENT, message &#x27;The server has no root folders; pass directory, or call tps_set_roots first.&#x27;, exit 1. Step 5: a two-element array: { \&quot;roots\&quot;: [\&quot;C:\\\\...\\\\mcp\\\\work\&quot;] } then the six entries, and stderr shows &#x27;tpscli-mcp tps_set_roots 1 root(s): C:\\\\...\\\\mcp\\\\work&#x27;. Step 6: error.code INVALID_ARGUMENT, message &#x27;roots[0] \&quot;work\&quot; must be an absolute path&#x27;, exit 1. Any other count, order, code or message: record FAIL and paste the output.&quot; },</code></pre>TC-10 expected text: the message for steps 3 and 4 becomes "KEYS.TPS is not an absolute path and the server currently has no root folders; call tps_set_roots or pass an absolute path" (and the same for \\data\\KEYS.TPS). Run <code>node --check</code> on the CUSTOMIZE block the way the instrument's own verify step does (extract the block between the CUSTOMIZE START and END markers to a temp .js and <code>node --check</code> it).</li><li class="step"><span class="t">Corpus runner: blocks.</span> In <code>mcp\tests\run-instrument.ps1</code> (line numbers as of 2026-09-20): TC-02 (line 167): <code>$tests -eq 40 -and $pass -eq 40</code> and the text <code>&quot;expected 40/40/0/0&quot;</code> (Task 2 added one test); TC-03 (line 177): the ready-line regex <code>^tpscli-mcp 0\.2\.0 ready:</code>. TC-04 (line 181-185): <code>$j.server -eq &#x27;0.2.0&#x27;</code> and add <code>Expect-True (@($j.roots).Count -eq 1 -and $j.roots[0] -eq $work) &quot;roots $($j.roots -join &#x27;;&#x27;)&quot;</code>. TC-05 (line 186-198) becomes:<pre><code>&#x27;TC-05&#x27; = {
+    $r = Call tps_list_files &#x27;&#x27; @(&#x27;--root&#x27;, &#x27;work&#x27;); $j = Json $r
+    if ($j) {
+        $names = @($j.files | ForEach-Object name)
+        Expect-True (($names -join &#x27;,&#x27;) -eq &#x27;ALLTYPES.TPS,GROUPS.TPS,KEYS.TPS,MEMOS.TPS,NOKEY.TPS,SECRET.TPS&#x27;) &quot;files: $($names -join &#x27;,&#x27;)&quot;
+        $f = $j.files[0]; Expect-True ($f.path -like &quot;$work\*&quot; -and $f.size -is [int64] -or $f.size -is [int32]) &#x27;path/size shape&#x27;; Expect-True ($f.modified -match &#x27;^\d{4}-\d{2}-\d{2}T&#x27;) &#x27;modified is not ISO&#x27;
+    }
+    Expect-Exit $r 0; Tick 1
+    $r = Call tps_list_files &#x27;{&quot;pattern&quot;:&quot;k*&quot;}&#x27; @(&#x27;--root&#x27;, &#x27;work&#x27;); $j = Json $r
+    if ($j) { Expect-True (@($j.files).Count -eq 1 -and $j.files[0].name -eq &#x27;KEYS.TPS&#x27;) &quot;pattern k* gave $(@($j.files | ForEach-Object name) -join &#x27;,&#x27;)&quot; }; Tick 2
+    $r = Call tps_list_files (&#x27;{&quot;directory&quot;:&quot;&#x27; + $workJson + &#x27;&quot;}&#x27;) @(); $j = Json $r
+    if ($j) { Expect-True (@($j.files).Count -eq 6) &quot;directory listing gave $(@($j.files).Count) files&quot; }; Expect-Exit $r 0; Tick 3
+    $r = Call tps_list_files &#x27;&#x27; @(); Expect-Error $r &#x27;INVALID_ARGUMENT&#x27; &#x27;The server has no root folders; pass directory, or call tps_set_roots first.&#x27; | Out-Null; Tick 4
+    $r = Call &#x27;tps_set_roots,tps_list_files&#x27; (&#x27;[{&quot;roots&quot;:[&quot;&#x27; + $workJson + &#x27;&quot;]},{}]&#x27;) @(); $j = Json $r
+    if ($j) { Expect-True (@($j).Count -eq 2 -and @($j[0].roots).Count -eq 1 -and $j[0].roots[0] -eq $work -and @($j[1].files).Count -eq 6) &quot;sequence gave $($r.Out)&quot; }
+    Expect-StderrContains $r &quot;tpscli-mcp tps_set_roots 1 root(s): $work&quot;; Expect-Exit $r 0; Tick 5
+    $r = Call tps_set_roots &#x27;{&quot;roots&quot;:[&quot;work&quot;]}&#x27; @(); Expect-Error $r &#x27;INVALID_ARGUMENT&#x27; &#x27;roots[0] &quot;work&quot; must be an absolute path&#x27; | Out-Null; Tick 6
+}</code></pre>and beside <code>$absKeysJson</code> (line 24) add <code>$workJson = $work -replace &#x27;\\&#x27;, &#x27;\\&#x27;</code>. TC-10 (lines 256 and 258): the two expected messages become "KEYS.TPS is not an absolute path and the server currently has no root folders; call tps_set_roots or pass an absolute path" and the same with \data\KEYS.TPS. Read <code>Expect-Error</code> (line 124) first: if it compares the message exactly, the strings above must match the server's to the character.</li><li class="step"><span class="t">Run, record, embed.</span> From <code>mcp\</code> (Chrome or Edge must be installed for the recorder):<pre><code>powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-instrument.ps1
+node --experimental-websocket tests\record-instrument.cjs
+python tests\embed-run.py</code></pre><p class="expect">Expected: run-instrument.ps1: every case PASS, exit 0 (a FAIL is a defect in Tasks 2-3 or in the case text: fix it, rerun from the beginning). The recorder prints the tally and writes docs\Testing\TpscliMcp-Unit-Test-Report-2026-09-20.pdf; embed-run.py prints "embedded 2026-09-20 build <sha>: N cases, PASS N FAIL 0 BLOCKED 0; CRLF ... lone-LF 0".</p>Open the instrument in a fresh browser profile (or after clearing localStorage) and confirm the run shows: 0.2.0 in the heading, TC-05 with six ticked steps.</li><li class="step"><span class="t">CONFIG instrument: cases.</span> In <code>docs\Testing\TpscliMcpConfig-Unit-Test-Cases.html</code> (binary mode, CRLF): <code>&lt;title&gt;</code> (line 12), <code>&lt;h1&gt;</code> (line 210), <code>SUITE_TITLE</code> (line 227) and the preamble scope (line 524) say 0.2.0. TC-03 becomes:<pre><code>  {
+      &quot;id&quot;: &quot;TC-03&quot;,
+      &quot;section&quot;: &quot;read&quot;,
+      &quot;priority&quot;: &quot;CORE&quot;,
+      &quot;title&quot;: &quot;Listing without a root: tps_list_files by directory, then tps_set_roots makes CONFIG the root&quot;,
+      &quot;pre&quot;: &quot;TC-01 passed. The server was registered without --root.&quot;,
+      &quot;steps&quot;: [
+          &quot;Ask: \&quot;list the TPS files in C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\&quot;  -&gt;  Tool call: tps_list_files {\&quot;directory\&quot;: \&quot;C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\&quot;}&quot;,
+          &quot;PowerShell: (Get-ChildItem &#x27;C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\*.TPS&#x27;).Count ; (Get-Item &#x27;C:\\Projects\\GitLab\\POS\\dtpos_404_data\\CONFIG\\OPTIONS.TPS&#x27;).Length&quot;,
+          &quot;Ask: \&quot;use that folder as the root from now on\&quot;  -&gt;  Tool call: tps_set_roots {\&quot;roots\&quot;: [\&quot;C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\&quot;]}&quot;,
+          &quot;Ask: \&quot;describe OPTIONS.TPS\&quot;  -&gt;  Tool call: tps_describe {\&quot;file\&quot;: \&quot;OPTIONS.TPS\&quot;}&quot;,
+          &quot;Ask: \&quot;list the TPS files\&quot;  -&gt;  Tool call: tps_list_files {}&quot;
+      ],
+      &quot;expected&quot;: &quot;Step 1: a files array with 64 entries, OPTIONS.TPS among them with size 118016. Step 2 prints 64 and 118016. Step 3: { \&quot;roots\&quot;: [\&quot;C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\&quot;] }. Step 4: ok true, records 407, file C:\\\\Projects\\\\GitLab\\\\POS\\\\dtpos_404_data\\\\CONFIG\\\\OPTIONS.TPS (the bare name resolved in the new root; nothing was written: TC-09 checks the hash). Step 5: the same 64 entries with no directory argument. Any other count, an error on step 3 or 4, or a FILE_NOT_FOUND on the bare name: record FAIL and paste the result.&quot;
+  },</code></pre>TC-09: the first step becomes <code>PowerShell: $h1 = (Get-FileHash &#x27;...\OPTIONS.TPS&#x27;).Hash ; $m1 = (Get-Item &#x27;...\OPTIONS.TPS&#x27;).LastWriteTimeUtc ; $h1 ; $m1</code> and the third <code>PowerShell: $h2 = ... ; $m2 = ... ; ($h1 -eq $h2) ; ($m1 -eq $m2)</code> (full paths as in the current text); pre: "TC-04 passed. Reads open the file ReadOnly, so neither the bytes nor the modified time change."; expected: "Step 3 prints True and True: the SHA-256 and the LastWriteTime of the real file are identical before and after the describe and the full select (paste both hashes and both stamps into Results). Either False: record FAIL with the values." Also <code>mcp\tests\run-config-instrument.ps1</code> line 190: <code>$j.server -eq &#x27;0.2.0&#x27;</code>. The CONFIG instrument keeps its <code>SUITE_ID</code> and its embedded 0.1.0 run until the owner's session run replaces it.</li><li class="step"><span class="t">Commit. The CONFIG run itself is the owner's gate.</span> CRLF check on the two instruments, both runners and the results JSON.<pre><code>git add docs/Testing/TpscliMcp-Unit-Test-Cases.html docs/Testing/TpscliMcp-Unit-Test-Results.json docs/Testing/TpscliMcp-Unit-Test-Report-2026-09-20.pdf mcp/tests/run-instrument.ps1 docs/Testing/TpscliMcpConfig-Unit-Test-Cases.html mcp/tests/run-config-instrument.ps1
+git commit -F - &lt;&lt;&#x27;EOF&#x27;
+docs: corpus instrument re-recorded for 0.2.0 (directory, tps_set_roots); CONFIG instrument cases rewritten for the new tools and ReadOnly reads
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+Claude-Session: https://claude.ai/code/session_01ND3nU1mjop1vRk5BYdANtF
+EOF</code></pre>After the branch is done, the owner runs the CONFIG instrument from a Claude Code session as before (new session or <code>/mcp</code> so the rebuilt <code>dist\server.js</code> is loaded; the tester session records each case; then <code>node --experimental-websocket tests\record-config-instrument.cjs</code> and <code>python tests\embed-config-run.py</code>; commit the three files). This plan does not perform that run.</li>        </ol>
+      </section>
+      <section class="task">
+        <h2>Task 6 <span class="tasknum">&middot; release: one script, one workflow, a zip people can pull</span></h2>
+        <p>Deliverable: <code>tools\release.ps1</code> builds and qualifies both components and packs <code>release\tpscli-&lt;version&gt;-win-x64.zip</code> (exe inside <code>dist\</code>, production <code>node_modules</code>, guides), with a SHA-256 file and release notes; <code>.github\workflows\release.yml</code> runs it on a self-hosted Windows runner when a <code>v*</code> tag is pushed and publishes the files with <code>gh release create</code>. The zip installs by unzipping and registering <code>node &lt;folder&gt;\dist\server.js</code>; no npm publish (the package is private and useless without the Windows exe). Then simplify and the final commit.</p>
+        <div class="files">
+          <div><span class="k">Create</span> <code>tools\release.ps1</code>, <code>.github\workflows\release.yml</code></div>
+          <div><span class="k">Modify</span> <code>.gitignore</code>, <code>README.md</code>, <code>mcp\README.md</code>, <code>docs\UserGuide\TpscliMcp-IT-Support-User-Guide.html</code> ("Install and register", "Move the server")</div>
+          <div><span class="k">Owner steps (not automated)</span> create the GitHub repository and push; register the self-hosted runner with the label <code>clarion</code>; push the tag.</div>
+        </div>
+        <ol class="steps">
+<li class="step"><span class="t">Ignore the output folder.</span> Append to the root <code>.gitignore</code> (CRLF): <code>release/</code>.</li><li class="step"><span class="t">Write the release script.</span> <code>tools\release.ps1</code> (new folder at the repository root; CRLF):<pre><code># Builds, qualifies and packs one release of tpscli: the exe (cli\verify.ps1 is the gate), the MCP
+# server (npm ci, build, test), then one zip that installs by unzipping. Run by the release workflow
+# on a tag push, or by hand from the repository root:
+#
+#   powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -Version v0.2.0 `
+#       -Extra C:\tps\dtpos -Expected C:\tps\dtpos-expected -TpsFixLog C:\tps\tpsfix.log   # a release
+#   powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -AllowSkips      # local build, corpus gate only
+#   powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -SkipVerify      # pack only (dry run)
+#
+# cli\verify.ps1 without -Extra/-Expected/-TpsFixLog skips the real-file, dictionary-parity and TPSFix
+# checks and says so (&quot;not a release qualification&quot;) while still exiting 0; this script refuses that
+# run unless -AllowSkips is given, so the workflow cannot publish an unqualified build by accident.
+# -Version must match mcp\package.json (a leading v is allowed). The release number is the server&#x27;s;
+# the exe reports its own version inside (tpscli.exe --version) and in notes.md.
+# Output: release\tpscli-&lt;version&gt;-win-x64.zip, its .sha256, and release\notes.md.
+param(
+    [string]$Version = &#x27;&#x27;,
+    [string]$Extra = &#x27;&#x27;,        # forwarded to cli\verify.ps1: the folder of real-world .TPS copies
+    [string]$Expected = &#x27;&#x27;,     # forwarded: the folder of dictionary-export JSON
+    [string]$TpsFixLog = &#x27;&#x27;,    # forwarded: the TPSFix log for those files (required with -Extra)
+    [switch]$AllowSkips,        # accept a verify.ps1 run that skipped the three checks above (local builds only)
+    [switch]$SkipVerify         # skip cli\verify.ps1 and npm test: a dry run of the packing only, never a release
+)
+$ErrorActionPreference = &#x27;Stop&#x27;
+$repo = Split-Path -Parent $PSScriptRoot
+$pkg = Get-Content (Join-Path $repo &#x27;mcp\package.json&#x27;) -Raw | ConvertFrom-Json
+$ver = $pkg.version
+if ($Version -and ($Version -replace &#x27;^v&#x27;, &#x27;&#x27;) -ne $ver) { throw &quot;release.ps1: -Version $Version does not match mcp\package.json ($ver); bump the package first&quot; }
+$name = &quot;tpscli-$ver-win-x64&quot;
+$out = Join-Path $repo &#x27;release&#x27;
+$stage = Join-Path $out $name
+
+function Run([string]$Label, [string]$Dir, [scriptblock]$Body) {
+    Write-Host &quot;release.ps1: $Label&quot;
+    Push-Location $Dir
+    try {
+        $global:LASTEXITCODE = 0
+        $output = &amp; $Body 2&gt;&amp;1 | ForEach-Object { &quot;$_&quot; }
+        $output | Write-Host
+        if ($LASTEXITCODE -ne 0) { throw &quot;release.ps1: $Label failed ($LASTEXITCODE)&quot; }
+        return $output
+    } finally { Pop-Location }
+}
+
+# ---- build and qualify ----
+if ($SkipVerify) {
+    Run &#x27;cli\tools\build.ps1&#x27; (Join-Path $repo &#x27;cli&#x27;) { powershell -NoProfile -ExecutionPolicy Bypass -File tools\build.ps1 } | Out-Null
+} else {
+    $verifyArgs = @()
+    if ($Extra) { $verifyArgs += @(&#x27;-Extra&#x27;, $Extra) }
+    if ($Expected) { $verifyArgs += @(&#x27;-Expected&#x27;, $Expected) }
+    if ($TpsFixLog) { $verifyArgs += @(&#x27;-TpsFixLog&#x27;, $TpsFixLog) }
+    $verifyOutput = Run &#x27;cli\verify.ps1 (build, corpus, suites, gate)&#x27; (Join-Path $repo &#x27;cli&#x27;) { powershell -NoProfile -ExecutionPolicy Bypass -File verify.ps1 @verifyArgs }
+    if (($verifyOutput -join &quot;`n&quot;) -match &#x27;not a release qualification&#x27; -and -not $AllowSkips) {
+        throw &#x27;release.ps1: verify.ps1 skipped the real-file checks (no -Extra/-Expected/-TpsFixLog); pass them, or -AllowSkips for a local build&#x27;
+    }
+}
+$exe = Join-Path $repo &#x27;cli\tpscli.exe&#x27;
+. (Join-Path $repo &#x27;cli\tests\TestHelpers.ps1&#x27;)    # Invoke-Tpscli_Bounded: the exe never runs without a timeout
+$v = Invoke-Tpscli_Bounded -FilePath $exe -ArgumentList @(&#x27;--version&#x27;) -WorkingDirectory (Join-Path $repo &#x27;cli&#x27;) -TimeoutMs 20000
+if ($v.TimedOut -or $v.ExitCode -ne 0) { throw &quot;release.ps1: tpscli.exe --version failed (timed out $($v.TimedOut), exit $($v.ExitCode)): $($v.StdOut)$($v.StdErr)&quot; }
+$exeVersion = ($v.StdOut | ConvertFrom-Json).version
+Run &#x27;npm ci&#x27; (Join-Path $repo &#x27;mcp&#x27;) { npm ci }
+Run &#x27;npm run build&#x27; (Join-Path $repo &#x27;mcp&#x27;) { npm run build }
+if (-not $SkipVerify) { Run &#x27;npm test&#x27; (Join-Path $repo &#x27;mcp&#x27;) { npm test } }
+
+# ---- stage: the layout the MCP guide&#x27;s &quot;Move the server&quot; describes; the exe inside dist\ is
+# second in the server&#x27;s search order, so no --exe flag is needed ----
+if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+New-Item -ItemType Directory -Force -Path (Join-Path $stage &#x27;dist&#x27;), (Join-Path $stage &#x27;tools&#x27;), (Join-Path $stage &#x27;docs&#x27;) | Out-Null
+Copy-Item (Join-Path $repo &#x27;mcp\dist\*.js&#x27;) (Join-Path $stage &#x27;dist&#x27;)
+Copy-Item $exe (Join-Path $stage &#x27;dist\tpscli.exe&#x27;)
+Copy-Item (Join-Path $repo &#x27;mcp\package.json&#x27;) $stage
+Copy-Item (Join-Path $repo &#x27;mcp\package-lock.json&#x27;) $stage
+Copy-Item (Join-Path $repo &#x27;mcp\tools\call.js&#x27;) (Join-Path $stage &#x27;tools&#x27;)
+Copy-Item (Join-Path $repo &#x27;mcp\README.md&#x27;) (Join-Path $stage &#x27;README.md&#x27;)
+Copy-Item (Join-Path $repo &#x27;cli\README.md&#x27;) (Join-Path $stage &#x27;docs\tpscli-cli-README.md&#x27;)
+Copy-Item (Join-Path $repo &#x27;docs\UserGuide\*.html&#x27;) (Join-Path $stage &#x27;docs&#x27;)
+Run &#x27;npm ci --omit=dev (production node_modules in the stage)&#x27; $stage { npm ci --omit=dev --ignore-scripts }
+Remove-Item (Join-Path $stage &#x27;package-lock.json&#x27;)    # served its purpose; the zip needs no npm
+
+# ---- zip, checksum, notes ----
+New-Item -ItemType Directory -Force -Path $out | Out-Null
+$zip = Join-Path $out &quot;$name.zip&quot;
+if (Test-Path $zip) { Remove-Item $zip }
+Compress-Archive -Path $stage -DestinationPath $zip
+$hash = (Get-FileHash $zip -Algorithm SHA256).Hash
+&quot;$hash  $name.zip&quot; | Set-Content (Join-Path $out &quot;$name.zip.sha256&quot;) -Encoding ASCII
+@&quot;
+tpscli ${ver}: tpscli.exe $exeVersion and tpscli-mcp $ver, Windows x64, Node 20 or later.
+
+Unzip anywhere, then register the server (Claude Code shown; Claude Desktop takes the same command):
+
+    claude mcp add -s user tpscli -- node &quot;&lt;folder&gt;\$name\dist\server.js&quot; --allow-writes
+
+The exe is inside dist\ beside server.js, so no --exe flag is needed. tools\call.js runs one tool
+from the command line (node tools\call.js tps_version). README.md and docs\ hold the guides.
+
+SHA-256 $hash  $name.zip
+&quot;@ | Set-Content (Join-Path $out &#x27;notes.md&#x27;) -Encoding UTF8
+Write-Host (&quot;release.ps1: {0} ({1:N1} MB) sha256 {2}&quot; -f $zip, ((Get-Item $zip).Length / 1MB), $hash)</code></pre></li><li class="step"><span class="t">Dry-run the packing and install from the zip.</span> From the repository root, PowerShell:<pre><code>powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -SkipVerify
+Expand-Archive release\tpscli-0.2.0-win-x64.zip -DestinationPath $env:TEMP\tpscli-rel -Force
+Get-ChildItem $env:TEMP\tpscli-rel\tpscli-0.2.0-win-x64 -Recurse -Depth 1 | Select-Object FullName
+Push-Location $env:TEMP\tpscli-rel\tpscli-0.2.0-win-x64
+try {
+  node tools\call.js tps_version
+  &#x27;{&quot;directory&quot;:&quot;C:\\Projects\\GitHub\\tpscli\\mcp\\work&quot;}&#x27; | node tools\call.js tps_list_files ; $LASTEXITCODE
+} finally { Pop-Location }</code></pre><p class="expect">Expected: release.ps1 ends with the zip path, a size of a few MB and the hash; the unzipped folder holds dist\server.js, runner.js, sql.js, tpscli.exe; package.json; node_modules\ (with @modelcontextprotocol and zod, no typescript); tools\call.js; README.md; docs\ with the two guides and tpscli-cli-README.md. tps_version from the unzipped folder prints { server 0.2.0, exe { version 0.1.0 }, roots [] } and the ready line names <tmp>\...\dist\tpscli.exe. The listing prints six files, exit 0.</p>Then, back at the repository root, the local full run (corpus gate; about five minutes) and the refusal it must give without the real-file inputs:<pre><code>powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 ; $LASTEXITCODE
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -AllowSkips</code></pre><p class="expect">Expected: first command: verify.ps1 runs, then "release.ps1: verify.ps1 skipped the real-file checks ..." and exit 1, no zip rewritten; second: verify.ps1 all steps PASS (the default-run skips), npm test 40 pass, same zip name, new hash. If the dtpos copies and their expected JSON and TPSFix log are on this machine, run once more with -Extra/-Expected/-TpsFixLog and no -AllowSkips: that is the run the workflow performs.</p></li><li class="step"><span class="t">Write the workflow.</span> <code>.github\workflows\release.yml</code> (CRLF):<pre><code># Cuts a release when a v* tag is pushed. Runs on a SELF-HOSTED Windows runner (label: clarion)
+# because the exe needs Clarion 12 at C:\Clarion12 and MSBuild; a hosted runner cannot build it.
+# tools\release.ps1 does the work; this file only checks out, calls it and publishes the output.
+name: release
+on:
+  push:
+    tags: [&#x27;v*&#x27;]
+permissions:
+  contents: write
+concurrency: release-${{ github.ref_name }}
+jobs:
+  release:
+    runs-on: [self-hosted, windows, clarion]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, qualify and pack
+        shell: powershell
+        # TPSCLI_EXTRA, TPSCLI_EXPECTED and TPSCLI_TPSFIX_LOG are repository variables (Settings &gt;
+        # Secrets and variables &gt; Actions &gt; Variables) naming folders on the runner machine; without
+        # them release.ps1 refuses to publish an unqualified build.
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tools\release.ps1 -Version ${{ github.ref_name }} -Extra &quot;${{ vars.TPSCLI_EXTRA }}&quot; -Expected &quot;${{ vars.TPSCLI_EXPECTED }}&quot; -TpsFixLog &quot;${{ vars.TPSCLI_TPSFIX_LOG }}&quot;
+      - name: Publish the GitHub Release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create ${{ github.ref_name }} (Get-Item release\*.zip).FullName (Get-Item release\*.sha256).FullName --title &quot;tpscli ${{ github.ref_name }}&quot; --notes-file release\notes.md</code></pre>The runner needs git, Node 20, Python 3 (the CLI suites use it for CRLF checks only if you add them; release.ps1 does not), Clarion 12 and <code>gh</code> on its PATH; this machine has all of them. <code>${{ github.token }}</code> is enough for <code>gh release create</code> in the same repository with <code>contents: write</code>.</li><li class="step"><span class="t">Document installing from a release and cutting one.</span> Root <code>README.md</code>, a new section before "Install the MCP server":<pre><code>## Install from a release
+
+Releases (`https://github.com/&lt;owner&gt;/tpscli/releases`) carry one zip per version,
+`tpscli-&lt;version&gt;-win-x64.zip`, with its SHA-256 beside it. Unzip it anywhere; it holds
+`dist\server.js` with `tpscli.exe` beside it, the production `node_modules`, `tools\call.js`
+and the guides under `docs\`. With Node 20 or later installed, register the server:
+
+```
+claude mcp add -s user tpscli -- node &quot;C:\tools\tpscli-0.2.0-win-x64\dist\server.js&quot; --allow-writes
+```
+
+No build, no npm. `node tools\call.js tps_version` from the unzipped folder checks the install.
+
+## Cutting a release (maintainers)
+
+A push of a tag `v&lt;version&gt;` runs `.github\workflows\release.yml` on the self-hosted Windows
+runner labelled `clarion`; it runs `tools\release.ps1` (the CLI gate `cli\verify.ps1`, `npm ci`,
+`npm run build`, `npm test`, then the zip) and publishes the zip, its `.sha256` and `notes.md`
+as a GitHub Release. `&lt;version&gt;` must equal `mcp\package.json`&#x27;s version. The workflow passes the
+real-file inputs of `cli\verify.ps1` from the repository variables `TPSCLI_EXTRA`, `TPSCLI_EXPECTED`
+and `TPSCLI_TPSFIX_LOG` (folders and a log on the runner machine); `release.ps1` refuses to package a
+run that skipped those checks unless `-AllowSkips` is given. Without the runner, run `tools\release.ps1`
+by hand with the same three arguments and `gh release create v&lt;version&gt; release\*.zip
+release\*.sha256 --notes-file release\notes.md`.</code></pre>Replace <code>&lt;owner&gt;</code> with the GitHub account once the repository exists (the owner's step below). <code>mcp\README.md</code>: at the top of the install section, one sentence: "Prefer the release zip (root README, *Install from a release*): no build, the exe is inside `dist\`." The MCP guide's "Build once" gets a sentence before step 1: "If you have a release zip, skip this: unzip it and go to *Register*; the exe is already inside `dist\`." and "Move the server to another machine" step 1 gains: "or simply copy the release zip and unzip it there."</li><li class="step"><span class="t">Owner steps, in order (recorded here; performed by the owner, not by a subagent).</span> <ol><li>Create the repository and push the branch (the repo has no remote today):<pre><code>gh repo create tpscli --private --source . --remote origin --push</code></pre></li><li>Register the runner: GitHub &rarr; the repository &rarr; Settings &rarr; Actions &rarr; Runners &rarr; New self-hosted runner &rarr; Windows x64; run the shown download and <code>config.cmd</code> commands on this machine with <code>--labels clarion --runasservice</code> so the runner starts with Windows. Confirm it shows "Idle" with labels self-hosted, windows, x64, clarion. Then Settings &rarr; Secrets and variables &rarr; Actions &rarr; Variables: <code>TPSCLI_EXTRA</code>, <code>TPSCLI_EXPECTED</code>, <code>TPSCLI_TPSFIX_LOG</code> with the paths <code>clierify.ps1</code>'s header describes (the dtpos copies, their dictionary-export JSON, the TPSFix log), all on the runner machine.</li><li>After the branch is merged (finishing-a-development-branch), from <code>main</code>:<pre><code>git tag v0.2.0
+git push origin main --tags</code></pre>The workflow runs; <code>gh release view v0.2.0</code> shows the zip, the .sha256 and the notes.</li></ol>Until step 1 is done the workflow cannot be exercised; the dry run and the full local run in this task are the verification of everything but the Actions trigger, and the report says so.</li><li class="step"><span class="t">Simplify.</span> Run <code>/simplify</code> over <code>mcp/src</code>, <code>mcp/test</code>, <code>mcp/tools/call.js</code>, <code>cli/tests/readonly.ps1</code> and <code>tools/release.ps1</code>; apply the fixes that keep every test green; re-run <code>npm test</code> from <code>mcp\</code> and <code>tests\readonly.ps1</code> from <code>cli\</code>.<p class="expect">Expected: 40 pass; readonly.ps1: OK.</p></li><li class="step"><span class="t">Line endings and final commit.</span> CRLF check on release.ps1, release.yml, .gitignore, both READMEs and the guide: lone-LF 0.<pre><code>git add .gitignore tools/release.ps1 .github/workflows/release.yml README.md mcp/README.md docs/UserGuide/TpscliMcp-IT-Support-User-Guide.html
+git commit -F - &lt;&lt;&#x27;EOF&#x27;
+release: tools/release.ps1 packs exe + server + guides into one zip; workflow publishes it on a v* tag from the self-hosted runner
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+Claude-Session: https://claude.ai/code/session_01ND3nU1mjop1vRk5BYdANtF
+EOF</code></pre></li>        </ol>
+      </section>
+      <h2>Risks and how the plan meets them</h2>
+      <table>
+        <thead><tr><th>Risk</th><th>Where it is met</th></tr></thead>
+        <tbody>
+          <tr><td>The TopSpeed driver refuses a ReadOnly open of a reconstructed structure.</td><td>Task 1 step 7 stops with BLOCKED and the exact codes; the controller chooses the fallback (spec &sect;5 watch-point) before anything else builds on the exe.</td></tr>
+          <tr><td>The deny-write ACE does not reach the file, so the ACL case passes for the wrong reason.</td><td>Task 1's UPDATE control must fail before the SELECT is credited; a machine that blocks <code>icacls</code> fails the suite visibly.</td></tr>
+          <tr><td>The setter leaks into other tests through the shared <code>base</code> config.</td><td>Task 2: <code>createServer</code> copies the roots; the test asserts <code>base.roots</code> and a second server are untouched.</td></tr>
+          <tr><td>A filesystem exception escapes as an SDK text error.</td><td>Task 3: <code>fsGuard</code> around every <code>fs</code> call in both tools; the broken-root test forces <code>readdirSync</code> to throw.</td></tr>
+          <tr><td><code>tps_set_roots</code> then <code>tps_list_files</code> cannot be exercised by call.js, one process per call.</td><td>Task 3 teaches call.js a comma-separated tool list on one server; Task 5's TC-05 step 5 uses it.</td></tr>
+          <tr><td>A hosted GitHub runner cannot build the exe.</td><td>Task 6 targets a self-hosted runner labelled <code>clarion</code>; <code>release.ps1</code> runs by hand for a release without the runner.</td></tr>
+          <tr><td>The workflow cannot be tested before the repository has a remote.</td><td>Task 6 verifies the script locally (dry run, full run, install from the zip) and names the Actions trigger as the one unverified piece; the owner steps close it.</td></tr>
+          <tr><td>The CONFIG instrument's real-data run is a session action, not a script.</td><td>Task 5 rewrites the cases and commits them; the run stays an owner gate performed as it was on 2026-09-20.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Self-review</h2>
+      <ul>
+        <li><strong>Spec coverage.</strong> &sect;3 tps_set_roots: Task 2. &sect;4 tps_list_files and NO_ROOT: Task 3. &sect;5 CLI open modes, --parse-only, docs: Task 1. &sect;6 codes and messages: Tasks 2-3 (asserted to the character). &sect;7 data flow: Task 3's call.js proof and e2e case walk it. &sect;8 CLI test, server unit tests, e2e, instruments: Tasks 1, 2, 3, 5. &sect;9 documents, tickets, version 0.2.0: Tasks 2 and 4. &sect;10 non-goals respected: no persistence, no add/remove, no other runtime flag. The release is outside the spec by the owner's later request and is Task 6.</li>
+        <li><strong>Placeholders.</strong> None: every edit shows the text; every command shows its expected output; the owner steps are commands, not "set up a runner".</li>
+        <li><strong>Type and name consistency.</strong> <code>roots</code>, <code>folderArg</code>, <code>fsGuard</code> are defined in Task 2 and used by name in Task 3; the messages asserted in Task 2/3 tests, in Task 5's runner and in Task 4's guide rows are the same strings as the server code; <code>Open(BYTE writing)</code> in the .inc matches the .clw and both call sites; the zip name <code>tpscli-0.2.0-win-x64</code> is the same in the script, the dry run and the README.</li>
+        <li><strong>Ablation.</strong> <code>fsGuard</code>: without it Task 3's broken-root test fails (SDK text error); <code>folderArg</code>: two callers with the same three rules; <code>Run</code> in release.ps1: five callers that all need Push/Pop-Location and the exit-code check; the call.js sequence form: without it TC-05 step 5 has no way to run. Nothing else was added.</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>
